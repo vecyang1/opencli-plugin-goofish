@@ -57,6 +57,7 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu search` | `[read]` | 全网高级搜索二手商品 | `<query> [--sort 综合/新发布/价格] [--min-price] [--max-price] [--tags] [--page-num 1]` |
 | `opencli xianyu detail` | `[read]` | 获取指定商品详情与卖家信誉档案 | `<item_id>` |
 | `opencli xianyu seller` | `[read]` | 深度分析卖家画像、在售SKU全貌、历史买家评价与砍价博弈策略 | `<user_id/url/item_id> [--limit 20]` |
+| `opencli xianyu recommend` | `[read]` | 提取商品页面「为你推荐」相似竞品、隐藏好价替代品与生态SKU | `<item_id/url> [--limit 20] [--filter all/same/gear/study]` |
 | `opencli xianyu inbox` | `[read]` | 获取私信联系人列表 (向下虚拟滚动加载) | `[query] [--limit 30] [--scrolls 6] [--unread-only]` |
 | `opencli xianyu messages` | `[read]` | 读取指定联系人聊天消息历史 (向上逆向滚动) | `<contact> [--limit 50] [--scrolls 5]` |
 | `opencli xianyu chat` | `[write]` | 向指定联系人发送或回复私信 | `<contact> <message> [--dry-run]` |
@@ -99,6 +100,9 @@ opencli xianyu detail 1076198967894 -f yaml
 
 # 深度分析卖家在售SKU全貌、历史买家评价与智能砍价博弈策略
 opencli xianyu seller 4108054065 -f yaml
+
+# 提取商品详情页「为你推荐」相似竞品与周边生态好价 SKU
+opencli xianyu recommend 1076198967894 --filter same -f table
 ```
 
 ### 5. IM 私信会话管理与聊天记录回溯
