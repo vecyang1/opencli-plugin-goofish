@@ -61,8 +61,12 @@ export const command = cli({
       targetUrl = 'https://www.goofish.com/personal?userId=' + target;
     }
 
-    await page.goto(targetUrl);
-    await page.wait(4);
+    await page.evaluate((u) => {
+      if (!window.location.href.includes(u)) {
+        window.location.href = u;
+      }
+    }, targetUrl);
+    await page.wait(3.5);
 
     const isAuth = await page.evaluate(() => {
       const text = document.body ? document.body.innerText : '';

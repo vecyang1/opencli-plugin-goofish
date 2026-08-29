@@ -1,5 +1,5 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError, ArgumentError } from '@jackwener/opencli/errors';
+import { ArgumentError } from '@jackwener/opencli/errors';
 
 export const command = cli({
   site: 'goofish',
@@ -39,24 +39,17 @@ export const command = cli({
     } catch (e) {}
 
     const url = 'https://www.goofish.com/item?id=' + itemId;
-    await page.goto(url);
+    await page.evaluate((u) => {
+      window.location.href = u;
+    }, url);
     await page.wait(3.5);
 
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('为你推荐') || text.includes('想要') || text.includes('浏览') || text.includes('￥') || text.includes('¥');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
-
-    // Smooth scroll down to trigger recommendation loader
-    for (let i = 0; i < 3; i++) {
+    // Scroll down to bottom to trigger Vue/React recommendations
+    for (let scrollStep = 0; scrollStep < 4; scrollStep++) {
       await page.evaluate(() => {
-        window.scrollBy(0, 1200);
+        window.scrollBy(0, 1000);
       });
-      await page.wait(1.8);
+      await page.wait(1.2);
     }
 
     const recs = await page.evaluate((targetItemId) => {
