@@ -102,14 +102,14 @@ opencli xianyu detail 1053427174826 -f yaml
 # 列出最近 15 位联系人
 opencli xianyu inbox --limit 15 -f table
 
-# 向上加载回溯与「教育优惠」的最近 20 条聊天记录
-opencli xianyu messages "教育优惠" --limit 20 -f table
+# 向上加载回溯与「吉他小铺」的最近 20 条聊天记录
+opencli xianyu messages "吉他小铺" --limit 20 -f table
 
 # 空跑测试回复
-opencli xianyu chat "教育优惠" "你好，请问今天能发货吗？" --dry-run -f table
+opencli xianyu chat "吉他小铺" "你好，请问宝贝还在吗？" --dry-run -f table
 
 # 正式发送私信
-opencli xianyu chat "教育优惠" "你好，请问今天能发货吗？" -f table
+opencli xianyu chat "吉他小铺" "你好，请问宝贝还在吗？" -f table
 ```
 
 ### 6. 数据报表导出

@@ -11,7 +11,7 @@ export const command = cli({
   browser: true,
   navigateBefore: false,
   args: [
-    { name: 'contact', positional: true, required: true, help: '联系人昵称或关键词 (如: 教育优惠, 秦时明月, 大橘日本代购跑腿)' },
+    { name: 'contact', positional: true, required: true, help: '联系人昵称或关键词 (如: 吉他小铺, 数码玩家)' },
     { name: 'limit', type: 'int', default: 50, help: '最大读取消息条数 (默认 50)' },
     { name: 'scrolls', type: 'int', default: 5, help: '向上滚动加载更早历史消息的轮数 (默认 5)' },
   ],
@@ -25,7 +25,7 @@ export const command = cli({
   func: async (page, kwargs) => {
     const contactQuery = String(kwargs.contact || kwargs._?.[0] || '').trim();
     if (!contactQuery) {
-      throw new ArgumentError('请指定要查询消息的联系人昵称 (如: opencli xianyu messages "教育优惠")');
+      throw new ArgumentError('请指定要查询消息的联系人昵称 (如: opencli xianyu messages "吉他小铺")');
     }
     const limit = Math.max(5, Math.min(Number(kwargs.limit) || 50, 200));
     const maxScrolls = Math.max(1, Math.min(Number(kwargs.scrolls) || 5, 20));
@@ -35,7 +35,7 @@ export const command = cli({
 
     const isAuth = await page.evaluate(() => {
       const text = document.body ? document.body.innerText : '';
-      return text.includes('消息') || text.includes('通知消息') || text.includes('Vector_Y');
+      return text.includes('消息') || text.includes('通知消息') || text.includes('设置');
     });
 
     if (!isAuth) {
@@ -113,8 +113,8 @@ export const command = cli({
         const text = it.innerText || '';
         const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
         
-        let sender = isSelf ? 'Vector_Y (我)' : (lines[0] || '对方');
-        let contentLines = lines.filter(l => l !== 'Vector_Y' && l !== '已读' && l !== '未读' && l !== '领取绑卡');
+        let sender = isSelf ? '我 (Buyer)' : (lines[0] || '对方');
+        let contentLines = lines.filter(l => l !== '已读' && l !== '未读' && l !== '领取绑卡');
         if (!isSelf && contentLines[0] === sender) {
           contentLines = contentLines.slice(1);
         }
