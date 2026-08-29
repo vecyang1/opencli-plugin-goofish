@@ -26,7 +26,7 @@ export const command = cli({
     'description',
   ],
   func: async (page, kwargs) => {
-    let itemId = String(kwargs.id || '').trim();
+    let itemId = String(kwargs.id || kwargs._?.[0] || '').trim();
     if (itemId.startsWith('http')) {
       try {
         itemId = new URL(itemId).searchParams.get('id') || itemId;

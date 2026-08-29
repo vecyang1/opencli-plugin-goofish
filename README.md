@@ -1,88 +1,139 @@
-# 🐟 opencli-plugin-goofish
+# 🐟 opencli-plugin-goofish (闲鱼 OpenCLI 生产级插件)
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![OpenCLI](https://img.shields.io/badge/OpenCLI->=1.8.6-orange.svg)](https://github.com/jackwener/OpenCLI)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![OpenCLI](https://img.shields.io/badge/OpenCLI-Plugin-orange.svg)](https://github.com/jackwener/opencli)
+[![Node: >=18](https://img.shields.io/badge/Node-%3E%3D18-green.svg)]()
 
-> **Goofish (闲鱼) Buyer 10-Year Order History, Favorites Collection, Personal Profile & Published Items, Account Security, Search, and AI Reasoning Suite for OpenCLI.**
-
-闲鱼买家已买到的宝贝（十余年滚动翻页历史订单）、宝贝收藏夹、个人主页与发布管理、账号安全、全网搜物与智能消费洞察套件。
-
----
-
-## 🌟 Highlights
-
-1. **👑 Zero-Risk & No Captchas (零风控与免验证码)**: Directly reuses authenticated Chrome browser sessions via OpenCLI's Browser Bridge — zero credentials stored locally, zero risk of triggering anti-bot security challenges.
-2. **⚡ Deep Backward Virtual Scroll (十余年订单长河滚动拉取)**: Seamless infinite scrolling engine designed specifically for `goofish.com/bought` and `goofish.com/collection`, automatically paging through years of purchase records.
-3. **📦 Multi-Dimensional Xianyu Suite (全维度闲鱼指令矩阵)**:
-   - `opencli goofish orders`: Extract historical orders across status tabs (`全部`, `待付款`, `待发货`, `待收货`, `待评价`, `退款中`).
-   - `opencli goofish favorites`: Extract collected items with price drop tracking and sale status.
-   - `opencli goofish personal`: View user profile, location, followers/following, credit rating, and total published count.
-   - `opencli goofish published`: Scroll and extract all items published and sold on user's personal page.
-   - `opencli goofish search`: Second-hand goods search with prices, locations, want counts, and seller credit badges.
-   - `opencli goofish detail`: Full product specification, seller longevity, and description inspector.
-   - `opencli goofish account`: Real-name and Alipay authentication audit.
-   - `opencli goofish whoami`: Instant identity check for active session.
-4. **🧠 AI Semantic Reasoning (智能消费与履约分析)**:
-   - `opencli goofish reason`: Computes historical spending totals, top seller relationships, unfulfilled order alerts, and second-hand habits.
-5. **📁 Multi-Format Export (结构化导出)**:
-   - `opencli goofish export`: Export orders and collections to Markdown, JSON, HTML, or CSV.
+> **闲鱼 (Goofish.com) 生产级 Agent-Native 终端适配器与数据自动化套件。**  
+> 一键通过 OpenCLI 操作闲鱼十余年历史订单拉取、收藏夹分类与降价监控、全网多维度二手搜索、完整 IM 私信收发与历史回溯、个人在售列表、账号安全认证状态与 AI 消费推断报表。
 
 ---
 
-## 🚀 Installation
+## ⚡ 核心能力一览
 
+- 👤 **身份与主页画像**: `whoami`, `personal`, `account` (快速确认登录态、昵称、城市、粉丝、信用极好/优秀徽章与实人/支付宝认证)
+- 📦 **十余年历史订单**: `orders` (支持十余年跨页滚动加载、`全部/待付款/待发货/待收货/待评价/退款中` 状态筛选与关键词搜索)
+- ⭐ **收藏夹与降价监控**: `favorites` (支持分类Tab筛选、自动提取降价幅度如 `降¥179.00`、在售与已失效状态)
+- 🛍️ **全网高级搜索**: `search` (支持综合/新降价/新发布/价格排序、`--min-price` / `--max-price` 价格区间、8种商品标签筛选与分页跳转)
+- 💬 **完整 IM 私信交互**:
+  - `inbox`: 驱动虚拟滚动列表向下持续加载历史联系人 (`.rc-virtual-list-holder`)，提取交易状态与最新消息摘要。
+  - `messages`: 驱动逆序聊天容器向上自动滚动加载早期消息 (`#msg-list-container`)，精准区分发送方、文本与链接。
+  - `chat` / `reply`: 向联系人发送或回复私信，内置 `--dry-run` 空跑模式确保安全。
+- 📊 **智能消费与看板**: `reason` (统计总流水、高频卖家、待发货预警与消费画像), `stats` (一站式资产与待办看板)
+- 📑 **多格式数据导出**: `export` (一键将订单或收藏夹导出为交互式 HTML、Markdown 表格或 JSON 结构体)
+
+---
+
+## 🚀 安装与启用
+
+### 方式 1: 本地开发与链接 (推荐)
 ```bash
-opencli plugin install github:vecyang1/opencli-plugin-goofish
+# 1. 克隆本仓库到本地
+git clone https://github.com/vecyang1/opencli-plugin-goofish.git ~/Documents/A-coding/opencli-plugin-goofish
+
+# 2. 链接适配器至 OpenCLI 配置目录 (同时注册 goofish 和 xianyu 别名)
+mkdir -p ~/.opencli/clis/goofish ~/.opencli/clis/xianyu
+cp -r ~/Documents/A-coding/opencli-plugin-goofish/clis/goofish/*.js ~/.opencli/clis/goofish/
+cp -r ~/Documents/A-coding/opencli-plugin-goofish/clis/goofish/*.js ~/.opencli/clis/xianyu/
 ```
 
-Or manually link into your local OpenCLI clis directory:
+### 方式 2: 使用 OpenCLI 插件管理器
 ```bash
-cp -r clis/goofish ~/.opencli/clis/
-```
-
----
-
-## 📖 Available Commands
-
-```bash
-# 1. Check logged-in Goofish identity
-opencli goofish whoami
-
-# 2. View personal profile summary & credit rating
-opencli goofish personal -f table
-
-# 3. Extract 10-year historical orders (with infinite scroll pagination)
-opencli goofish orders --limit 30 -f table
-opencli goofish orders --status "待发货" -f table
-opencli goofish orders "吉他" --limit 50 -f table
-opencli goofish orders --all -f table
-
-# 4. View favorite / collected items
-opencli goofish favorites --limit 30 -f table
-opencli goofish favorites --tab "降价宝贝" -f table
-
-# 5. Extract published items
-opencli goofish published --limit 30 -f table
-
-# 6. Search items on Goofish
-opencli goofish search "MacBook M3" --limit 20 -f table
-
-# 7. View item details
-opencli goofish detail 1059195860101 -f yaml
-
-# 8. View account security & verification status
-opencli goofish account -f table
-
-# 9. AI reasoning & spending analysis
-opencli goofish reason -f yaml
-
-# 10. Export orders or favorites to Markdown / HTML / JSON
-opencli goofish export orders --output ./goofish-orders.md
-opencli goofish export favorites --file-type html --output ./favorites.html
+opencli plugin install ./opencli-plugin-goofish
 ```
 
 ---
 
-## 📄 License
+## 📖 命令完整手册 (Command Reference)
 
-This project is licensed under the [GNU Affero General Public License v3.0 (AGPL-3.0-or-later)](./LICENSE).
+| 命令 | 类型 | 说明 | 核心参数与选项 |
+| :--- | :--- | :--- | :--- |
+| `opencli xianyu whoami` | `[read]` | 检查当前登录的闲鱼账号身份与信用等级 | `-f table/json/yaml` |
+| `opencli xianyu personal` | `[read]` | 获取个人主页概览 (城市、粉丝、宝贝数、信用评级) | `-f table/yaml` |
+| `opencli xianyu account` | `[read]` | 查看账号基本信息、实人认证、支付宝实名与身份信息 | `-f table/yaml` |
+| `opencli xianyu orders` | `[read]` | 获取已买到的宝贝历史订单 (十余年翻页) | `[query] [--limit 50] [--status 全部] [--all]` |
+| `opencli xianyu favorites` | `[read]` | 查看收藏夹宝贝与降价监控 | `[query] [--tab 全部/降价宝贝/有效宝贝] [--limit 30]` |
+| `opencli xianyu published` | `[read]` | 获取个人发布在售与已卖出闲置列表 | `[query] [--limit 30] [--all]` |
+| `opencli xianyu search` | `[read]` | 全网高级搜索二手商品 | `<query> [--sort 综合/新发布/价格] [--min-price] [--max-price] [--tags] [--page-num 1]` |
+| `opencli xianyu detail` | `[read]` | 获取指定商品详情与卖家信誉档案 | `<item_id>` |
+| `opencli xianyu inbox` | `[read]` | 获取私信联系人列表 (向下虚拟滚动加载) | `[query] [--limit 30] [--scrolls 6] [--unread-only]` |
+| `opencli xianyu messages` | `[read]` | 读取指定联系人聊天消息历史 (向上逆向滚动) | `<contact> [--limit 50] [--scrolls 5]` |
+| `opencli xianyu chat` | `[write]` | 向指定联系人发送或回复私信 | `<contact> <message> [--dry-run]` |
+| `opencli xianyu reason` | `[read]` | 智能消费推断分析 (流水、高频卖家、待发货预警) | `[query] [--limit 50]` |
+| `opencli xianyu stats` | `[read]` | 个人资产、订单待办与消息看板 | `-f table/yaml` |
+| `opencli xianyu export` | `[read]` | 将订单或收藏导出为 Markdown、JSON 或 HTML 报表 | `[type orders/favorites] [--output path] [--file-type md/html/json]` |
+
+---
+
+## 💡 典型使用示例
+
+### 1. 检查账号状态与一站式资产看板
+```bash
+opencli xianyu whoami -f table
+opencli xianyu stats -f table
+```
+
+### 2. 跨页检索历史订单
+```bash
+# 检索最近 20 笔订单
+opencli xianyu orders --limit 20 -f table
+
+# 筛选包含「吉他」关键词的全部历史订单
+opencli xianyu orders "吉他" --status 全部 -f table
+```
+
+### 3. 查看收藏夹并监控降价宝贝
+```bash
+# 查看降价分类下的所有收藏
+opencli xianyu favorites --tab 降价宝贝 -f table
+```
+
+### 4. 全网二手高级搜索与比价
+```bash
+# 搜索「吉他」，按新发布排序，价格在 50~500 元之间，筛选「个人闲置」和「包邮」
+opencli xianyu search "吉他" --sort new_publish --min-price 50 --max-price 500 --tags 个人闲置,包邮 --limit 10 -f table
+
+# 查看特定商品详情
+opencli xianyu detail 1053427174826 -f yaml
+```
+
+### 5. IM 私信会话管理与聊天记录回溯
+```bash
+# 列出最近 15 位联系人
+opencli xianyu inbox --limit 15 -f table
+
+# 向上加载回溯与「教育优惠」的最近 20 条聊天记录
+opencli xianyu messages "教育优惠" --limit 20 -f table
+
+# 空跑测试回复
+opencli xianyu chat "教育优惠" "你好，请问今天能发货吗？" --dry-run -f table
+
+# 正式发送私信
+opencli xianyu chat "教育优惠" "你好，请问今天能发货吗？" -f table
+```
+
+### 6. 数据报表导出
+```bash
+# 导出历史订单为 Markdown 流水清单
+opencli xianyu export orders --limit 50 --output ./my-orders.md
+
+# 导出收藏夹为美观的 HTML 交互报表
+opencli xianyu export favorites --file-type html --output ./my-favorites.html
+```
+
+---
+
+## 🛠️ 技术架构与第一性原理
+
+1. **虚拟滚动技术适配 (Virtual List Downward Loading)**:
+   闲鱼联系人列表采用 `.rc-virtual-list-holder` 进行动态 DOM 渲染。适配器自动在浏览器内执行分段步进滚动并派发 `scroll` 事件，动态捕获所有离屏联系人数据。
+2. **逆序消息流回溯 (Reverse Message Scroll Loading)**:
+   聊天窗口为 `#msg-list-container` 逆向滚动容器。适配器通过对容器 `scrollTop = 0` 的精准触发，自动拉取历史聊天气泡并解析发送者角色、文字与富文本链接。
+3. **SPA 状态自愈与认证校验 (Self-Healing Auth)**:
+   每个命令均包含轻量级会话嗅探机制，当检测到登录态失效时精准抛出 `AuthRequiredError`，引导用户在 Chrome 浏览器中无缝续期。
+
+---
+
+## 📄 许可证
+
+本项目采用 [AGPL-3.0-or-later](LICENSE) 协议开源。
