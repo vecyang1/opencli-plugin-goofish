@@ -1,0 +1,6 @@
+{
+  "name": "goofish",
+  "version": "1.0.0",
+  "description": "Goofish (闲鱼) buyer order history, favorites, personal profile, published items, account security, search, and AI reasoning suite for OpenCLI",
+  "opencli": ">=1.8.6"
+}

@@ -1,0 +1,30 @@
+{
+  "name": "opencli-plugin-goofish",
+  "version": "1.0.0",
+  "description": "Goofish (闲鱼) buyer order history, favorites, personal profile, published items, account security, search, and AI reasoning suite for OpenCLI",
+  "type": "module",
+  "main": "opencli-plugin.json",
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "opencli",
+    "opencli-plugin",
+    "goofish",
+    "xianyu",
+    "orders",
+    "favorites",
+    "personal",
+    "ecommerce",
+    "agentic"
+  ],
+  "author": "Vec Yang",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vecyang1/opencli-plugin-goofish.git"
+  },
+  "peerDependencies": {
+    "@jackwener/opencli": ">=1.8.6"
+  }
+}
