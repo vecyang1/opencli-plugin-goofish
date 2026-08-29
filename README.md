@@ -54,7 +54,8 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu orders` | `[read]` | 获取已买到的宝贝历史订单 (十余年翻页) | `[query] [--limit 50] [--status 全部] [--all]` |
 | `opencli xianyu favorites` | `[read]` | 查看收藏夹宝贝与降价监控 | `[query] [--tab 全部/降价宝贝/有效宝贝] [--limit 30]` |
 | `opencli xianyu published` | `[read]` | 获取个人发布在售与已卖出闲置列表 | `[query] [--limit 30] [--all]` |
-| `opencli xianyu search` | `[read]` | 全网高级搜索二手商品 | `<query> [--sort 综合/新发布/价格] [--min-price] [--max-price] [--tags] [--page-num 1]` |
+| `opencli xianyu search` | `[read]` | 全网高级搜索二手商品 (地区/排序/价格/标签/降价) | `<query> [--region 珠三角/广东] [--sort 综合/新发布/新降价/价格] [--min-price] [--max-price] [--tags] [--page-num 1]` |
+| `opencli xianyu suggest` | `[read]` | 获取闲鱼全网热搜词与搜索关键词联想补全 | `[query] [--limit 20]` |
 | `opencli xianyu detail` | `[read]` | 获取指定商品详情与卖家信誉档案 | `<item_id>` |
 | `opencli xianyu seller` | `[read]` | 深度分析卖家画像、在售SKU全貌、历史买家评价与砍价博弈策略 | `<user_id/url/item_id> [--limit 20]` |
 | `opencli xianyu recommend` | `[read]` | 提取商品页面「为你推荐」相似竞品、隐藏好价替代品与生态SKU | `<item_id/url> [--limit 20] [--filter all/same/gear/study]` |
@@ -94,6 +95,13 @@ opencli xianyu favorites --tab 降价宝贝 -f table
 ```bash
 # 搜索「吉他」，按新发布排序，价格在 50~500 元之间，筛选「个人闲置」和「包邮」
 opencli xianyu search "吉他" --sort new_publish --min-price 50 --max-price 500 --tags 个人闲置,包邮 --limit 10 -f table
+
+# 区域精准筛选 (如: 筛选广东/珠三角地区的「nexg2」二手在售吉他)
+opencli xianyu search "nexg2" --region 广东 --limit 10 -f table
+
+# 获取平台实时热搜关键词或特定前缀联想词
+opencli xianyu suggest -f table
+opencli xianyu suggest "nexg" -f table
 
 # 查看特定商品详情
 opencli xianyu detail 1076198967894 -f yaml
