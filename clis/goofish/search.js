@@ -1,11 +1,11 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { ArgumentError, AuthRequiredError } from '@jackwener/opencli/errors';
+import { ArgumentError } from '@jackwener/opencli/errors';
 
 export const command = cli({
   site: 'goofish',
   name: 'search',
   access: 'read',
-  description: '在闲鱼全网搜索二手商品 (支持地域筛选、排序、价格区间、8大官方标签、降价监控与多页连续拉取)',
+  description: '在闲鱼全网搜索二手商品 (默认全国范围搜索，可选指定地区、排序、价格区间、8大官方标签、降价监控与分页)',
   domain: 'www.goofish.com',
   strategy: Strategy.COOKIE,
   browser: true,
@@ -13,7 +13,7 @@ export const command = cli({
   args: [
     { name: 'query', positional: true, required: true, help: '搜索关键词 (如: nexg2, 吉他, iPad, 显卡)' },
     { name: 'sort', type: 'str', default: '综合', help: '排序方式: 综合 (default), 新降价, 新发布, 价格, 价格升序, 价格降序' },
-    { name: 'region', type: 'str', required: false, help: '地区筛选: 全国, 珠三角, 江浙沪, 京津冀, 东三省, 或各省市 (如: 广东, 北京, 上海, 浙江, 江苏, 辽宁, 云南)' },
+    { name: 'region', type: 'str', required: false, help: '可选地区筛选 (默认全国不限): 全国, 珠三角, 江浙沪, 京津冀, 东三省, 广东, 北京, 上海, 浙江等' },
     { name: 'min-price', type: 'str', required: false, help: '最低价格筛选 (如: 50)' },
     { name: 'max-price', type: 'str', required: false, help: '最高价格筛选 (如: 500)' },
     { name: 'tags', type: 'str', required: false, help: '标签筛选，英文逗号分隔 (个人闲置, 验货宝, 验号担保, 包邮, 超赞鱼小铺, 全新, 严选, 转卖)' },
@@ -47,19 +47,11 @@ export const command = cli({
     const tags = kwargs.tags ? String(kwargs.tags).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
     const pageNum = Math.max(1, Number(kwargs['page-num']) || 1);
 
-    await page.goto('https://www.goofish.com/search?q=' + encodeURIComponent(query));
+    const searchUrl = 'https://www.goofish.com/search?q=' + encodeURIComponent(query);
+    await page.goto(searchUrl);
     await page.wait(4);
 
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('综合') || text.includes('新发布') || text.includes('价格') || text.includes('区域') || text.includes('Vector_Y');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
-
-    // 1. Regional Filter
+    // 1. Regional Filter (Only when explicitly specified, defaults to nationwide 全国)
     if (region && region !== '全国') {
       const regionClicked = await page.evaluate((targetRegion) => {
         const regBtn = Array.from(document.querySelectorAll('div, span, button')).find(el => {
@@ -183,6 +175,10 @@ export const command = cli({
         try {
           itemId = new URL(a.href, window.location.origin).searchParams.get('id') || '';
         } catch (e) {}
+        if (!itemId) {
+          const m = (a.href || '').match(/[?&]id=(\d+)/);
+          if (m) itemId = m[1];
+        }
 
         const text = a.innerText || '';
         const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
@@ -276,8 +272,9 @@ export const command = cli({
     const seen = new Set();
     let deduplicated = [];
     for (const it of (items || [])) {
-      if (it.item_id && it.item_id !== '-' && !seen.has(it.item_id)) {
-        seen.add(it.item_id);
+      const key = it.item_id !== '-' ? it.item_id : (it.title + '_' + it.price);
+      if (!seen.has(key)) {
+        seen.add(key);
         deduplicated.push(it);
       }
     }
