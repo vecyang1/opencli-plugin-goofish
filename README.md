@@ -56,6 +56,7 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu published` | `[read]` | 获取个人发布在售与已卖出闲置列表 | `[query] [--limit 30] [--all]` |
 | `opencli xianyu search` | `[read]` | 全网高级搜索二手商品 | `<query> [--sort 综合/新发布/价格] [--min-price] [--max-price] [--tags] [--page-num 1]` |
 | `opencli xianyu detail` | `[read]` | 获取指定商品详情与卖家信誉档案 | `<item_id>` |
+| `opencli xianyu seller` | `[read]` | 深度分析卖家画像、在售SKU全貌、历史买家评价与砍价博弈策略 | `<user_id/url/item_id> [--limit 20]` |
 | `opencli xianyu inbox` | `[read]` | 获取私信联系人列表 (向下虚拟滚动加载) | `[query] [--limit 30] [--scrolls 6] [--unread-only]` |
 | `opencli xianyu messages` | `[read]` | 读取指定联系人聊天消息历史 (向上逆向滚动) | `<contact> [--limit 50] [--scrolls 5]` |
 | `opencli xianyu chat` | `[write]` | 向指定联系人发送或回复私信 | `<contact> <message> [--dry-run]` |
@@ -94,7 +95,10 @@ opencli xianyu favorites --tab 降价宝贝 -f table
 opencli xianyu search "吉他" --sort new_publish --min-price 50 --max-price 500 --tags 个人闲置,包邮 --limit 10 -f table
 
 # 查看特定商品详情
-opencli xianyu detail 1053427174826 -f yaml
+opencli xianyu detail 1076198967894 -f yaml
+
+# 深度分析卖家在售SKU全貌、历史买家评价与智能砍价博弈策略
+opencli xianyu seller 4108054065 -f yaml
 ```
 
 ### 5. IM 私信会话管理与聊天记录回溯
