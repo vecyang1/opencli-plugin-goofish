@@ -5,7 +5,7 @@ export const command = cli({
   site: 'goofish',
   name: 'whoami',
   access: 'read',
-  description: '快速检查当前登录的闲鱼账号身份与信用等级',
+  description: '快速检查当前登录的闲鱼账号身份、所在地与信用等级',
   domain: 'www.goofish.com',
   strategy: Strategy.COOKIE,
   browser: true,

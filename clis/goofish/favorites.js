@@ -43,7 +43,6 @@ export const command = cli({
       throw new AuthRequiredError('goofish');
     }
 
-    // Trigger target tab click to mount feed
     await page.evaluate((tabName) => {
       const tabs = Array.from(document.querySelectorAll('div, span, button')).filter(el => {
         const t = el.innerText ? el.innerText.trim() : '';
