@@ -3,9 +3,10 @@
 # Agent Instructions: opencli-plugin-goofish
 
 ## Single Chokepoint & Transport Architecture
+- **Alias & Surface Parity**: "xianyu cli", "goofish cli", and "闲鱼 CLI" all refer to this plugin. Both `opencli xianyu <subcommand>` and `opencli goofish <subcommand>` route to the exact same 18 command definitions in `clis/goofish/`.
 - All commands execute through OpenCLI's browser runtime (`browser: true, navigateBefore: false, strategy: Strategy.COOKIE`).
 - The browser instance connects to Chrome Profile 2 where the user is permanently authenticated on `https://www.goofish.com`.
-- **Never attempt to bypass OpenCLI's Page evaluate or spawn duplicate headless Chrome instances.**
+- **Never attempt to bypass OpenCLI's Page evaluate or spawn duplicate headless Chrome instances or one-off scrapers.**
 
 ## In-Browser Execution Gotchas & Writing Back
 1. **Virtual List Downward Scrolling (`inbox.js`)**:
