@@ -2,3 +2,6 @@ node_modules/
 *.baiduyun.uploading.cfg
 .DS_Store
 scratch/
+
+# Derived Graphify index — never commit (see A-coding/CLAUDE.md)
+graphify-out/

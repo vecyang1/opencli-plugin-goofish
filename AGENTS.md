@@ -21,6 +21,12 @@
 4. **Column Integrity & Convention Audit**:
    - Every key returned in the command function MUST be declared in the `columns` array (`opencli convention-audit goofish` must remain 0 violations).
    - Never use silent clamping (`Math.min`); throw `ArgumentError` on invalid parameters.
+5. **Transport deadline vs multi-navigation commands (`seller.js`, `recommend.js`, deep scrolls)**:
+   - OpenCLI has **two** independent command timeouts. `OPENCLI_BROWSER_COMMAND_TIMEOUT` (env, default 60s) raises only the CLI-layer runner. The daemon *transport* deadline is a separate hard **120s** (`DEFAULT_COMMAND_TIMEOUT_SECONDS` in `dist/src/browser/daemon-client.js`), and a caller can lift it **only** if the adapter declares a `timeout` arg — `readUserTimeoutSeconds` requires `cmd.args.some(a => a.name === 'timeout')`, otherwise `--timeout`/`OPENCLI_BROWSER_COMMAND_TIMEOUT` never reach the transport.
+   - Consequence: `seller` on a heavy seller (item page → seller profile → SKU scroll → reviews) can genuinely exceed 120s and die with `TIMEOUT: … timed out after 120s; it may still complete in the browser`. Measured 2026-09-03 on a live, logged-in listing. If you need to lift the cap, add a `timeout` positional/option to the adapter's `args`; do not paper over it with the env var, which cannot reach this layer.
+6. **MV3 service-worker flap during a pending extension self-update**:
+   - When Chrome has staged a newer OpenCLI Browser Bridge on disk (e.g. `1.0.24`) while the running worker is still the old version (`1.0.23`), Chrome periodically recycles the worker to apply the update. Short single-page commands (`whoami`, `search`, `detail`) land in a healthy window and pass; long multi-navigation commands span a recycle and fail with `Browser connection dropped after the navigate command was dispatched; it may have completed`.
+   - The tell is `opencli daemon status` printing `Extension update available: vX → vY`. A `opencli daemon restart` and even a full Chrome relaunch do **not** force the update. Fix: open `chrome://extensions`, toggle the OpenCLI extension off then on (or click the Developer-mode Update button). Do not read intermittent drops as adapter bugs.
 
 ## Verification Gate
 Before claiming any modification complete, run:
@@ -31,3 +37,4 @@ and verify the modified command with OpenCLI:
 ```bash
 /Users/vecsatfoxmailcom/.hermes/node/bin/opencli xianyu <command_name> [args] -f table
 ```
+`npm test` (`node --check` + drift guard) is browser-free and always runnable. Live verification of **long** commands (`seller`, `recommend`, deep scrolls) additionally requires a healthy bridge — see gotchas 5–6; if the worker is flapping on a pending update, resolve that first rather than treating a dropped connection as a code failure.
