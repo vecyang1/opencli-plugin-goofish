@@ -31,11 +31,16 @@
 # 1. 克隆本仓库到本地
 git clone https://github.com/vecyang1/opencli-plugin-goofish.git ~/Documents/A-coding/opencli-plugin-goofish
 
-# 2. 链接适配器至 OpenCLI 配置目录 (同时注册 goofish 和 xianyu 别名)
-mkdir -p ~/.opencli/clis/goofish ~/.opencli/clis/xianyu
-cp -r ~/Documents/A-coding/opencli-plugin-goofish/clis/goofish/*.js ~/.opencli/clis/goofish/
-cp -r ~/Documents/A-coding/opencli-plugin-goofish/clis/goofish/*.js ~/.opencli/clis/xianyu/
+# 2. 安装适配器到 OpenCLI 本地覆盖目录 (同时注册 goofish 与 xianyu 两个站点名)
+cd ~/Documents/A-coding/opencli-plugin-goofish && npm run install-adapters
 ```
+
+`install-adapters` 会把 `clis/goofish/*.js` 以**真实文件**复制到 `~/.opencli/clis/goofish/`，再生成一份 `site:` 行改为 `'xianyu'` 的副本到 `~/.opencli/clis/xianyu/`，重启守护进程，并以 `opencli list` 同时列出两个站点的 `whoami` 作为回执。两点不能绕开：
+
+- **OpenCLI 不加载符号链接**（v1.8.7 `dist/src/cli.js` 的 `listJsFiles` 只认真实目录与真实 `.js` 文件），把 `~/.opencli/clis/goofish` 做成软链会让 `opencli goofish *` 整站消失且没有任何报错。
+- **命令按适配器里的 `site:` 字段注册，不按目录名**。直接把 `site: 'goofish'` 的文件复制进 `xianyu/` 目录不会得到 `opencli xianyu *`。
+
+改完 `clis/goofish/` 之后必须重新运行 `npm run install-adapters`，否则正在运行的命令仍是旧副本；`npm test` 里的漂移守卫会在两处不一致时变红。
 
 ### 方式 2: 使用 OpenCLI 插件管理器
 ```bash

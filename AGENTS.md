@@ -3,7 +3,9 @@
 # Agent Instructions: opencli-plugin-goofish
 
 ## Single Chokepoint & Transport Architecture
-- **Alias & Surface Parity**: "xianyu cli", "goofish cli", and "闲鱼 CLI" all refer to this plugin. Both `opencli xianyu <subcommand>` and `opencli goofish <subcommand>` route to the exact same 18 command definitions in `clis/goofish/`.
+- **Alias & Surface Parity**: "xianyu cli", "goofish cli", and "闲鱼 CLI" all refer to this plugin. Both `opencli xianyu <subcommand>` and `opencli goofish <subcommand>` are built from the same 18 command definitions in `clis/goofish/` — but what OpenCLI *serves* is the real-file copies in `~/.opencli/clis/goofish/` and `~/.opencli/clis/xianyu/` written by `npm run install-adapters` (the `xianyu` copy has its `site:` line rewritten; OpenCLI keys commands by that field). Editing `clis/goofish/` changes nothing until the installer runs, and `npm test`'s drift guard stays red until it does. Never symlink a site dir: OpenCLI's loader skips symlinks silently (measured 2026-09-02 — `goofish` had been a symlink since 2026-08-29, so `opencli goofish *` never existed and `xianyu seller` served stale code).
+- **Keep `page.evaluate` in function form** (`page.evaluate(() => …)`), never a template string: `node --check` cannot see inside a template literal, so a `SyntaxError` there only surfaces against a logged-in browser.
+- **Verification order**: `npm test` → `npm run install-adapters` (receipt: `opencli list` shows both sites) → `opencli xianyu login` if `whoami` returns `AUTH_REQUIRED` → run the changed command live.
 - All commands execute through OpenCLI's browser runtime (`browser: true, navigateBefore: false, strategy: Strategy.COOKIE`).
 - The browser instance connects to Chrome Profile 2 where the user is permanently authenticated on `https://www.goofish.com`.
 - **Never attempt to bypass OpenCLI's Page evaluate or spawn duplicate headless Chrome instances or one-off scrapers.**
