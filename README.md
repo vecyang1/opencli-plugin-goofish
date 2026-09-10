@@ -29,10 +29,11 @@
 ### 方式 1: 本地开发与链接 (推荐)
 ```bash
 # 1. 克隆本仓库到本地
-git clone https://github.com/vecyang1/opencli-plugin-goofish.git ~/Documents/A-coding/opencli-plugin-goofish
+git clone https://github.com/vecyang1/opencli-plugin-goofish.git
+cd opencli-plugin-goofish
 
 # 2. 安装适配器到 OpenCLI 本地覆盖目录 (同时注册 goofish 与 xianyu 两个站点名)
-cd ~/Documents/A-coding/opencli-plugin-goofish && npm run install-adapters
+npm run install-adapters
 ```
 
 `install-adapters` 会把 `clis/goofish/*.js` 以**真实文件**复制到 `~/.opencli/clis/goofish/`，再生成一份 `site:` 行改为 `'xianyu'` 的副本到 `~/.opencli/clis/xianyu/`，重启守护进程，并以 `opencli list` 同时列出两个站点的 `whoami` 作为回执。两点不能绕开：
