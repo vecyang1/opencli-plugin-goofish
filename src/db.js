@@ -91,6 +91,47 @@ export function initSchema(db) {
       sender,
       content
     );
+
+    CREATE TABLE IF NOT EXISTS candidates (
+      item_id TEXT PRIMARY KEY,
+      keyword TEXT,
+      category TEXT,
+      title TEXT,
+      price TEXT,
+      price_num REAL,
+      original_price TEXT,
+      price_drop TEXT,
+      publish_time TEXT,
+      location TEXT,
+      seller TEXT,
+      seller_user_id TEXT,
+      seller_tag TEXT,
+      condition TEXT,
+      guarantee TEXT,
+      item_url TEXT,
+      image_url TEXT,
+      seller_status TEXT DEFAULT 'unknown',
+      seller_note TEXT DEFAULT '',
+      status TEXT DEFAULT 'active',
+      updated_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS seller_reviews (
+      seller TEXT PRIMARY KEY,
+      status TEXT,
+      reason TEXT,
+      last_message TEXT,
+      interaction_count INTEGER DEFAULT 1,
+      updated_at TEXT
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS candidates_fts USING fts5(
+      item_id UNINDEXED,
+      title,
+      seller,
+      keyword,
+      category
+    );
   `);
 }
 
@@ -311,6 +352,247 @@ export function queryMessages(contactName, limit = 100) {
 }
 
 /**
+ * Upsert candidates into SQLite SSOT.
+ */
+export function saveCandidates(items, { keyword = '', category = '' } = {}) {
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  const insertCandidate = db.prepare(`
+    INSERT INTO candidates (
+      item_id, keyword, category, title, price, price_num, original_price,
+      price_drop, publish_time, location, seller, seller_user_id,
+      seller_tag, condition, guarantee, item_url, image_url,
+      seller_status, seller_note, status, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(item_id) DO UPDATE SET
+      keyword = COALESCE(NULLIF(excluded.keyword, ''), candidates.keyword),
+      category = COALESCE(NULLIF(excluded.category, ''), candidates.category),
+      title = excluded.title,
+      price = excluded.price,
+      price_num = excluded.price_num,
+      original_price = excluded.original_price,
+      price_drop = excluded.price_drop,
+      publish_time = excluded.publish_time,
+      location = excluded.location,
+      seller = excluded.seller,
+      seller_user_id = excluded.seller_user_id,
+      seller_tag = excluded.seller_tag,
+      condition = excluded.condition,
+      guarantee = excluded.guarantee,
+      item_url = excluded.item_url,
+      image_url = excluded.image_url,
+      seller_status = COALESCE(NULLIF(excluded.seller_status, 'unknown'), candidates.seller_status),
+      seller_note = COALESCE(NULLIF(excluded.seller_note, ''), candidates.seller_note),
+      status = excluded.status,
+      updated_at = excluded.updated_at;
+  `);
+
+  const deleteFts = db.prepare(`DELETE FROM candidates_fts WHERE item_id = ?;`);
+  const insertFts = db.prepare(`INSERT INTO candidates_fts (item_id, title, seller, keyword, category) VALUES (?, ?, ?, ?, ?);`);
+
+  let count = 0;
+  for (const it of items) {
+    if (!it.item_id || it.item_id === '-') continue;
+    const priceNum = parseFloat(String(it.price || '').replace(/[^\d.]/g, '')) || 0;
+    
+    let sStatus = it.seller_status || 'unknown';
+    let sNote = it.seller_note || '';
+    if (it.seller && it.seller !== '-' && it.seller !== '闲鱼卖家') {
+      const rev = db.prepare('SELECT * FROM seller_reviews WHERE seller = ?').get(it.seller);
+      if (rev) {
+        sStatus = rev.status || sStatus;
+        sNote = rev.reason || sNote;
+      }
+    }
+
+    insertCandidate.run(
+      it.item_id,
+      keyword || it.keyword || '',
+      category || it.category || '',
+      it.title || '',
+      it.price || '¥0',
+      priceNum,
+      it.original_price || '-',
+      it.price_drop || '-',
+      it.publish_time || '-',
+      it.location || '-',
+      it.seller || '-',
+      it.seller_user_id || '-',
+      it.seller_tag || '-',
+      it.condition || '-',
+      it.guarantee || '普通',
+      it.item_url || '',
+      it.image_url || '',
+      sStatus,
+      sNote,
+      it.status || 'active',
+      now
+    );
+
+    deleteFts.run(it.item_id);
+    insertFts.run(it.item_id, it.title || '', it.seller || '', keyword || it.keyword || '', category || it.category || '');
+    count++;
+  }
+  return count;
+}
+
+export function queryCandidates({
+  category = '',
+  keyword = '',
+  minPrice = null,
+  maxPrice = null,
+  excludeGhosted = false,
+  sort = 'price_asc',
+  limit = 50,
+} = {}) {
+  const db = getDb();
+  let sql = 'SELECT * FROM candidates WHERE 1=1';
+  const params = [];
+
+  if (category) {
+    sql += ' AND (category = ? OR keyword LIKE ?)';
+    params.push(category, `%${category}%`);
+  }
+
+  if (keyword) {
+    sql += ' AND (title LIKE ? OR keyword LIKE ? OR seller LIKE ?)';
+    const q = `%${keyword}%`;
+    params.push(q, q, q);
+  }
+
+  if (minPrice !== null && minPrice !== undefined && minPrice !== '') {
+    sql += ' AND price_num >= ?';
+    params.push(Number(minPrice));
+  }
+
+  if (maxPrice !== null && maxPrice !== undefined && maxPrice !== '') {
+    sql += ' AND price_num <= ?';
+    params.push(Number(maxPrice));
+  }
+
+  if (excludeGhosted) {
+    sql += " AND seller_status NOT IN ('ghosted', 'unfit')";
+  }
+
+  if (sort === 'price_asc') {
+    sql += ' ORDER BY price_num ASC, updated_at DESC';
+  } else if (sort === 'price_desc') {
+    sql += ' ORDER BY price_num DESC, updated_at DESC';
+  } else {
+    sql += ' ORDER BY updated_at DESC';
+  }
+
+  sql += ' LIMIT ?';
+  params.push(limit);
+
+  return db.prepare(sql).all(...params);
+}
+
+/**
+ * Upsert seller review / reputation.
+ */
+export function saveSellerReview({ seller, status, reason = '', last_message = '' }) {
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  const insert = db.prepare(`
+    INSERT INTO seller_reviews (seller, status, reason, last_message, interaction_count, updated_at)
+    VALUES (?, ?, ?, ?, 1, ?)
+    ON CONFLICT(seller) DO UPDATE SET
+      status = excluded.status,
+      reason = excluded.reason,
+      last_message = excluded.last_message,
+      interaction_count = seller_reviews.interaction_count + 1,
+      updated_at = excluded.updated_at;
+  `);
+
+  insert.run(seller, status, reason, last_message, now);
+
+  // Propagate to candidates table (SSOT consistency)
+  db.prepare(`
+    UPDATE candidates 
+    SET seller_status = ?, seller_note = ? 
+    WHERE seller = ?
+  `).run(status, reason, seller);
+}
+
+export function getSellerReview(seller) {
+  const db = getDb();
+  return db.prepare('SELECT * FROM seller_reviews WHERE seller = ?').get(seller) || null;
+}
+
+export function querySellerReviews({ status = '', limit = 50 } = {}) {
+  const db = getDb();
+  if (status) {
+    return db.prepare('SELECT * FROM seller_reviews WHERE status = ? ORDER BY updated_at DESC LIMIT ?').all(status, limit);
+  }
+  return db.prepare('SELECT * FROM seller_reviews ORDER BY updated_at DESC LIMIT ?').all(limit);
+}
+
+/**
+ * Automatically inspect recent chat records and session logs to classify sellers into:
+ * - 'ghosted': automated reply only, never responded, or left chat unanswered
+ * - 'unfit': explicitly stated no stock ("没有", "只有se"), or trade was closed/canceled
+ * - 'responsive': gave active quote or verified stock ("1980全新", "air1998", "是的全新正品")
+ */
+export function syncSellerReviewsFromSessionsAndMessages() {
+  const db = getDb();
+  const sessions = db.prepare('SELECT * FROM sessions').all();
+  let count = 0;
+
+  for (const sess of sessions) {
+    const seller = sess.contact_name;
+    if (!seller || seller === '-' || seller === '未知联系人') continue;
+
+    const msgs = db.prepare('SELECT * FROM messages WHERE contact_name = ? ORDER BY id ASC').all(seller);
+    const allText = [sess.last_message, ...msgs.map(m => m.content)].filter(Boolean).join(' | ');
+    const sellerMsgs = msgs.filter(m => m.is_self === '否').map(m => m.content);
+    const lastMsg = sess.last_message || (msgs[msgs.length - 1]?.content || '-');
+
+    let status = 'unknown';
+    let reason = '';
+
+    if (
+      allText.includes('没有') ||
+      allText.includes('没有咯') ||
+      allText.includes('nexg se') ||
+      allText.includes('卖家关闭了订单') ||
+      sess.trade_status === '交易关闭'
+    ) {
+      status = 'unfit';
+      reason = `明确无货或交易关闭: ${allText.match(/(?:没有|没有咯|nexg se|卖家关闭了订单)[^|]*/)?.[0] || lastMsg}`;
+    } else if (
+      allText.includes('没回复说明客服可能在忙') ||
+      (msgs.length >= 1 && sellerMsgs.length === 0) ||
+      (msgs.length >= 1 && sellerMsgs.every(m => m.trim() === '[微笑]'))
+    ) {
+      status = 'ghosted';
+      reason = `已读不回或仅自动回复/表情: ${lastMsg}`;
+    } else if (
+      allText.includes('全新正品') ||
+      allText.includes('包邮') ||
+      allText.includes('专拍价') ||
+      allText.includes('可以发') ||
+      allText.includes('有奶白') ||
+      allText.includes('标价拿火源') ||
+      /\b(?:1\d{3}|2\d{3})\b/.test(allText)
+    ) {
+      status = 'responsive';
+      const quote = allText.match(/(?:1\d{3}|2\d{3}|全新正品|专拍价|有奶白|标价拿火源)[^|]*/)?.[0] || lastMsg;
+      reason = `活跃报价与现货确认: ${quote}`;
+    }
+
+    if (status !== 'unknown') {
+      saveSellerReview({ seller, status, reason, last_message: lastMsg });
+      count++;
+    }
+  }
+
+  return count;
+}
+
+/**
  * Global database statistics.
  */
 export function getDbStats() {
@@ -319,6 +601,8 @@ export function getDbStats() {
   const favCount = db.prepare('SELECT COUNT(*) as count FROM favorites').get().count;
   const sessionCount = db.prepare('SELECT COUNT(*) as count FROM sessions').get().count;
   const msgCount = db.prepare('SELECT COUNT(*) as count FROM messages').get().count;
+  const candidateCount = db.prepare('SELECT COUNT(*) as count FROM candidates').get().count;
+  const reviewCount = db.prepare('SELECT COUNT(*) as count FROM seller_reviews').get().count;
 
   const spentRow = db.prepare(`
     SELECT SUM(CAST(REPLACE(REPLACE(price, '¥', ''), '￥', '') AS REAL)) as total 
@@ -331,6 +615,8 @@ export function getDbStats() {
     favorites_stored: favCount,
     sessions_stored: sessionCount,
     messages_stored: msgCount,
+    candidates_stored: candidateCount,
+    seller_reviews_stored: reviewCount,
     total_spent: '¥' + (spentRow.total || 0).toFixed(2),
   };
 }

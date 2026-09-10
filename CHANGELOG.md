@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-09-11
+
+### Added
+- **Multi-Category Candidate Pipeline & SQLite SSOT (`src/db.js`, `bin/xy-chat.js`)**:
+  - `candidates` SQLite table with FTS5 search, `price_num` indexing, category tagging (`nexg2_nylon`, `lava_me_air`, `lava_me_4`), real item image URL capture, and seller vetting notes.
+  - `seller_reviews` SQLite table tracking seller risk status (`responsive`, `ghosted`, `unfit`, `pending`) and evaluation notes.
+  - `xy-chat candidates`: Fast querying, category filtering, and status updates for evaluated second-hand listings.
+  - `xy-chat reviews`: Multi-seller credibility and interaction assessment management.
+  - `xy-chat sync-chats`: Automated scanner linking all active IM sessions and recent message interactions to identify unresponsive bot sellers vs verified responsive sellers.
+  - `xy-chat pick`: Unified intelligent deal picker executing multi-keyword search, live detail extraction, seller risk screening, and candidate scoring.
+- **Search & Detail Adapter Enhancements (`clis/goofish/search.js`, `clis/goofish/detail.js`)**:
+  - Added in-page defensive JavaScript price boundary checks (`minPrice`/`maxPrice`) and numerical price sorting to prevent accessory noise.
+  - Added `image_url` and `seller` extraction to search results for instant visual appraisal.
+  - Added high-resolution `images` extraction (filtering out Alibaba `-tps-` sprite icons) and `seller_user_id` to detail adapter.
+
 ## [1.2.0] - 2026-09-11
 
 ### Added
