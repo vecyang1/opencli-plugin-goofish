@@ -8,6 +8,9 @@ import {
   saveFavorites, queryFavorites, 
   saveSessions, querySessions, 
   saveMessages, queryMessages, 
+  saveCandidates, queryCandidates,
+  saveSellerReview, getSellerReview, querySellerReviews,
+  syncSellerReviewsFromSessionsAndMessages,
   getDbStats, resolveDbPath 
 } from '../src/db.js';
 
@@ -226,6 +229,200 @@ async function main() {
       break;
     }
 
+    case 'candidates': {
+      const category = subArgs.find(a => !a.startsWith('-')) || '';
+      const minPrice = subArgs.includes('--min-price') ? subArgs[subArgs.indexOf('--min-price') + 1] : null;
+      const maxPrice = subArgs.includes('--max-price') ? subArgs[subArgs.indexOf('--max-price') + 1] : null;
+      const excludeGhosted = subArgs.includes('--exclude-ghosted');
+      const sort = subArgs.includes('--sort') ? subArgs[subArgs.indexOf('--sort') + 1] : 'price_asc';
+
+      const results = queryCandidates({ category, minPrice, maxPrice, excludeGhosted, sort });
+      if (results.length === 0) {
+        console.log('（本地 SQLite SSOT 中暂无候选宝贝，请运行 xy-chat pick 或 search 同步）');
+        process.exit(0);
+      }
+      console.log(`🎯 从本地 SQLite SSOT 命中 ${results.length} 个候选宝贝:`);
+      printTable(results.map((c, idx) => ({
+        '#': idx + 1,
+        '商品ID': c.item_id,
+        '标题': c.title.slice(0, 32),
+        '价格': c.price,
+        '卖家': c.seller,
+        '卖家状态': c.seller_status === 'responsive' ? '✅ 活跃报价' : (c.seller_status === 'ghosted' ? '⚠️ 已读不回' : (c.seller_status === 'unfit' ? '❌ 明确无货' : '❓ 待沟通')),
+        '成色': c.condition,
+        '所在地': c.location,
+      })));
+      process.exit(0);
+      break;
+    }
+
+    case 'reviews': {
+      const seller = subArgs.find(a => !a.startsWith('-')) || '';
+      if (seller) {
+        const rev = getSellerReview(seller);
+        if (!rev) {
+          console.log(`未找到卖家 ${seller} 的沟通评估记录`);
+        } else {
+          console.log(`📋 卖家 [${seller}] 评估详情:`);
+          console.table([rev]);
+        }
+      } else {
+        const revs = querySellerReviews();
+        console.log(`📋 卖家沟通评估记录表 (${revs.length} 位卖家):`);
+        printTable(revs.map((r, idx) => ({
+          '#': idx + 1,
+          '卖家': r.seller,
+          '评级': r.status === 'responsive' ? '✅ 活跃沟通/已报价' : (r.status === 'ghosted' ? '⚠️ 曾已读不回' : (r.status === 'unfit' ? '❌ 明确无货/已关闭' : '❓ 未知')),
+          '原因/最近消息': r.reason,
+          '最近消息': r.last_message.slice(0, 30),
+        })));
+      }
+      process.exit(0);
+      break;
+    }
+
+    case 'sync-chats': {
+      console.log('🔍 正在全量同步私信联系人与关键卖家聊天记录...');
+      const inRes = runOpenCli('inbox', ['--limit', '50', '-f', 'json']);
+      let sess = [];
+      try {
+        sess = JSON.parse(inRes.stdout);
+        if (Array.isArray(sess)) saveSessions(sess);
+      } catch (e) {}
+
+      console.log(`✅ 已读取 ${sess.length} 个会话`);
+      const musicSellers = sess.filter(s => {
+        const name = s.contact_name;
+        const msg = s.last_message || '';
+        return msg.includes('吉他') || msg.includes('nexg') || msg.includes('lava') || msg.includes('琴') || msg.includes('air') || name.includes('琴') || name.includes('乐器') || name.includes('吉他') || name.includes('音乐');
+      });
+
+      console.log(`🎸 识别到 ${musicSellers.length} 位乐器相关沟通卖家，正在拉取聊天记录...`);
+      for (const s of musicSellers) {
+        try {
+          console.log(`  -> 拉取 [${s.contact_name}] 聊天记录...`);
+          const msgRes = runOpenCli('messages', [s.contact_name, '--limit', '30', '-f', 'json']);
+          const msgs = JSON.parse(msgRes.stdout);
+          if (Array.isArray(msgs)) {
+            saveMessages(s.contact_name, msgs);
+          }
+        } catch (e) {}
+      }
+
+      const revCount = syncSellerReviewsFromSessionsAndMessages();
+      console.log(`\n✅ 卖家沟通评估分析完成，更新了 ${revCount} 条卖家档案！`);
+      console.table(querySellerReviews({ limit: 20 }));
+      process.exit(0);
+      break;
+    }
+
+    case 'pick': {
+      const target = (subArgs[0] || 'all').toLowerCase();
+      console.log(`🎸 正在执行闲鱼高性价比吉他智能选购与多维博弈筛选 (目标: ${target})...`);
+
+      // First ensure seller reviews from chat records are fresh
+      syncSellerReviewsFromSessionsAndMessages();
+
+      const searchConfigs = [];
+      if (target === 'all' || target.includes('nexg')) {
+        searchConfigs.push({
+          category: 'nexg2_nylon',
+          keyword: 'nexg 2n',
+          minPrice: '1000',
+          maxPrice: '3800',
+          sort: '价格升序',
+        });
+        searchConfigs.push({
+          category: 'nexg2_nylon',
+          keyword: 'nexg2 尼龙',
+          minPrice: '1000',
+          maxPrice: '3800',
+          sort: '价格升序',
+        });
+      }
+      if (target === 'all' || target.includes('air')) {
+        searchConfigs.push({
+          category: 'lava_me_air',
+          keyword: 'lava me air',
+          minPrice: '1000',
+          maxPrice: '3200',
+          sort: '价格升序',
+        });
+      }
+      if (target === 'all' || target.includes('me4') || target.includes('me 4') || target.includes('lava 4')) {
+        searchConfigs.push({
+          category: 'lava_me_4',
+          keyword: 'lava me 4',
+          minPrice: '1400',
+          maxPrice: '3800',
+          sort: '价格升序',
+        });
+      }
+
+      let totalFound = 0;
+      for (const sc of searchConfigs) {
+        console.log(`\n🔍 [${sc.category}] 正在线上搜索 "${sc.keyword}" (价格区间: ¥${sc.minPrice} - ¥${sc.maxPrice})...`);
+        const searchRes = runOpenCli('search', [
+          sc.keyword,
+          '--min-price', sc.minPrice,
+          '--max-price', sc.maxPrice,
+          '--sort', sc.sort,
+          '--limit', '15',
+          '-f', 'json'
+        ]);
+
+        let items = [];
+        try {
+          items = JSON.parse(searchRes.stdout);
+        } catch (e) {
+          const m = searchRes.stdout.match(/\[\s*\{[\s\S]*\}\s*\]/);
+          if (m) items = JSON.parse(m[0]);
+        }
+
+        if (Array.isArray(items) && items.length > 0) {
+          console.log(`  -> 抓取到 ${items.length} 个原始候选，正在拉取详情与卖家身份补全...`);
+          // Enrich top 5 items with detail if seller missing
+          for (let i = 0; i < Math.min(items.length, 5); i++) {
+            const it = items[i];
+            if (!it.seller || it.seller === '-') {
+              try {
+                const detRes = runOpenCli('detail', [it.item_id, '-f', 'json']);
+                const det = JSON.parse(detRes.stdout);
+                if (det[0]?.seller) {
+                  it.seller = det[0].seller;
+                  it.seller_user_id = det[0].seller_user_id;
+                  if (det[0].images && det[0].images !== '-') it.image_url = det[0].images.split('|')[0].trim();
+                }
+              } catch (e) {}
+            }
+          }
+
+          const saved = saveCandidates(items, { keyword: sc.keyword, category: sc.category });
+          totalFound += saved;
+          console.log(`  ✅ 已持久化 ${saved} 个候选至本地 SQLite SSOT`);
+        }
+      }
+
+      // Re-read authoritative candidates from SQLite (SSOT & Unidirectional Data Flow)
+      console.log('\n=================== 📊 闲鱼最优吉他候选选购决策全景图 (SSOT 真理库) ===================');
+      const allCandidates = queryCandidates({ limit: 40 });
+      printTable(allCandidates.map((c, idx) => ({
+        '#': idx + 1,
+        '类别': c.category,
+        '商品ID': c.item_id,
+        '价格': c.price,
+        '成色': c.condition,
+        '卖家': c.seller,
+        '聊天/信誉风控': c.seller_status === 'responsive' ? '✅ 活跃报价' : (c.seller_status === 'ghosted' ? '⚠️ 已读不回' : (c.seller_status === 'unfit' ? '❌ 明确无货' : '❓ 待深入沟通')),
+        '标题': c.title.slice(0, 30),
+        '所在地': c.location,
+        '链接': c.item_url,
+      })));
+
+      process.exit(0);
+      break;
+    }
+
     case 'help':
     default: {
       console.log(`
@@ -244,6 +441,10 @@ async function main() {
   xy-chat search <关键词>            全网多维度二手搜索
   xy-chat detail <商品ID>            查看商品详情与卖家信用档案
   xy-chat seller <卖家ID/商品链接>   深度分析卖家在售SKU与砍价策略
+  xy-chat candidates [category]      查询已沉淀的吉他候选库 (SSOT)
+  xy-chat reviews [卖家]             查询卖家聊天评估档案 (排除已读不回/无货卖家)
+  xy-chat sync-chats                 全量同步私信记录并分析卖家沟通状态
+  xy-chat pick [nexg|air|me4|all]    全自动搜索、比价、风控过滤并输出最优推荐
   xy-chat sync                       全量同步线上资产至本地 SQLite SSOT
   xy-chat stats                      查看本地离线库统计数据
       `);

@@ -80,6 +80,10 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu reason` | `[read]` | 智能消费推断分析 (流水、高频卖家、待发货预警) | `[query] [--limit 50]` |
 | `opencli xianyu stats` | `[read]` | 个人资产、订单待办与消息看板 | `-f table/yaml` |
 | `opencli xianyu export` | `[read]` | 将订单或收藏导出为 Markdown、JSON 或 HTML 报表 | `[type orders/favorites] [--output path] [--file-type md/html/json]` |
+| `xy-chat candidates` | `[read/write]` | 候选池管理与离线全文检索 (按品类/价格/卖家状态筛选) | `[query] [--category] [--status] [--limit 50]` |
+| `xy-chat reviews` | `[read/write]` | 卖家信誉与沟通记录评估 (已读不回/无货/可沟通标注) | `[nick] [--status responsive/ghosted/unfit] [--note]` |
+| `xy-chat sync-chats` | `[read/write]` | 自动扫描并同步所有活跃私信会话与消息，提取卖家风险状态 | `[--limit 50] [--msg-limit 20]` |
+| `xy-chat pick` | `[read/write]` | 自动化跨品类候选聚合、详情补全、风险卖家过滤与最优解排序推荐 | `[category nexg2_nylon/lava_me_air/lava_me_4/all]` |
 
 ---
 

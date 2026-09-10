@@ -19,11 +19,13 @@ export const command = cli({
     'title',
     'price',
     'seller',
+    'seller_user_id',
     'location',
     'seller_stats',
     'want_count',
     'browse_count',
     'specs',
+    'images',
     'description',
   ],
   func: async (page, kwargs) => {
@@ -55,12 +57,20 @@ export const command = cli({
       let sellerStatsArr = [];
 
       // Semantic extraction from seller personal link
+      let sellerUserId = '';
       const personalLink = document.querySelector('a[href*="/personal?userId="]');
-      if (personalLink && personalLink.innerText) {
-        const sLines = personalLink.innerText.split('\n').map(s => s.trim()).filter(Boolean);
-        if (sLines.length > 0) seller = sLines[0];
-        if (sLines.length > 1) location = sLines[1];
-        if (sLines.length > 2) sellerStatsArr = sLines.slice(2);
+      if (personalLink) {
+        if (personalLink.href) {
+          try {
+            sellerUserId = new URL(personalLink.href, window.location.origin).searchParams.get('userId') || '';
+          } catch (e) {}
+        }
+        if (personalLink.innerText) {
+          const sLines = personalLink.innerText.split('\n').map(s => s.trim()).filter(Boolean);
+          if (sLines.length > 0) seller = sLines[0];
+          if (sLines.length > 1) location = sLines[1];
+          if (sLines.length > 2) sellerStatsArr = sLines.slice(2);
+        }
       }
 
       // Fallback if link not matched
@@ -73,6 +83,24 @@ export const command = cli({
               seller = lines[i - 2] || lines[i - 1];
             }
           }
+        }
+      }
+
+      // Extract item images
+      const imageEls = Array.from(document.querySelectorAll('div[class*="slider--"] img, div[class*="main--"] img, img[src*="alicdn"], img[src*="tbcdn"]'));
+      const images = [];
+      for (const img of imageEls) {
+        let src = img.src || img.getAttribute('data-src') || '';
+        if (src.startsWith('//')) src = 'https:' + src;
+        if (
+          src &&
+          (src.includes('alicdn') || src.includes('tbcdn')) &&
+          !src.includes('avatar') &&
+          !src.includes('TB1') &&
+          !src.includes('-tps-') &&
+          !images.includes(src)
+        ) {
+          images.push(src);
         }
       }
 
@@ -109,11 +137,13 @@ export const command = cli({
         title: title || '闲鱼商品',
         price,
         seller: seller || '闲鱼卖家',
+        seller_user_id: sellerUserId || '-',
         location,
         seller_stats: sellerStatsArr.join(' · ') || '正常卖家',
         want_count: wantCount,
         browse_count: browseCount,
         specs,
+        images: images.slice(0, 6).join(' | ') || '-',
         description: description.slice(0, 300) || '-',
       };
     });
@@ -127,11 +157,13 @@ export const command = cli({
       title: data.title,
       price: data.price,
       seller: data.seller,
+      seller_user_id: data.seller_user_id,
       location: data.location,
       seller_stats: data.seller_stats,
       want_count: data.want_count,
       browse_count: data.browse_count,
       specs: data.specs,
+      images: data.images,
       description: data.description,
     }];
   },

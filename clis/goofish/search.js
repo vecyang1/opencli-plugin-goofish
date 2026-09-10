@@ -30,9 +30,11 @@ export const command = cli({
     'price_drop',
     'publish_time',
     'location',
+    'seller',
     'seller_tag',
     'condition',
     'guarantee',
+    'image_url',
     'item_url',
   ],
   func: async (page, kwargs) => {
@@ -231,6 +233,21 @@ export const command = cli({
           location = locEl.innerText.trim();
         }
 
+        // Seller Name
+        let seller = '-';
+        const sellerEl = a.querySelector('div[class*="seller-name--"], div[class*="seller-nick--"], span[class*="seller-name--"], div[class*="seller-title--"]');
+        if (sellerEl && sellerEl.innerText) {
+          seller = sellerEl.innerText.trim();
+        }
+
+        // Image URL
+        let imageUrl = '';
+        const imgEl = a.querySelector('img[src*="alicdn"], img[src*="tbcdn"], img');
+        if (imgEl) {
+          imageUrl = imgEl.src || imgEl.getAttribute('data-src') || '';
+          if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl;
+        }
+
         // Seller Tag
         let sellerTag = '-';
         const tagEl = a.querySelector('div[class*="credit-container--"]');
@@ -271,9 +288,11 @@ export const command = cli({
           price_drop: priceDrop,
           publish_time: publishTime,
           location: location,
+          seller: seller,
           seller_tag: sellerTag,
           condition: condition,
           guarantee: guarantees.join(' · ') || '普通',
+          image_url: imageUrl,
           item_url: a.href,
         };
       });
@@ -289,6 +308,31 @@ export const command = cli({
       }
     }
 
+    // Defensive price filter & sort
+    if (minPrice) {
+      const minVal = parseFloat(minPrice);
+      if (!isNaN(minVal)) {
+        deduplicated = deduplicated.filter(it => {
+          const p = parseFloat(it.price.replace(/[^\d.]/g, ''));
+          return isNaN(p) || p >= minVal;
+        });
+      }
+    }
+    if (maxPrice) {
+      const maxVal = parseFloat(maxPrice);
+      if (!isNaN(maxVal)) {
+        deduplicated = deduplicated.filter(it => {
+          const p = parseFloat(it.price.replace(/[^\d.]/g, ''));
+          return isNaN(p) || p <= maxVal;
+        });
+      }
+    }
+    if (sort === '价格升序' || sort === '价格' || sort === 'price_asc') {
+      deduplicated.sort((a, b) => (parseFloat(a.price.replace(/[^\d.]/g, '')) || 0) - (parseFloat(b.price.replace(/[^\d.]/g, '')) || 0));
+    } else if (sort === '价格降序' || sort === 'price_desc') {
+      deduplicated.sort((a, b) => (parseFloat(b.price.replace(/[^\d.]/g, '')) || 0) - (parseFloat(a.price.replace(/[^\d.]/g, '')) || 0));
+    }
+
     return deduplicated.slice(0, limit).map((item, idx) => ({
       index: idx + 1,
       item_id: item.item_id,
@@ -298,9 +342,11 @@ export const command = cli({
       price_drop: item.price_drop,
       publish_time: item.publish_time,
       location: item.location,
+      seller: item.seller,
       seller_tag: item.seller_tag,
       condition: item.condition,
       guarantee: item.guarantee,
+      image_url: item.image_url,
       item_url: item.item_url,
     }));
   },

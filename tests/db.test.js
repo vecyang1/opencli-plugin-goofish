@@ -9,7 +9,16 @@ test('SQLite SSOT db operations', async (t) => {
   const testDbPath = path.join(tmpDir, 'test_goofish.db');
   process.env.GOOFISH_DB = testDbPath;
 
-  const { saveOrders, queryOrders, saveFavorites, queryFavorites, saveSessions, querySessions, saveMessages, queryMessages, getDbStats } = await import('../src/db.js');
+  const { 
+    saveOrders, queryOrders, 
+    saveFavorites, queryFavorites, 
+    saveSessions, querySessions, 
+    saveMessages, queryMessages, 
+    saveCandidates, queryCandidates,
+    saveSellerReview, getSellerReview, querySellerReviews,
+    syncSellerReviewsFromSessionsAndMessages,
+    getDbStats 
+  } = await import('../src/db.js');
 
   await t.test('saves and queries orders with FTS', () => {
     const orders = [
@@ -78,6 +87,22 @@ test('SQLite SSOT db operations', async (t) => {
         time: '05-17',
         unread: '2',
         has_item: '是',
+      },
+      {
+        contact_name: '泰裤辣乐器批发',
+        trade_status: '-',
+        last_message: '没有',
+        time: '09-08',
+        unread: '-',
+        has_item: '是',
+      },
+      {
+        contact_name: '小夏吉他批发',
+        trade_status: '-',
+        last_message: '没回复说明客服可能在忙～您可以点击右上角',
+        time: '09-08',
+        unread: '-',
+        has_item: '是',
       }
     ];
 
@@ -97,12 +122,77 @@ test('SQLite SSOT db operations', async (t) => {
     assert.equal(qMsgs[0].content, '这是什么拾音器');
   });
 
+  await t.test('syncs seller reviews and manages candidates with SSOT', () => {
+    // Seller reviews
+    const reviewedCount = syncSellerReviewsFromSessionsAndMessages();
+    assert.ok(reviewedCount >= 2);
+
+    const ghostReview = getSellerReview('小夏吉他批发');
+    assert.ok(ghostReview);
+    assert.equal(ghostReview.status, 'ghosted');
+
+    const unfitReview = getSellerReview('泰裤辣乐器批发');
+    assert.ok(unfitReview);
+    assert.equal(unfitReview.status, 'unfit');
+
+    // Candidates
+    const candidates = [
+      {
+        item_id: 'CAND_01',
+        title: '恩雅NEXG 2N 黑色古典尼龙吉他',
+        price: '¥1780',
+        seller: '泰裤辣乐器批发',
+        location: '广东',
+        condition: '全新',
+        guarantee: '普通',
+        item_url: 'https://www.goofish.com/item?id=CAND_01',
+        image_url: 'https://img.alicdn.com/test_01.jpg',
+      },
+      {
+        item_id: 'CAND_02',
+        title: '恩雅NEXG2黑色豪华版 尼龙弦自用',
+        price: '¥1800',
+        seller: '海上逃跑的话梅',
+        location: '四川',
+        condition: '几乎全新',
+        guarantee: '包邮',
+        item_url: 'https://www.goofish.com/item?id=CAND_02',
+        image_url: 'https://img.alicdn.com/test_02.jpg',
+      },
+      {
+        item_id: 'CAND_03',
+        title: '拿火LAVA ME air 36寸黑色碳纤维',
+        price: '¥1500',
+        seller: '森悦乐器_Guitar',
+        location: '北京',
+        condition: '全新',
+        guarantee: '包邮',
+        item_url: 'https://www.goofish.com/item?id=CAND_03',
+        image_url: 'https://img.alicdn.com/test_03.jpg',
+      }
+    ];
+
+    const cCount = saveCandidates(candidates, { category: 'nexg2_nylon', keyword: 'nexg 2n' });
+    assert.equal(cCount, 3);
+
+    // Filter candidates excluding ghosted/unfit
+    const validCandidates = queryCandidates({ category: 'nexg2_nylon', excludeGhosted: true });
+    assert.equal(validCandidates.length, 2);
+    assert.equal(validCandidates[0].item_id, 'CAND_03'); // price ¥1500 sorted first
+
+    // Query with price filter
+    const priceFiltered = queryCandidates({ minPrice: 1700, maxPrice: 1850 });
+    assert.equal(priceFiltered.length, 2);
+  });
+
   await t.test('computes database statistics', () => {
     const stats = getDbStats();
     assert.equal(stats.orders_stored, 2);
     assert.equal(stats.favorites_stored, 1);
-    assert.equal(stats.sessions_stored, 1);
+    assert.equal(stats.sessions_stored, 3);
     assert.equal(stats.messages_stored, 2);
+    assert.equal(stats.candidates_stored, 3);
+    assert.ok(stats.seller_reviews_stored >= 2);
     assert.equal(stats.total_spent, '¥9.99');
   });
 
