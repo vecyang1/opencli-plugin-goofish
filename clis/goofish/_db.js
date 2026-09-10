@@ -3,10 +3,14 @@ import { EventEmitter } from 'node:events';
 import fs from 'fs';
 import path from 'path';
 import { 
+  SCHEMA_CONTRACT,
   generateDdl, 
   validateCandidate, 
   validateSellerReview, 
-  validateOrder 
+  validateOrder,
+  isAccessoryTitle,
+  inferCategory,
+  classifySellerCommunication
 } from './_contract.js';
 
 /**
@@ -47,8 +51,30 @@ export function getDb() {
 
 /**
  * Initialize SQLite schema from Contract DDL.
+ * Configures WAL mode and busy timeout for non-blocking concurrency.
  */
 export function initSchema(db) {
+  try {
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA synchronous = NORMAL;');
+  } catch (e) {}
+
+  // Migrate existing seller_reviews table if seller_user_id column is missing
+  try {
+    const cols = db.prepare("PRAGMA table_info('seller_reviews');").all();
+    if (cols.length > 0 && !cols.some(c => c.name === 'seller_user_id')) {
+      db.exec("ALTER TABLE seller_reviews ADD COLUMN seller_user_id TEXT DEFAULT '';");
+    }
+  } catch (e) {}
+
+  // Drop views before recreating so view definitions always stay synchronized with SCHEMA_CONTRACT
+  for (const viewName of Object.keys(SCHEMA_CONTRACT.views)) {
+    try {
+      db.exec(`DROP VIEW IF EXISTS ${viewName};`);
+    } catch (e) {}
+  }
+
   const ddlStatements = generateDdl();
   for (const ddl of ddlStatements) {
     db.exec(ddl);
@@ -387,9 +413,9 @@ export function queryMessages(contactOrOpts, maybeOpts = {}) {
 
 /**
  * Upsert candidates into SQLite SSOT.
- * Enforces contract validation and emits reactive change events.
+ * Enforces contract validation, accessory exclusion, and emits reactive change events.
  */
-export function saveCandidates(items, { keyword = '', category = '' } = {}) {
+export function saveCandidates(items, { keyword = '', category = '', filterAccessories = true } = {}) {
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -427,6 +453,12 @@ export function saveCandidates(items, { keyword = '', category = '' } = {}) {
   let count = 0;
   for (const raw of items) {
     if (!raw.item_id || raw.item_id === '-') continue;
+
+    // Filter out accessories before writing to SSOT
+    if (filterAccessories && isAccessoryTitle(raw.title, category || raw.category)) {
+      continue;
+    }
+
     let valid;
     try {
       valid = validateCandidate({
@@ -435,6 +467,11 @@ export function saveCandidates(items, { keyword = '', category = '' } = {}) {
         category: category || raw.category,
       });
     } catch (e) {
+      continue;
+    }
+
+    // Sanity check: reject non-guitar cheap items under ¥400 misclassified into guitar categories
+    if (filterAccessories && valid.price_num > 0 && valid.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(valid.category)) {
       continue;
     }
 
@@ -478,6 +515,7 @@ export function saveCandidates(items, { keyword = '', category = '' } = {}) {
 /**
  * Query candidates from authoritative SSOT projection (candidates_view).
  * Joins seller_reviews dynamically so that seller reputation changes are instantly reflected.
+ * Correctly handles 'all' / '全部' / empty category without dropping records.
  */
 export function queryCandidates({
   category = '',
@@ -485,6 +523,7 @@ export function queryCandidates({
   minPrice = null,
   maxPrice = null,
   excludeGhosted = false,
+  excludeAccessories = true,
   sort = 'price_asc',
   limit = 50,
 } = {}) {
@@ -492,18 +531,17 @@ export function queryCandidates({
   let sql = 'SELECT * FROM candidates_view WHERE 1=1';
   const params = [];
 
-  if (category) {
-    const catLower = category.toLowerCase().trim();
-    let mapped = category;
-    if (catLower === 'me4' || catLower === 'me 4' || catLower === 'lava4' || catLower === 'lava 4') {
-      mapped = 'lava_me_4';
-    } else if (catLower === 'air' || catLower === 'lava air') {
-      mapped = 'lava_me_air';
-    } else if (catLower === 'nexg' || catLower === 'nexg2' || catLower === '2n' || catLower === 'nylon') {
-      mapped = 'nexg2_nylon';
+  const catTrim = String(category || '').trim();
+  const catLower = catTrim.toLowerCase();
+
+  // If category is not 'all', '全部', or empty, apply category filter
+  if (catTrim && catLower !== 'all' && catLower !== '全部') {
+    let mapped = inferCategory({ category: catTrim });
+    if (mapped === 'other' && catTrim) {
+      mapped = catTrim;
     }
     sql += ' AND (category = ? OR category LIKE ? OR keyword LIKE ?)';
-    params.push(mapped, `%${category}%`, `%${category}%`);
+    params.push(mapped, `%${catTrim}%`, `%${catTrim}%`);
   }
 
   if (keyword) {
@@ -535,9 +573,44 @@ export function queryCandidates({
   }
 
   sql += ' LIMIT ?';
-  params.push(limit);
+  params.push(limit * 2);
 
-  return db.prepare(sql).all(...params);
+  const rows = db.prepare(sql).all(...params);
+
+  let filtered = rows;
+  if (excludeAccessories) {
+    filtered = rows.filter(r => !isAccessoryTitle(r.title, r.category));
+  }
+
+  return filtered.slice(0, limit);
+}
+
+/**
+ * Purge junk non-guitar accessories and invalid low-price items from candidates table.
+ */
+export function purgeJunkCandidates() {
+  const db = getDb();
+  const all = db.prepare('SELECT item_id, title, category, price_num FROM candidates').all();
+  let purged = 0;
+  const deleteCand = db.prepare('DELETE FROM candidates WHERE item_id = ?');
+  const deleteFts = db.prepare('DELETE FROM candidates_fts WHERE item_id = ?');
+
+  for (const it of all) {
+    const isJunk = isAccessoryTitle(it.title, it.category) || 
+      (it.price_num > 0 && it.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4', ''].includes(it.category));
+    if (isJunk) {
+      deleteCand.run(it.item_id);
+      try { deleteFts.run(it.item_id); } catch (e) {}
+      purged++;
+    }
+  }
+
+  if (purged > 0) {
+    dbEmitter.emit('table:candidates', { count: purged, action: 'purge' });
+    dbEmitter.emit('change', { table: 'candidates', count: purged, action: 'purge' });
+  }
+
+  return purged;
 }
 
 /**
@@ -551,9 +624,10 @@ export function saveSellerReview(reviewData) {
   const now = valid.updated_at || new Date().toISOString();
 
   const insert = db.prepare(`
-    INSERT INTO seller_reviews (seller, status, reason, last_message, interaction_count, updated_at)
-    VALUES (?, ?, ?, ?, 1, ?)
+    INSERT INTO seller_reviews (seller, seller_user_id, status, reason, last_message, interaction_count, updated_at)
+    VALUES (?, ?, ?, ?, ?, 1, ?)
     ON CONFLICT(seller) DO UPDATE SET
+      seller_user_id = COALESCE(NULLIF(excluded.seller_user_id, ''), seller_reviews.seller_user_id),
       status = excluded.status,
       reason = excluded.reason,
       last_message = excluded.last_message,
@@ -561,7 +635,7 @@ export function saveSellerReview(reviewData) {
       updated_at = excluded.updated_at;
   `);
 
-  insert.run(valid.seller, valid.status, valid.reason, valid.last_message, now);
+  insert.run(valid.seller, valid.seller_user_id || '', valid.status, valid.reason, valid.last_message, now);
 
   dbEmitter.emit('table:seller_reviews', { action: 'upsert', seller: valid.seller, status: valid.status });
   dbEmitter.emit('change', { table: 'seller_reviews', action: 'upsert', seller: valid.seller });
@@ -596,41 +670,27 @@ export function syncSellerReviewsFromSessionsAndMessages() {
     if (!seller || seller === '-' || seller === '未知联系人') continue;
 
     const msgs = db.prepare('SELECT * FROM messages WHERE contact_name = ? ORDER BY id ASC').all(seller);
-    const allText = [sess.last_message, ...msgs.map(m => m.content)].filter(Boolean).join(' | ');
-    const sellerMsgs = msgs.filter(m => m.is_self === '否').map(m => m.content);
-    const lastMsg = sess.last_message || (msgs[msgs.length - 1]?.content || '-');
 
-    let status = 'unknown';
-    let reason = '';
-
-    const unfitRegex = /(?:没有|没有咯|已出|卖了|不在了|下架|缺货|nexg se|卖家关闭了订单|不单出|已坏|故障)/i;
-    const ghostRegex = /(?:没回复说明客服可能在忙|自动回复)/;
-    const responsiveRegex = /(?:全新正品|包邮|专拍价|可以发|明天发|当天发|有货|现货|在的|还在|有奶白|加振款|拿火源|标价.*拿火|\b(?:1\d{3}|2\d{3})\b)/;
-
-    if (
-      unfitRegex.test(allText) ||
-      sess.trade_status === '交易关闭'
-    ) {
-      status = 'unfit';
-      const m = allText.match(unfitRegex);
-      reason = `明确无货或交易关闭: ${m ? m[0] : lastMsg}`;
-    } else if (
-      ghostRegex.test(allText) ||
-      (msgs.length >= 1 && sellerMsgs.length === 0) ||
-      (msgs.length >= 1 && sellerMsgs.every(m => m.trim() === '[微笑]' || m.trim() === '对方撤回了一条信息'))
-    ) {
-      status = 'ghosted';
-      reason = `已读不回或仅自动回复/表情: ${lastMsg}`;
-    } else if (
-      responsiveRegex.test(allText)
-    ) {
-      status = 'responsive';
-      const quote = allText.match(responsiveRegex)?.[0] || lastMsg;
-      reason = `活跃报价与现货确认: ${quote}`;
+    // Look up seller_user_id from orders or candidates if available
+    let sellerUserId = '';
+    const orderMatch = db.prepare("SELECT seller_user_id FROM orders WHERE seller = ? AND seller_user_id != '' LIMIT 1").get(seller);
+    if (orderMatch) {
+      sellerUserId = orderMatch.seller_user_id;
+    } else {
+      const candMatch = db.prepare("SELECT seller_user_id FROM candidates WHERE seller = ? AND seller_user_id != '' AND seller_user_id != '-' LIMIT 1").get(seller);
+      if (candMatch) sellerUserId = candMatch.seller_user_id;
     }
 
-    if (status !== 'unknown') {
-      saveSellerReview({ seller, status, reason, last_message: lastMsg });
+    const review = classifySellerCommunication({ session: sess, messages: msgs });
+
+    if (review.status !== 'unknown') {
+      saveSellerReview({
+        seller: review.seller,
+        seller_user_id: sellerUserId,
+        status: review.status,
+        reason: review.reason,
+        last_message: review.last_message,
+      });
       count++;
     }
   }

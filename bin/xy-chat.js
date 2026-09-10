@@ -8,11 +8,12 @@ import {
   saveFavorites, queryFavorites, 
   saveSessions, querySessions, 
   saveMessages, queryMessages, 
-  saveCandidates, queryCandidates,
+  saveCandidates, queryCandidates, purgeJunkCandidates,
   saveSellerReview, getSellerReview, querySellerReviews,
   syncSellerReviewsFromSessionsAndMessages,
   getDbStats, resolveDbPath 
 } from '../src/db.js';
+import { isAccessoryTitle, inferCategory } from '../src/contract.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -319,17 +320,29 @@ async function main() {
 
     case 'candidates': {
       const { positionals, options } = parseCliArgs(subArgs);
-      const category = options['--category'] || positionals[0] || '';
-      const keyword = options['--keyword'] || options['-q'] || '';
+      const rawPos = positionals[0] || '';
+      const knownCats = ['all', '全部', 'nexg', 'nexg2', '2n', 'nylon', '尼龙', 'air', 'lava air', 'me4', 'me 4', 'lava4', 'lava 4', 'nexg2_nylon', 'lava_me_air', 'lava_me_4'];
+      let category = options['--category'] || '';
+      let keyword = options['--keyword'] || options['-q'] || '';
+
+      if (!category && rawPos) {
+        if (knownCats.includes(rawPos.toLowerCase())) {
+          category = rawPos;
+        } else {
+          keyword = keyword ? `${keyword} ${rawPos}` : rawPos;
+        }
+      }
+
       const minPrice = options['--min-price'] || null;
       const maxPrice = options['--max-price'] || null;
       const excludeGhosted = !!options['--exclude-ghosted'];
+      const excludeAccessories = !options['--include-accessories'];
       const sort = options['--sort'] || 'price_asc';
       const limit = parseInt(options['--limit'] || options['-n'] || '50', 10);
 
-      const results = queryCandidates({ category, keyword, minPrice, maxPrice, excludeGhosted, sort, limit });
+      const results = queryCandidates({ category, keyword, minPrice, maxPrice, excludeGhosted, excludeAccessories, sort, limit });
       if (results.length === 0) {
-        console.log('（本地 SQLite SSOT 中暂无候选宝贝，请运行 xy-chat pick 或 search 同步）');
+        console.log('（本地 SQLite SSOT 中暂无匹配候选宝贝，请运行 xy-chat pick 或 search 同步）');
         process.exit(0);
       }
       console.log(`🎯 从本地 SQLite SSOT 命中 ${results.length} 个候选宝贝:`);
@@ -375,6 +388,7 @@ async function main() {
     }
 
     case 'sync-chats': {
+      const { options } = parseCliArgs(subArgs);
       console.log('🔍 正在全量同步私信联系人与关键卖家聊天记录...');
       const inRes = runOpenCli('inbox', ['--limit', '50', '-f', 'json']);
       let sess = [];
@@ -384,14 +398,20 @@ async function main() {
       } catch (e) {}
 
       console.log(`✅ 已读取 ${sess.length} 个会话`);
-      const musicSellers = sess.filter(s => {
+
+      // Discover sellers present in candidates table to ensure their chat history is never skipped
+      const candSellers = new Set(queryCandidates({ limit: 500 }).map(c => c.seller).filter(s => s && s !== '-'));
+
+      const targetSellers = sess.filter(s => {
+        if (options['--all']) return true;
         const name = s.contact_name;
+        if (candSellers.has(name)) return true;
         const msg = s.last_message || '';
         return msg.includes('吉他') || msg.includes('nexg') || msg.includes('lava') || msg.includes('琴') || msg.includes('air') || name.includes('琴') || name.includes('乐器') || name.includes('吉他') || name.includes('音乐');
       });
 
-      console.log(`🎸 识别到 ${musicSellers.length} 位乐器相关沟通卖家，正在拉取聊天记录...`);
-      for (const s of musicSellers) {
+      console.log(`🎸 识别到 ${targetSellers.length} 位重点沟通卖家 (包含候选商品卖家与乐器沟通)，正在拉取聊天记录...`);
+      for (const s of targetSellers) {
         try {
           console.log(`  -> 拉取 [${s.contact_name}] 聊天记录...`);
           const msgRes = runOpenCli('messages', [s.contact_name, '--limit', '30', '-f', 'json']);
@@ -452,7 +472,6 @@ async function main() {
         });
       }
 
-      const accessoryRegex = /(?:踏板|踩钉|麦克风|话筒|耳麦|耳机|支架|图纸|维修|主板|琴包|背带|网线|插头|零配件|贴纸|图传|接头|书籍)/i;
       const excludeStr = '踏板,麦克风,话筒,耳麦,耳机,支架,图纸,维修,主板,琴包,背带,网线,插头,零配件,贴纸';
 
       let totalFound = 0;
@@ -477,13 +496,8 @@ async function main() {
         }
 
         if (Array.isArray(items) && items.length > 0) {
-          // Pre-filter accessories and category mismatches
-          const validGuitars = items.filter(it => {
-            const title = it.title || '';
-            if (accessoryRegex.test(title)) return false;
-            if (sc.category === 'lava_me_air' && /play/i.test(title)) return false;
-            return true;
-          });
+          // Pre-filter accessories via centralized contract
+          const validGuitars = items.filter(it => !isAccessoryTitle(it.title, sc.category));
 
           console.log(`  -> 抓取到 ${items.length} 个候选 (过滤配件后剩余 ${validGuitars.length} 把吉他)，正在拉取详情与卖家身份补全...`);
           // Enrich top 5 real guitar items with detail if seller missing

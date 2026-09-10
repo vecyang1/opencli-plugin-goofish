@@ -1,10 +1,14 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { safeGoto, checkAuth } from './_shared.js';
+import { safeGoto } from './_shared.js';
 import { 
   saveCandidates, 
   queryCandidates, 
   subscribeLiveQuery 
 } from './_db.js';
+import { 
+  isAccessoryTitle, 
+  inferCategory 
+} from './_contract.js';
 
 export const command = cli({
   site: 'goofish',
@@ -35,8 +39,9 @@ export const command = cli({
   ],
   func: async (page, kwargs) => {
     const query = String(kwargs.query || kwargs._?.[0] || 'nexg 2n').trim();
-    const category = String(kwargs.category || '').trim();
-    const minPrice = kwargs['min-price'] || null;
+    const category = kwargs.category ? String(kwargs.category).trim() : inferCategory({ keyword: query });
+    const isGuitarTarget = ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(category);
+    const minPrice = kwargs['min-price'] || (isGuitarTarget ? '700' : null);
     const maxPrice = kwargs['max-price'] || null;
     const intervalSec = Math.max(2, Number(kwargs.interval) || 10);
     const maxIterations = Math.max(1, Math.min(Number(kwargs.iterations) || 1, 100));
@@ -97,7 +102,6 @@ export const command = cli({
 
       for (let iter = 0; iter < maxIterations; iter++) {
         await safeGoto(page, searchUrl);
-        await checkAuth(page);
 
         // Extract items from page
         const items = await page.evaluate(() => {
@@ -155,9 +159,12 @@ export const command = cli({
         });
 
         if (Array.isArray(items) && items.length > 0) {
-          // Unidirectional write: save to SQLite DB
-          // This triggers dbEmitter -> live query push update
-          saveCandidates(items, { keyword: query, category });
+          const validGuitars = items.filter(it => !isAccessoryTitle(it.title, category));
+          if (validGuitars.length > 0) {
+            // Unidirectional write: save to SQLite DB
+            // This triggers dbEmitter -> live query push update
+            saveCandidates(validGuitars, { keyword: query, category, filterAccessories: true });
+          }
         }
 
         if (iter < maxIterations - 1) {
