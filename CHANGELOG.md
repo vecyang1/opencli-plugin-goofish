@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-09-11
+
+### Added & Hardened (Anti-Ban & Human Behavior Simulation)
+- **Code-Level Rate Limiter & Navigation Cooldown (`_shared.js`, Rung 3 Architectural Guard)**:
+  - Enforced `enforceRateLimit(url)` before all page navigations via `safeGoto`.
+  - Defined sensitive endpoint cooldowns: Web IM (`/im`, `/chat`) >= 5500ms + 1500~3500ms jitter, item details (`/item?id=`) >= 3500ms + 1000~2500ms jitter, search >= 2500ms + 1000~2000ms jitter.
+  - Implemented `humanDelay(minMs, maxMs)` providing stochastic human pauses between sequential operations.
+- **Throttled Batch Ingestion (`bin/xy-chat.js`)**:
+  - Inserted mandatory `await humanDelay(3500, 6500)` inside `sync-chats` seller loop to prevent burst navigations against `/im`.
+- **Automated Rate Limiter Testing (`tests/rate_limiter.test.js`)**:
+  - Added unit test suite covering endpoint classification, test-environment auto-bypass, and cooldown logic (32/32 tests passing).
+- **Operational Risk Governance (`SKILL.md`)**:
+  - Documented 2026-09-11 01:32 violation incident root cause analysis, Alibaba anti-bot mechanics, and the immediate mobile app face-scan unban pathway.
+
 ## [1.4.1] - 2026-09-11
 
 ### Fixed & Hardened
