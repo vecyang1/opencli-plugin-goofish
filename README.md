@@ -80,10 +80,11 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu reason` | `[read]` | 智能消费推断分析 (流水、高频卖家、待发货预警) | `[query] [--limit 50]` |
 | `opencli xianyu stats` | `[read]` | 个人资产、订单待办与消息看板 | `-f table/yaml` |
 | `opencli xianyu export` | `[read]` | 将订单或收藏导出为 Markdown、JSON 或 HTML 报表 | `[type orders/favorites] [--output path] [--file-type md/html/json]` |
-| `xy-chat candidates` | `[read/write]` | 候选池管理与离线全文检索 (按品类/价格/卖家状态筛选) | `[category] [--category] [--keyword] [--min-price] [--max-price] [--exclude-ghosted] [--limit 50]` |
-| `xy-chat reviews` | `[read/write]` | 卖家信誉与沟通记录评估 (已读不回/无货/可沟通标注) | `[nick] [--status responsive/ghosted/unfit] [--note]` |
-| `xy-chat sync-chats` | `[read/write]` | 自动扫描并同步所有活跃私信会话与消息，提取卖家风险状态 | `[--limit 50] [--msg-limit 20]` |
-| `xy-chat pick` | `[read/write]` | 自动化跨品类候选聚合、详情补全、风险卖家过滤与最优解排序推荐 | `[category nexg2_nylon/lava_me_air/lava_me_4/all]` |
+| `opencli xianyu candidates` | `[read]` | 候选池管理与离线全文检索 (按品类/价格/卖家状态筛选) | `[query] [--category <cat>] [--keyword <kw>] [--min-price N] [--max-price N] [--exclude-ghosted] [--limit 50]` |
+| `opencli xianyu reviews` | `[read]` | 卖家信誉与沟通记录评估 (活跃报价/已读不回/无货标注) | `[seller] [--status responsive/ghosted/unfit] [--sync] [--limit 50]` |
+| `opencli xianyu pick` | `[read/write]` | 自动化跨品类候选聚合、详情补全、风险卖家过滤与最优解推荐 | `[target nexg2_nylon/lava_me_air/lava_me_4/all] [--min-price N] [--max-price N] [--limit 20]` |
+| `opencli xianyu watch` | `[read/write]` | 实时监听新上架宝贝与降价动态 (推送式实时订阅与离线真理库同步) | `[query] [--category <cat>] [--interval 10] [--min-price N] [--max-price N] [--iterations 1]` |
+| `xy-chat <cmd>` | `[all]` | 统一独立可执行命令行表面，与 OpenCLI 共享相同底层契约与 SSOT 数据库 | `xy-chat <doctor/whoami/personal/orders/favorites/search/detail/seller/candidates/reviews/pick/watch/sync/stats>` |
 
 ---
 

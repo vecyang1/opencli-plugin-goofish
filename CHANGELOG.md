@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-09-11
+
+### Added
+- **Contract-First Architecture & End-to-End Type Safety (`src/contract.js`, `clis/goofish/_contract.js`)**:
+  - Authoritative `SCHEMA_CONTRACT` specifying table schemas, constraints, and column definitions.
+  - Dynamic DDL generator (`generateDdl()`) replacing brittle hardcoded SQL strings.
+  - Runtime object validators (`validateCandidate`, `validateSellerReview`, `validateOrder`) enforcing typed integrity before database persistence.
+- **Zero Redundant State & Dynamic SSOT Projection (`candidates_view`)**:
+  - Eliminated duplicated `seller_status` and `seller_note` columns in candidates; `candidates_view` executes dynamic `LEFT JOIN seller_reviews ON candidates.seller = seller_reviews.seller`.
+  - When seller reputation changes (e.g. seller goes unresponsive or confirms stock), all past and future candidates for that seller automatically project the updated status with zero redundant table writes.
+- **Push-Style Real-Time Sync & Reactive Live Queries (`src/db.js`, `clis/goofish/_db.js`)**:
+  - Integrated `dbEmitter` and `subscribeLiveQuery` engine.
+  - Writes to SQLite automatically trigger typed mutation events, pushing fresh query snapshots to live subscribers in sub-millisecond latency.
+- **Native OpenCLI Adapters & Unified Entrypoint**:
+  - Implemented `candidates.js`, `reviews.js`, `pick.js`, and `watch.js` inside `clis/goofish/`, fully deployable to `~/.opencli/clis/goofish/` and `~/.opencli/clis/xianyu/`.
+  - Both `xy-chat` and `opencli xianyu` share the exact same underlying logic, contracts, and SQLite SSOT database.
+- **Push-Style Real-Time Watch (`opencli xianyu watch` / `xy-chat watch`)**:
+  - Continuous or iterative background polling with reactive live query subscription.
+  - Real-time event notifications (`🆕 新上架`, `📉 降价通知`, `🔍 实时对齐`) emitted as items appear.
+- **Comprehensive Two-Sided Verification & Test Suite**:
+  - Added `tests/contract.test.js`, `tests/ssot_unidirectional.test.js`, and `tests/live_query.test.js`.
+  - 22/22 tests passing green across contract, database CRUD, install drift, live queries, smoke guards, and SSOT views.
+- **Cross-Agent Discoverability**:
+  - Updated `goofish-ops` canonical skill (`~/.gemini/antigravity/skills/goofish-ops/SKILL.md`) and 2nd Brain capabilities registry (`00 - System/registries/project-capabilities.md`).
+
 ## [1.3.0] - 2026-09-11
 
 ### Added

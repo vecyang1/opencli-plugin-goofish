@@ -12,7 +12,8 @@ const expectedFiles = [
   'orders.js', 'favorites.js', 'published.js', 'search.js',
   'detail.js', 'inbox.js', 'messages.js', 'chat.js',
   'reply.js', 'reason.js', 'seller.js', 'recommend.js',
-  'suggest.js', 'export.js'
+  'suggest.js', 'export.js', 'candidates.js', 'reviews.js',
+  'pick.js', 'watch.js'
 ];
 
 test('all expected CLI command files exist', () => {
