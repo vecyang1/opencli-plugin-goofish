@@ -59,6 +59,8 @@ function parseCliArgs(args) {
     '--file-type',
     '--msg-limit',
     '--note',
+    '--interval',
+    '--iterations',
   ]);
   const positionals = [];
   const options = {};
@@ -550,6 +552,13 @@ async function main() {
       break;
     }
 
+    case 'watch': {
+      console.log('📡 正在启动闲鱼新上架与降价实时监听 (推送式实时订阅)...');
+      const res = spawnSync('opencli', ['xianyu', 'watch', ...subArgs], { stdio: 'inherit' });
+      process.exit(res.status ?? 0);
+      break;
+    }
+
     case 'help':
     default: {
       console.log(`
@@ -572,6 +581,7 @@ async function main() {
   xy-chat reviews [卖家]             查询卖家聊天评估档案 (排除已读不回/无货卖家)
   xy-chat sync-chats                 全量同步私信记录并分析卖家沟通状态
   xy-chat pick [nexg|air|me4|all]    全自动搜索、比价、风控过滤并输出最优推荐
+  xy-chat watch [query] [--interval] 实时监听新上架宝贝与降价动态 (推送式订阅)
   xy-chat sync                       全量同步线上资产至本地 SQLite SSOT
   xy-chat stats                      查看本地离线库统计数据
       `);
