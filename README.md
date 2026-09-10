@@ -48,6 +48,15 @@ npm run install-adapters
 opencli plugin install ./opencli-plugin-goofish
 ```
 
+### 3. 浏览器环境推荐 (轻量专用 Profile)
+为避免第三方扩展（如 1Password、网页爬虫、AI 助手侧边栏）向页面注入 iframe 导致 Chrome CDP 调试被跨域安全策略拦截（`attach failed: Cannot access a chrome-extension:// URL`），推荐使用专门的纯净 Profile：
+- **主用 Profile**: Chrome **Profile 38** (`/Users/vecsatfoxmailcom/Library/Application Support/Google/Chrome/Profile 38`，别名 `profile38`，contextId: `wg7phej7`)。
+- **启动与登录**: 若该 Profile 未开启，执行：
+  ```bash
+  open -na "Google Chrome" --args --profile-directory="Profile 38" https://www.goofish.com
+  ```
+- 首次使用扫码登录闲鱼；若命令返回 `AUTH_REQUIRED`，依提示扫码完成续期即可。
+
 ---
 
 ## 📖 命令完整手册 (Command Reference)
