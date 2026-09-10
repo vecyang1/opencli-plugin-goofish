@@ -79,6 +79,7 @@ export const SCHEMA_CONTRACT = {
       primaryKey: ['seller'],
       columns: {
         seller: { type: 'TEXT', notNull: true, description: '卖家昵称 (SSOT主键)' },
+        seller_user_id: { type: 'TEXT', default: '', description: '卖家用户数字ID' },
         status: { 
           type: 'TEXT', 
           notNull: true, 
@@ -147,7 +148,10 @@ export const SCHEMA_CONTRACT = {
         c.status,
         c.updated_at
       FROM candidates c
-      LEFT JOIN seller_reviews r ON c.seller = r.seller;
+      LEFT JOIN seller_reviews r ON (
+        c.seller = r.seller OR 
+        (c.seller_user_id != '' AND c.seller_user_id != '-' AND r.seller_user_id != '' AND c.seller_user_id = r.seller_user_id)
+      );
     `,
   },
 
@@ -221,6 +225,133 @@ export function generateDdl() {
 }
 
 /**
+ * Standard authoritative accessory regex pattern.
+ * Excludes pedals, foot-switches, microphones, cables, earphones, brackets, parts, blueprints, etc.
+ */
+export const ACCESSORY_REGEX = /(?:踏板|踩钉|麦克风|话筒|耳麦|耳机|支架|图纸|维修|主板|琴包|背带|网线|插头|零配件|贴纸|图传|接头|书籍|音箱线|连接线|电源适配器|充电线|拾音器|琴弦|指套|换弦器|防尘罩)/i;
+
+/**
+ * Check if a title indicates an accessory or non-guitar product.
+ */
+export function isAccessoryTitle(title, category = '') {
+  if (!title || typeof title !== 'string') return false;
+  if (ACCESSORY_REGEX.test(title)) return true;
+  if (category === 'lava_me_air' && /play/i.test(title) && !/air/i.test(title)) return true;
+  return false;
+}
+
+/**
+ * Infer or normalize canonical category slug from keyword, title, or raw category string.
+ */
+export function inferCategory({ category = '', keyword = '', title = '' } = {}) {
+  const text = `${category} ${keyword} ${title}`.toLowerCase().trim();
+  if (text.includes('me4') || text.includes('me 4') || text.includes('lava4') || text.includes('lava 4') || text.includes('拿火4') || text.includes('拿火 4')) {
+    return 'lava_me_4';
+  }
+  if (text.includes('air') || text.includes('拿火air') || text.includes('拿火 air')) {
+    return 'lava_me_air';
+  }
+  if (text.includes('nexg') || text.includes('2n') || text.includes('nylon') || text.includes('尼龙')) {
+    return 'nexg2_nylon';
+  }
+  const cleanCat = String(category || '').trim().toLowerCase();
+  if (cleanCat && cleanCat !== 'all' && cleanCat !== '全部') {
+    return category;
+  }
+  return 'other';
+}
+
+/**
+ * Regex patterns for seller communication analysis.
+ * Uses negative lookbehinds/lookaheads to prevent matching questions like '有没有' or '没有问题'.
+ */
+export const UNFIT_SELLER_REGEX = /(?:(?<!有)没有(?!问题|毛病|瑕疵|损坏)|没有咯|已出|卖了|不在了|下架|缺货|只有se|仅se|卖家关闭了订单|不单出|已坏|故障)/i;
+export const GHOST_SELLER_REGEX = /(?:没回复说明客服可能在忙|自动回复|智能客服)/;
+export const RESPONSIVE_SELLER_REGEX = /(?:全新正品|包邮|专拍价|可以发|明天发|当天发|有货|现货|在的|还在|有奶白|加振款|拿火源|标价.*拿火|\b(?:1\d{3}|2\d{3})\b)/;
+
+/**
+ * Classifies a seller's communication status based on session metadata and messages.
+ * Evaluates seller messages (is_self = '否') strictly separate from buyer messages (is_self = '是'),
+ * ensuring buyer questions like '请问有没有现货' never misclassify a seller as unfit.
+ */
+export function classifySellerCommunication({ session = {}, messages = [] }) {
+  const seller = session.contact_name || '';
+  const sellerMsgs = messages.filter(m => m.is_self === '否').map(m => m.content);
+  const lastSellerMsg = sellerMsgs[sellerMsgs.length - 1] || '';
+  const lastMsg = session.last_message || (messages[messages.length - 1]?.content || '-');
+
+  // Trade closed is an unambiguous unfit signal
+  if (
+    session.trade_status === '交易关闭' || 
+    /卖家关闭了订单/i.test(lastMsg) || 
+    /卖家关闭了订单/i.test(session.last_message || '')
+  ) {
+    return {
+      seller,
+      status: 'unfit',
+      reason: '交易已关闭或卖家取消订单',
+      last_message: lastMsg,
+    };
+  }
+
+  // Build seller text pool from explicit seller messages plus session last_message
+  // when last message was not sent by the buyer
+  const pool = [...sellerMsgs];
+  if (
+    (messages.length === 0 || messages[messages.length - 1]?.is_self !== '是') &&
+    session.last_message &&
+    session.last_message !== '-' &&
+    !pool.includes(session.last_message)
+  ) {
+    pool.push(session.last_message);
+  }
+  const sellerText = pool.join(' | ');
+
+  // Check seller's actual messages for explicit lack of stock
+  if (sellerText && UNFIT_SELLER_REGEX.test(sellerText)) {
+    const m = sellerText.match(UNFIT_SELLER_REGEX);
+    return {
+      seller,
+      status: 'unfit',
+      reason: `卖家明确无货或已出: ${m ? m[0] : lastSellerMsg || session.last_message}`,
+      last_message: lastSellerMsg || lastMsg,
+    };
+  }
+
+  // Check for ghosted: automated reply only, or buyer asked and seller never replied
+  if (
+    (sellerText && GHOST_SELLER_REGEX.test(sellerText) && (sellerMsgs.length <= 2 || messages.length === 0)) ||
+    (messages.length >= 1 && sellerMsgs.length === 0) ||
+    (sellerMsgs.length >= 1 && sellerMsgs.every(m => m.trim() === '[微笑]' || m.trim() === '对方撤回了一条信息'))
+  ) {
+    return {
+      seller,
+      status: 'ghosted',
+      reason: `已读不回或仅自动回复/表情: ${lastSellerMsg || lastMsg}`,
+      last_message: lastSellerMsg || lastMsg,
+    };
+  }
+
+  // Check for responsive: active quotes, stock confirmations
+  if (sellerText && RESPONSIVE_SELLER_REGEX.test(sellerText)) {
+    const quote = sellerText.match(RESPONSIVE_SELLER_REGEX)?.[0] || lastSellerMsg || session.last_message;
+    return {
+      seller,
+      status: 'responsive',
+      reason: `活跃报价与现货确认: ${quote}`,
+      last_message: lastSellerMsg || lastMsg,
+    };
+  }
+
+  return {
+    seller,
+    status: 'unknown',
+    reason: '待进一步沟通或未获取完整消息',
+    last_message: lastMsg,
+  };
+}
+
+/**
  * Type validation and normalization for Candidates.
  */
 export function validateCandidate(data) {
@@ -241,10 +372,16 @@ export function validateCandidate(data) {
     ? data.price_num
     : parseFloat(rawPrice.replace(/[^\d.]/g, '')) || 0;
 
+  const keyword = String(data.keyword || '').trim();
+  let category = String(data.category || '').trim();
+  if (!category || category === 'all' || category === '全部') {
+    category = inferCategory({ category, keyword, title });
+  }
+
   return {
     item_id: itemId,
-    keyword: String(data.keyword || '').trim(),
-    category: String(data.category || '').trim(),
+    keyword,
+    category,
     title,
     price: rawPrice.startsWith('¥') || rawPrice.startsWith('￥') ? rawPrice : `¥${rawPrice}`,
     price_num: priceNum,
@@ -286,6 +423,7 @@ export function validateSellerReview(data) {
 
   return {
     seller,
+    seller_user_id: String(data.seller_user_id || '').trim(),
     status,
     reason: String(data.reason || '').trim(),
     last_message: String(data.last_message || '').trim(),

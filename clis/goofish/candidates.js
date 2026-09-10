@@ -7,16 +7,16 @@ export const command = cli({
   access: 'read',
   description: '查询本地 SQLite SSOT 沉淀的二手候选商品库 (支持品类别名映射、价格区间、关键词及卖家风控过滤)',
   domain: 'www.goofish.com',
-  strategy: Strategy.COOKIE,
-  browser: true,
-  navigateBefore: false,
+  strategy: Strategy.LOCAL,
+  browser: false,
   args: [
-    { name: 'query', positional: true, required: false, help: '品类或关键词 (如 nexg2_nylon / lava_me_air / lava_me_4 / me4 / air / 2n)' },
-    { name: 'category', type: 'str', required: false, help: '指定品类过滤 (如 nexg2_nylon / lava_me_air / lava_me_4)' },
+    { name: 'query', positional: true, required: false, help: '品类或关键词 (如 nexg2_nylon / lava_me_air / lava_me_4 / me4 / air / 2n / all)' },
+    { name: 'category', type: 'str', required: false, help: '指定品类过滤 (如 nexg2_nylon / lava_me_air / lava_me_4 / all)' },
     { name: 'keyword', type: 'str', required: false, help: '商品标题或卖家关键词过滤' },
     { name: 'min-price', type: 'str', required: false, help: '最低价格过滤' },
     { name: 'max-price', type: 'str', required: false, help: '最高价格过滤' },
     { name: 'exclude-ghosted', type: 'bool', default: false, help: '是否过滤曾已读不回或明确无货卖家' },
+    { name: 'include-accessories', type: 'bool', default: false, help: '是否包含配件 (踏板/耳机/网线等，默认排除)' },
     { name: 'sort', type: 'str', default: 'price_asc', help: '排序方式: price_asc | price_desc | updated' },
     { name: 'limit', type: 'int', default: 50, help: '返回候选数量上限 (默认 50)' },
   ],
@@ -31,13 +31,26 @@ export const command = cli({
     'location',
     'item_url',
   ],
-  func: async (_page, kwargs) => {
+  func: async (first, second) => {
+    const kwargs = (second && typeof second === 'object' && !second.isContext) ? second : (first || {});
     const rawPos = String(kwargs.query || kwargs._?.[0] || '').trim();
-    const category = String(kwargs.category || rawPos).trim();
-    const keyword = String(kwargs.keyword || kwargs.q || '').trim();
+    
+    const knownCats = ['all', '全部', 'nexg', 'nexg2', '2n', 'nylon', '尼龙', 'air', 'lava air', 'me4', 'me 4', 'lava4', 'lava 4', 'nexg2_nylon', 'lava_me_air', 'lava_me_4'];
+    let category = kwargs.category ? String(kwargs.category).trim() : '';
+    let keyword = String(kwargs.keyword || kwargs.q || '').trim();
+
+    if (!category && rawPos) {
+      if (knownCats.includes(rawPos.toLowerCase())) {
+        category = rawPos;
+      } else {
+        keyword = keyword ? `${keyword} ${rawPos}` : rawPos;
+      }
+    }
+
     const minPrice = kwargs['min-price'] || null;
     const maxPrice = kwargs['max-price'] || null;
     const excludeGhosted = Boolean(kwargs['exclude-ghosted']);
+    const excludeAccessories = !Boolean(kwargs['include-accessories']);
     const sort = String(kwargs.sort || 'price_asc').trim();
     const limit = Math.max(1, Math.min(Number(kwargs.limit) || 50, 500));
 
@@ -47,6 +60,7 @@ export const command = cli({
       minPrice,
       maxPrice,
       excludeGhosted,
+      excludeAccessories,
       sort,
       limit,
     });

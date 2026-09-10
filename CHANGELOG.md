@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-09-11
+
+### Fixed & Hardened
+- **SQLite WAL Mode & Concurrency Resilience (`_db.js`, `src/db.js`)**:
+  - Initialized `PRAGMA journal_mode = WAL;`, `PRAGMA busy_timeout = 5000;`, and `PRAGMA synchronous = NORMAL;` to prevent SQLite lock contention under concurrent adapter runs.
+- **Centralized Accessory Filtering & Ingestion Guard (`_contract.js`, `_db.js`, `watch.js`, `pick.js`)**:
+  - Centralized `isAccessoryTitle(title, category)` and `ACCESSORY_REGEX` in `_contract.js` to eliminate duplicated snippet rot.
+  - Implemented `purgeJunkCandidates()` removing cables, pedals, and sub-¥400 accessories from `candidates` table.
+  - Guarded `saveCandidates` with automatic accessory rejection and baseline guitar price checks (default min ¥400 for guitar queries).
+- **Dual-Key Identity in `candidates_view` (`_contract.js`)**:
+  - Added `seller_user_id` to `seller_reviews`. Upgraded `candidates_view` to join on `(c.seller = r.seller OR (c.seller_user_id != '' AND c.seller_user_id != '-' AND r.seller_user_id != '' AND c.seller_user_id = r.seller_user_id))`, ensuring risk status persists across seller nickname changes.
+- **Zero-Browser Overhead on Local CLI Adapters (`candidates.js`, `reviews.js`)**:
+  - Reconfigured `candidates.js` and `reviews.js` with `browser: false` and `strategy: Strategy.LOCAL` for instant sub-10ms response times without launching Chromium.
+- **Context-Aware Seller Chat Classification (`_contract.js`)**:
+  - Upgraded `classifySellerCommunication` with negative lookbehinds/lookaheads `(?<!有)没有(?!问题|毛病|瑕疵|损坏)` to ensure buyer questions like "请问有没有现货" never misclassify a seller as `unfit`.
+  - Added intelligent fallback to check `session.last_message` when detailed messages are not yet synchronized.
+- **Flaky Search Navigation Auth Check Removed (`watch.js`, `pick.js`)**:
+  - Removed `checkAuth` from search page navigation routines where account header DOM selectors are intermittently absent.
+- **Candidate Cross-Referencing in `sync-chats` (`bin/xy-chat.js`)**:
+  - `xy-chat sync-chats` now automatically cross-references and synchronizes chat logs for sellers discovered in the candidate database.
+
 ## [1.4.0] - 2026-09-11
 
 ### Added

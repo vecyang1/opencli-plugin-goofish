@@ -1,10 +1,11 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { safeGoto, checkAuth } from './_shared.js';
+import { safeGoto } from './_shared.js';
 import { 
   saveCandidates, 
   queryCandidates, 
   syncSellerReviewsFromSessionsAndMessages 
 } from './_db.js';
+import { isAccessoryTitle } from './_contract.js';
 
 export const command = cli({
   site: 'goofish',
@@ -71,12 +72,9 @@ export const command = cli({
       });
     }
 
-    const accessoryRegex = /(?:踏板|踩钉|麦克风|话筒|耳麦|耳机|支架|图纸|维修|主板|琴包|背带|网线|插头|零配件|贴纸|图传|接头|书籍)/i;
-
     for (const sc of searchConfigs) {
       const searchUrl = 'https://www.goofish.com/search?q=' + encodeURIComponent(sc.keyword);
       await safeGoto(page, searchUrl);
-      await checkAuth(page);
 
       // Set price inputs
       if (sc.minPrice || sc.maxPrice) {
@@ -157,17 +155,12 @@ export const command = cli({
         });
       }, limit);
 
-      // Filter out accessories
-      const validGuitars = (rawCards || []).filter(it => {
-        const title = it.title || '';
-        if (accessoryRegex.test(title)) return false;
-        if (sc.category === 'lava_me_air' && /play/i.test(title)) return false;
-        return true;
-      });
+      // Filter out accessories via contract
+      const validGuitars = (rawCards || []).filter(it => !isAccessoryTitle(it.title, sc.category));
 
       // Write valid items to SQLite SSOT
       if (validGuitars.length > 0) {
-        saveCandidates(validGuitars, { keyword: sc.keyword, category: sc.category });
+        saveCandidates(validGuitars, { keyword: sc.keyword, category: sc.category, filterAccessories: true });
       }
     }
 

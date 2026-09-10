@@ -11,9 +11,8 @@ export const command = cli({
   access: 'read',
   description: '查看与管理卖家沟通与履约评估档案 (基于聊天记录自动分类: 活跃报价/已读不回/明确无货)',
   domain: 'www.goofish.com',
-  strategy: Strategy.COOKIE,
-  browser: true,
-  navigateBefore: false,
+  strategy: Strategy.LOCAL,
+  browser: false,
   args: [
     { name: 'seller', positional: true, required: false, help: '指定卖家昵称 (若不传则展示全部评估列表)' },
     { name: 'name', type: 'str', required: false, help: '卖家昵称筛选' },
@@ -29,7 +28,8 @@ export const command = cli({
     'interaction_count',
     'updated_at',
   ],
-  func: async (_page, kwargs) => {
+  func: async (first, second) => {
+    const kwargs = (second && typeof second === 'object' && !second.isContext) ? second : (first || {});
     if (kwargs.sync) {
       syncSellerReviewsFromSessionsAndMessages();
     }
