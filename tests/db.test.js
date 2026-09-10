@@ -120,12 +120,40 @@ test('SQLite SSOT db operations', async (t) => {
     const qMsgs = queryMessages('音乐家肖邦');
     assert.equal(qMsgs.length, 2);
     assert.equal(qMsgs[0].content, '这是什么拾音器');
+
+    // Test flexible queryMessages signature
+    const qMsgsWithOpts = queryMessages('音乐家肖邦', { limit: 1 });
+    assert.equal(qMsgsWithOpts.length, 1);
+    const qMsgsByObj = queryMessages({ contactName: '音乐家肖邦', query: '芬兰' });
+    assert.equal(qMsgsByObj.length, 1);
+    assert.equal(qMsgsByObj[0].sender, '音乐家肖邦');
   });
 
   await t.test('syncs seller reviews and manages candidates with SSOT', () => {
+    // Add sessions for additional seller classification testing
+    const moreSessions = [
+      {
+        contact_name: '雅趣琴音',
+        trade_status: '-',
+        last_message: '标价图九拿火源加振款',
+        time: '09-09',
+        unread: '-',
+        has_item: '是',
+      },
+      {
+        contact_name: '和泉纱雾860',
+        trade_status: '交易关闭',
+        last_message: '卖家关闭了订单，钱款已原路退返',
+        time: '09-08',
+        unread: '-',
+        has_item: '是',
+      }
+    ];
+    saveSessions(moreSessions);
+
     // Seller reviews
     const reviewedCount = syncSellerReviewsFromSessionsAndMessages();
-    assert.ok(reviewedCount >= 2);
+    assert.ok(reviewedCount >= 4);
 
     const ghostReview = getSellerReview('小夏吉他批发');
     assert.ok(ghostReview);
@@ -134,6 +162,14 @@ test('SQLite SSOT db operations', async (t) => {
     const unfitReview = getSellerReview('泰裤辣乐器批发');
     assert.ok(unfitReview);
     assert.equal(unfitReview.status, 'unfit');
+
+    const responsiveReview = getSellerReview('雅趣琴音');
+    assert.ok(responsiveReview);
+    assert.equal(responsiveReview.status, 'responsive');
+
+    const closedReview = getSellerReview('和泉纱雾860');
+    assert.ok(closedReview);
+    assert.equal(closedReview.status, 'unfit');
 
     // Candidates
     const candidates = [
@@ -183,13 +219,19 @@ test('SQLite SSOT db operations', async (t) => {
     // Query with price filter
     const priceFiltered = queryCandidates({ minPrice: 1700, maxPrice: 1850 });
     assert.equal(priceFiltered.length, 2);
+
+    // Query with category aliases
+    const aliasNexg = queryCandidates({ category: 'nexg' });
+    assert.equal(aliasNexg.length, 3);
+    const alias2n = queryCandidates({ category: '2n' });
+    assert.equal(alias2n.length, 3);
   });
 
   await t.test('computes database statistics', () => {
     const stats = getDbStats();
     assert.equal(stats.orders_stored, 2);
     assert.equal(stats.favorites_stored, 1);
-    assert.equal(stats.sessions_stored, 3);
+    assert.equal(stats.sessions_stored, 5);
     assert.equal(stats.messages_stored, 2);
     assert.equal(stats.candidates_stored, 3);
     assert.ok(stats.seller_reviews_stored >= 2);

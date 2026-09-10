@@ -69,7 +69,7 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu orders` | `[read]` | 获取已买到的宝贝历史订单 (十余年翻页) | `[query] [--limit 50] [--status 全部] [--all]` |
 | `opencli xianyu favorites` | `[read]` | 查看收藏夹宝贝与降价监控 | `[query] [--tab 全部/降价宝贝/有效宝贝] [--limit 30]` |
 | `opencli xianyu published` | `[read]` | 获取个人发布在售与已卖出闲置列表 | `[query] [--limit 30] [--all]` |
-| `opencli xianyu search` | `[read]` | 全网高级搜索二手商品 (地区/排序/价格/标签/降价) | `<query> [--region 珠三角/广东] [--sort 综合/新发布/新降价/价格] [--min-price] [--max-price] [--tags] [--page-num 1]` |
+| `opencli xianyu search` | `[read]` | 全网高级搜索二手商品 (地区/排序/价格/标签/降价/排除词) | `<query> [--region 珠三角/广东] [--sort 综合/新发布/新降价/价格] [--min-price] [--max-price] [--exclude 关键词] [--tags] [--page-num 1]` |
 | `opencli xianyu suggest` | `[read]` | 获取闲鱼全网热搜词与搜索关键词联想补全 | `[query] [--limit 20]` |
 | `opencli xianyu detail` | `[read]` | 获取指定商品详情与卖家信誉档案 | `<item_id>` |
 | `opencli xianyu seller` | `[read]` | 深度分析卖家画像、在售SKU全貌、历史买家评价与砍价博弈策略 | `<user_id/url/item_id> [--limit 20]` |
@@ -80,7 +80,7 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu reason` | `[read]` | 智能消费推断分析 (流水、高频卖家、待发货预警) | `[query] [--limit 50]` |
 | `opencli xianyu stats` | `[read]` | 个人资产、订单待办与消息看板 | `-f table/yaml` |
 | `opencli xianyu export` | `[read]` | 将订单或收藏导出为 Markdown、JSON 或 HTML 报表 | `[type orders/favorites] [--output path] [--file-type md/html/json]` |
-| `xy-chat candidates` | `[read/write]` | 候选池管理与离线全文检索 (按品类/价格/卖家状态筛选) | `[query] [--category] [--status] [--limit 50]` |
+| `xy-chat candidates` | `[read/write]` | 候选池管理与离线全文检索 (按品类/价格/卖家状态筛选) | `[category] [--category] [--keyword] [--min-price] [--max-price] [--exclude-ghosted] [--limit 50]` |
 | `xy-chat reviews` | `[read/write]` | 卖家信誉与沟通记录评估 (已读不回/无货/可沟通标注) | `[nick] [--status responsive/ghosted/unfit] [--note]` |
 | `xy-chat sync-chats` | `[read/write]` | 自动扫描并同步所有活跃私信会话与消息，提取卖家风险状态 | `[--limit 50] [--msg-limit 20]` |
 | `xy-chat pick` | `[read/write]` | 自动化跨品类候选聚合、详情补全、风险卖家过滤与最优解排序推荐 | `[category nexg2_nylon/lava_me_air/lava_me_4/all]` |

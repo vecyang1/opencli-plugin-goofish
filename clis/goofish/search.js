@@ -18,6 +18,7 @@ export const command = cli({
     { name: 'min-price', type: 'str', required: false, help: '最低价格筛选 (如: 50)' },
     { name: 'max-price', type: 'str', required: false, help: '最高价格筛选 (如: 500)' },
     { name: 'tags', type: 'str', required: false, help: '标签筛选，英文逗号分隔 (个人闲置, 验货宝, 验号担保, 包邮, 超赞鱼小铺, 全新, 严选, 转卖)' },
+    { name: 'exclude', type: 'str', required: false, help: '排除关键词，英文逗号分隔 (如: 踏板,耳麦,麦克风,支架,图纸,维修,琴包)' },
     { name: 'page-num', type: 'int', default: 1, help: '指定翻页页码 (1-50)' },
     { name: 'limit', type: 'int', default: 30, help: '返回结果最大数量 (默认 30)' },
   ],
@@ -48,6 +49,7 @@ export const command = cli({
     const minPrice = kwargs['min-price'] ? String(kwargs['min-price']).trim() : '';
     const maxPrice = kwargs['max-price'] ? String(kwargs['max-price']).trim() : '';
     const tags = kwargs.tags ? String(kwargs.tags).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
+    const excludeKeywords = kwargs.exclude ? String(kwargs.exclude).split(/[,，]/).map(s => s.trim().toLowerCase()).filter(Boolean) : [];
     const pageNum = Math.max(1, Number(kwargs['page-num']) || 1);
 
     const searchUrl = 'https://www.goofish.com/search?q=' + encodeURIComponent(query);
@@ -111,22 +113,22 @@ export const command = cli({
     if (minPrice || maxPrice) {
       await page.evaluate(({ min, max }) => {
         const priceInputs = Array.from(document.querySelectorAll('input[class*="search-price-input--"]'));
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
         if (priceInputs.length >= 2) {
           if (min) {
-            priceInputs[0].value = min;
+            if (setter) setter.call(priceInputs[0], min); else priceInputs[0].value = min;
             priceInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
             priceInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
           }
           if (max) {
-            priceInputs[1].value = max;
+            if (setter) setter.call(priceInputs[1], max); else priceInputs[1].value = max;
             priceInputs[1].dispatchEvent(new Event('input', { bubbles: true }));
             priceInputs[1].dispatchEvent(new Event('change', { bubbles: true }));
           }
-          const confirmBtn = Array.from(document.querySelectorAll('div, span, button')).find(el => {
-            return el.innerText && el.innerText.trim() === '确定' && el.children.length === 0;
-          });
-          if (confirmBtn) confirmBtn.click();
         }
+        const btn = document.querySelector('button[class*="search-price-confirm-button--"]') ||
+          Array.from(document.querySelectorAll('button, div, span')).find(el => (el.innerText || '').trim() === '确定' && el.children.length === 0);
+        if (btn) btn.click();
       }, { min: minPrice, max: maxPrice });
       await page.wait(2.5);
     }
@@ -267,7 +269,10 @@ export const command = cli({
         }
         const dropEl = a.querySelector('div[class*="price-desc--"]');
         if (dropEl && dropEl.innerText) {
-          priceDrop = dropEl.innerText.trim();
+          const dt = dropEl.innerText.trim();
+          if (dt.includes('降') || dt.includes('折')) {
+            priceDrop = dt;
+          }
         }
 
         // Condition
@@ -306,6 +311,13 @@ export const command = cli({
         seen.add(key);
         deduplicated.push(it);
       }
+    }
+
+    if (excludeKeywords.length > 0) {
+      deduplicated = deduplicated.filter(it => {
+        const titleLower = it.title.toLowerCase();
+        return !excludeKeywords.some(ex => titleLower.includes(ex));
+      });
     }
 
     // Defensive price filter & sort
