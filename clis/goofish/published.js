@@ -1,5 +1,5 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError } from '@jackwener/opencli/errors';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -24,21 +24,12 @@ export const command = cli({
     'seller',
   ],
   func: async (page, kwargs) => {
-    const limit = kwargs.all ? 500 : (kwargs.limit || 30);
+    const limit = kwargs.all ? 500 : (Number(kwargs.limit) || 30);
     const maxScrolls = kwargs.all ? 30 : Math.max(1, Math.ceil(limit / 10));
     const query = String(kwargs.query || '').trim().toLowerCase();
 
-    await page.goto('https://www.goofish.com/personal');
-    await page.wait(4);
-
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('编辑资料') || text.includes('宝贝') || text.includes('信用及评价') || text.includes('Vector_Y');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
+    await safeGoto(page, 'https://www.goofish.com/personal');
+    await checkAuth(page);
 
     for (let s = 0; s < maxScrolls; s++) {
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -51,69 +42,80 @@ export const command = cli({
 
       let startIndex = 0;
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes('信用及评价') && lines[i + 1] && lines[i + 1].match(/^\d+$/)) {
+        if (lines[i].includes('信用及评价') && lines[i + 1] && /^\d+$/.test(lines[i + 1])) {
           startIndex = i + 2;
           break;
         }
       }
 
       const itemLines = lines.slice(startIndex);
-      const parsed = [];
-      let cur = null;
+      const items = [];
+      let i = 0;
 
-      for (let i = 0; i < itemLines.length; i++) {
-        const l = itemLines[i];
-        if (['发闲置', '消息', 'APP', '反馈', '客服', '回顶部', '阿里巴巴集团'].includes(l)) {
+      while (i < itemLines.length) {
+        if (['发闲置', '消息', 'APP', '反馈', '客服', '回顶部', '阿里巴巴集团'].some(stopWord => itemLines[i] && itemLines[i].includes(stopWord))) {
           break;
         }
 
-        if (l === '¥' || l === '￥') {
-          if (cur && itemLines[i + 1]) {
-            cur.price = '¥' + itemLines[i + 1];
-            if (itemLines[i + 2] && itemLines[i + 2].startsWith('¥')) {
-              cur.original_price = itemLines[i + 2];
+        const title = itemLines[i];
+        i++;
+
+        let price = '¥0';
+        let origPrice = '-';
+        let status = '在售';
+
+        if (i < itemLines.length && itemLines[i] === '¥') {
+          i++;
+          if (i < itemLines.length) {
+            price = '¥' + itemLines[i];
+            i++;
+            if (i < itemLines.length && itemLines[i].startsWith('.')) {
+              price += itemLines[i];
+              i++;
             }
           }
-        } else if (l === 'Vector_Y' || l.includes('Vector_')) {
-          if (cur && cur.title) {
-            parsed.push(cur);
-          }
-          cur = null;
-        } else if (!cur && l.length > 2 && !l.startsWith('¥') && !l.startsWith('￥')) {
-          cur = {
-            title: l,
-            price: '¥0',
-            original_price: '-',
-            status: '在售',
-            seller: 'Vector_Y',
-          };
+        } else if (i < itemLines.length && (itemLines[i].startsWith('¥') || itemLines[i].startsWith('￥'))) {
+          price = itemLines[i];
+          i++;
+        }
+
+        if (i < itemLines.length && (itemLines[i].startsWith('¥') || itemLines[i].startsWith('￥'))) {
+          origPrice = itemLines[i];
+          i++;
+        }
+
+        let seller = '';
+        if (i < itemLines.length && !itemLines[i].startsWith('¥') && !itemLines[i].startsWith('￥') && itemLines[i].length < 25) {
+          seller = itemLines[i];
+          i++;
+        }
+
+        if (title && title.length > 1 && !['¥', '￥', '编辑资料', '宝贝'].includes(title)) {
+          items.push({
+            title: title.slice(0, 100),
+            price,
+            original_price: origPrice,
+            status,
+            seller: seller || '-',
+          });
         }
       }
-      if (cur && cur.title) parsed.push(cur);
-      return parsed;
+
+      return items;
     });
 
-    const seen = new Set();
-    let deduplicated = [];
-    for (const it of (rawItems || [])) {
-      if (!seen.has(it.title)) {
-        seen.add(it.title);
-        deduplicated.push(it);
-      }
-    }
-
+    let filtered = rawItems || [];
     if (query) {
-      deduplicated = deduplicated.filter(i => i.title.toLowerCase().includes(query));
+      filtered = filtered.filter(it => it.title.toLowerCase().includes(query) || it.seller.toLowerCase().includes(query));
     }
 
-    const sliced = deduplicated.slice(0, limit);
-    return sliced.map((item, idx) => ({
+    return filtered.slice(0, limit).map((it, idx) => ({
       index: idx + 1,
-      title: item.title,
-      price: item.price,
-      original_price: item.original_price,
-      status: item.status,
-      seller: item.seller,
+      title: it.title,
+      price: it.price,
+      original_price: it.original_price,
+      status: it.status,
+      seller: it.seller,
     }));
   },
 });

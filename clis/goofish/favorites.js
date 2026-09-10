@@ -1,5 +1,5 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError } from '@jackwener/opencli/errors';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -26,22 +26,13 @@ export const command = cli({
     'item_url',
   ],
   func: async (page, kwargs) => {
-    const limit = kwargs.all ? 1000 : (kwargs.limit || 30);
+    const limit = kwargs.all ? 1000 : (Number(kwargs.limit) || 30);
     const maxScrolls = kwargs.all ? 50 : Math.max(1, Math.ceil(limit / 10));
     const query = String(kwargs.query || '').trim().toLowerCase();
     const targetTab = String(kwargs.tab || '全部').trim();
 
-    await page.goto('https://www.goofish.com/collection');
-    await page.wait(3);
-
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('我的收藏') || text.includes('降价宝贝') || text.includes('有效宝贝') || text.includes('全部');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
+    await safeGoto(page, 'https://www.goofish.com/collection');
+    await checkAuth(page);
 
     await page.evaluate((tabName) => {
       const tabs = Array.from(document.querySelectorAll('div, span, button')).filter(el => {

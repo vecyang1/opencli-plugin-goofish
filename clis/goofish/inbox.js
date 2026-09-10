@@ -1,5 +1,5 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError } from '@jackwener/opencli/errors';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -32,17 +32,8 @@ export const command = cli({
     const query = String(kwargs.query || '').trim().toLowerCase();
     const unreadOnly = Boolean(kwargs['unread-only']);
 
-    await page.goto('https://www.goofish.com/im');
-    await page.wait(4);
-
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('消息') || text.includes('通知消息') || text.includes('聊天') || text.includes('Vector_Y');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
+    await safeGoto(page, 'https://www.goofish.com/im');
+    await checkAuth(page);
 
     // Wait for conversation items to render
     for (let retry = 0; retry < 5; retry++) {
@@ -62,7 +53,6 @@ export const command = cli({
           const text = it.innerText || '';
           const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
           
-          let name = lines[0] || '未知联系人';
           let tradeStatus = '-';
           let lastMsg = '-';
           let timeStr = '-';
@@ -74,11 +64,17 @@ export const command = cli({
           }
 
           for (const l of lines) {
-            if (['等待卖家发货', '等待买家付款', '等待买家发货', '待收货', '有新交易评价', '交易关闭', '交易成功', '退款中'].includes(l)) {
+            if (['等待卖家发货', '等待买家付款', '等待买家发货', '待收货', '有新交易评价', '交易关闭', '交易成功', '退款中', '等待见面交易'].includes(l)) {
               tradeStatus = l;
-            } else if (l.includes('小时前') || l.includes('分钟前') || l.includes('刚刚') || l.includes('昨天') || l.match(/^\d{2}-\d{2}$/)) {
+            } else if (l.includes('小时前') || l.includes('分钟前') || l.includes('刚刚') || l.includes('昨天') || /^\d{2}-\d{2}$/.test(l)) {
               timeStr = l;
             }
+          }
+
+          // Contact name is typically the first line unless empty or skeleton
+          let name = lines[0] || '未知联系人';
+          if (name === timeStr || name === tradeStatus) {
+            name = lines[1] || '未知联系人';
           }
 
           const msgCand = lines.find(l => l !== name && l !== tradeStatus && l !== timeStr && l !== unreadCount && !l.includes('评价') && !l.startsWith('¥'));
@@ -104,8 +100,8 @@ export const command = cli({
       });
 
       for (const item of (batch || [])) {
-        if (item.name && item.name !== '未知联系人' && !collectedMap.has(item.name)) {
-          collectedMap.set(item.name, item);
+        if (item.name && item.name !== '未知联系人' && !collectedMap.has(item.name + '_' + item.last_message)) {
+          collectedMap.set(item.name + '_' + item.last_message, item);
         }
       }
 

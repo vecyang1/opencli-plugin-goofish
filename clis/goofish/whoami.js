@@ -1,5 +1,5 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError } from '@jackwener/opencli/errors';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -19,39 +19,43 @@ export const command = cli({
     'status',
   ],
   func: async (page) => {
-    await page.goto('https://www.goofish.com/personal');
-    await page.wait(4);
-
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('编辑资料') || text.includes('信用及评价') || text.includes('宝贝') || text.includes('Vector_Y');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
+    await safeGoto(page, 'https://www.goofish.com/personal');
+    await checkAuth(page);
 
     const data = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
-
+      // 1. Nickname from semantic class or header link
       let nick = '';
-      const nickEl = document.querySelector('div[class*="nick--"], div[class*="name--"]');
+      const nickEl = document.querySelector('span[class*="nick--"], div[class*="nick--"], div[class*="name--"]');
       if (nickEl) nick = nickEl.innerText.trim();
+      if (!nick) {
+        const personalLink = document.querySelector('a[href*="/personal"]');
+        if (personalLink) nick = personalLink.innerText.trim();
+      }
 
+      // 2. Location from user info center
       let location = '-';
-      for (const l of lines.slice(0, 20)) {
-        if (['越南', '北京', '上海', '广州', '深圳', '杭州', '成都', '武汉'].includes(l)) {
-          location = l;
+      const infoSpans = Array.from(document.querySelectorAll('div[class*="infoCenter--"] span, span[class*="infoCenterText--"]'));
+      const locSpan = infoSpans.find(s => {
+        const t = s.innerText ? s.innerText.trim() : '';
+        return t && !t.includes('粉丝') && !t.includes('关注') && t.length <= 12;
+      });
+      if (locSpan) {
+        location = locSpan.innerText.trim();
+      }
+
+      // 3. Published items count from tab number
+      let itemsCount = '0';
+      const numEls = Array.from(document.querySelectorAll('div[class*="num--"]'));
+      for (const el of numEls) {
+        const parentText = el.parentElement ? el.parentElement.innerText : '';
+        if (parentText.includes('宝贝') && el.innerText && /^\d+$/.test(el.innerText.trim())) {
+          itemsCount = el.innerText.trim();
+          break;
         }
       }
 
-      let itemsCount = '0';
-      const itemsIdx = lines.findIndex(l => l === '宝贝');
-      if (itemsIdx >= 0 && lines[itemsIdx + 1] && lines[itemsIdx + 1].match(/^\d+$/)) {
-        itemsCount = lines[itemsIdx + 1];
-      }
-
+      // 4. Credit badges
+      const text = document.body ? document.body.innerText : '';
       const creditBadges = [];
       if (text.includes('卖家信用极好')) creditBadges.push('卖家信用极好');
       else if (text.includes('卖家信用优秀')) creditBadges.push('卖家信用优秀');
@@ -59,8 +63,14 @@ export const command = cli({
       if (text.includes('买家信用极好')) creditBadges.push('买家信用极好');
       else if (text.includes('买家信用优秀')) creditBadges.push('买家信用优秀');
 
+      // Check credit tag images if text badge not present
+      if (creditBadges.length === 0) {
+        const tagImgs = document.querySelectorAll('img[class*="creditTag--"]');
+        if (tagImgs.length > 0) creditBadges.push('信用优秀');
+      }
+
       return {
-        nick: nick || 'Vector_Y',
+        nick: nick || '已登录用户',
         location: location || '-',
         published_count: itemsCount + ' 件',
         credit_level: creditBadges.join(' · ') || '正常信用',

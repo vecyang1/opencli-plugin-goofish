@@ -1,5 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError, ArgumentError } from '@jackwener/opencli/errors';
+import { ArgumentError } from '@jackwener/opencli/errors';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -11,7 +12,7 @@ export const command = cli({
   browser: true,
   navigateBefore: false,
   args: [
-    { name: 'contact', positional: true, required: true, help: '目标联系人昵称或关键词 (如: 吉他小铺)' },
+    { name: 'contact', positional: true, required: true, help: '目标联系人昵称或关键词 (如: 音乐家肖邦)' },
     { name: 'message', positional: true, required: true, help: '要发送的私信文本内容' },
     { name: 'dry-run', type: 'bool', default: false, help: '空跑测试 (只定位会话并填入文本，不触发最终发送)' },
   ],
@@ -27,61 +28,51 @@ export const command = cli({
     const dryRun = Boolean(kwargs['dry-run']);
 
     if (!contactQuery || !messageText) {
-      throw new ArgumentError('请指定联系人和消息内容 (如: opencli xianyu chat "吉他小铺" "你好，请问宝贝还在吗？")');
+      throw new ArgumentError('请指定联系人和消息内容 (如: opencli xianyu chat "音乐家肖邦" "你好，请问宝贝还在吗？")');
     }
 
-    await page.goto('https://www.goofish.com/im');
-    await page.wait(4);
+    await safeGoto(page, 'https://www.goofish.com/im');
+    await checkAuth(page);
 
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('消息') || text.includes('通知消息') || text.includes('设置');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
-
+    // Wait until conversation items have loaded text
     for (let r = 0; r < 6; r++) {
-      const count = await page.evaluate(() => document.querySelectorAll('div[class*="conversation-item--"]').length);
-      if (count > 0) break;
+      const hasText = await page.evaluate(() => {
+        const item = document.querySelector('div[class*="conversation-item--"]');
+        return Boolean(item && item.innerText && item.innerText.trim().length > 0);
+      });
+      if (hasText) break;
       await page.wait(1.5);
     }
 
-    // Reset scrollTop to 0
-    await page.evaluate(() => {
+    // In-page search and scroll loop for virtual list
+    const found = await page.evaluate(async (targetName) => {
       const holder = document.querySelector('.rc-virtual-list-holder');
       if (holder) {
         holder.scrollTop = 0;
         holder.dispatchEvent(new Event('scroll', { bubbles: true }));
       }
-    });
-    await page.wait(1.5);
+      await new Promise(r => setTimeout(r, 600));
 
-    // Select contact
-    let found = false;
-    for (let s = 0; s < 15; s++) {
-      const clicked = await page.evaluate((targetName) => {
+      for (let s = 0; s < 30; s++) {
         const items = Array.from(document.querySelectorAll('div[class*="conversation-item--"]'));
-        const target = items.find(it => (it.innerText || '').toLowerCase().includes(targetName.toLowerCase()));
+        const target = items.find(it => {
+          const t = (it.innerText || '').toLowerCase();
+          return t.includes(targetName.toLowerCase());
+        });
+
         if (target) {
           target.click();
           return true;
         }
-        const holder = document.querySelector('.rc-virtual-list-holder');
+
         if (holder) {
-          holder.scrollTop += 350;
+          holder.scrollTop += 320;
           holder.dispatchEvent(new Event('scroll', { bubbles: true }));
         }
-        return false;
-      }, contactQuery);
-
-      if (clicked) {
-        found = true;
-        break;
+        await new Promise(r => setTimeout(r, 500));
       }
-      await page.wait(1.2);
-    }
+      return false;
+    }, contactQuery);
 
     if (!found) {
       throw new ArgumentError('未在私信列表中找到包含 "' + contactQuery + '" 的联系人');

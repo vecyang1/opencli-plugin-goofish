@@ -1,5 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { AuthRequiredError, ArgumentError } from '@jackwener/opencli/errors';
+import { safeGoto } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -43,8 +44,7 @@ export const command = cli({
           itemId = new URL(target).searchParams.get('id') || itemId;
         }
       } catch (e) {}
-      await page.goto('https://www.goofish.com/item?id=' + itemId);
-      await page.wait(3.5);
+      await safeGoto(page, 'https://www.goofish.com/item?id=' + itemId);
       
       const userLink = await page.evaluate(() => {
         const a = document.querySelector('a[href*="personal?userId="], a[href*="personal?"]');
@@ -61,12 +61,7 @@ export const command = cli({
       targetUrl = 'https://www.goofish.com/personal?userId=' + target;
     }
 
-    await page.evaluate((u) => {
-      if (!window.location.href.includes(u)) {
-        window.location.href = u;
-      }
-    }, targetUrl);
-    await page.wait(3.5);
+    await safeGoto(page, targetUrl);
 
     const isAuth = await page.evaluate(() => {
       const text = document.body ? document.body.innerText : '';

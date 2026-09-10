@@ -1,7 +1,7 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError } from '@jackwener/opencli/errors';
 import fs from 'fs';
 import path from 'path';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -32,17 +32,8 @@ export const command = cli({
     const format = String(kwargs['file-type'] || (outputPath.endsWith('.json') ? 'json' : outputPath.endsWith('.html') ? 'html' : 'md')).toLowerCase();
 
     const targetUrl = exportType === 'favorites' ? 'https://www.goofish.com/collection' : 'https://www.goofish.com/bought';
-    await page.goto(targetUrl);
-    await page.wait(3);
-
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('我买到的') || text.includes('我的收藏') || text.includes('全部') || text.includes('订单');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
+    await safeGoto(page, targetUrl);
+    await checkAuth(page);
 
     if (exportType === 'favorites') {
       await page.evaluate(() => {

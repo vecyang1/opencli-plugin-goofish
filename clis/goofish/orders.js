@@ -1,5 +1,5 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError } from '@jackwener/opencli/errors';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -29,22 +29,13 @@ export const command = cli({
     'order_url',
   ],
   func: async (page, kwargs) => {
-    const limit = kwargs.all ? 2000 : (kwargs.limit || 50);
+    const limit = kwargs.all ? 2000 : (Number(kwargs.limit) || 50);
     const maxScrolls = kwargs.all ? 100 : Math.max(1, Math.ceil(limit / 10));
     const query = String(kwargs.query || '').trim().toLowerCase();
     const statusFilter = String(kwargs.status || '').trim();
 
-    await page.goto('https://www.goofish.com/bought');
-    await page.wait(4);
-
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('我买到的') || text.includes('全部') || text.includes('我的交易') || text.includes('订单');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
+    await safeGoto(page, 'https://www.goofish.com/bought');
+    await checkAuth(page);
 
     if (statusFilter && statusFilter !== '全部') {
       await page.evaluate((targetStatus) => {
@@ -56,7 +47,7 @@ export const command = cli({
           tabs[0].click();
         }
       }, statusFilter);
-      await page.wait(3);
+      await page.wait(2.5);
     }
 
     let prevCount = 0;
@@ -64,7 +55,7 @@ export const command = cli({
 
     for (let s = 0; s < maxScrolls; s++) {
       const currentCount = await page.evaluate(() => {
-        return document.querySelectorAll('div[class*="container--Bhfvcld8"]').length;
+        return document.querySelectorAll('a[href*="personal?userId="], div[class*="container--Bhfvcld8"]').length;
       });
 
       if (currentCount >= limit) break;
@@ -82,33 +73,18 @@ export const command = cli({
     }
 
     const rawOrders = await page.evaluate(() => {
-      const cards = Array.from(document.querySelectorAll('div[class*="container--Bhfvcld8"]'));
+      const sellerLinks = Array.from(document.querySelectorAll('a[href*="personal?userId="]'));
       
-      return cards.map((card) => {
-        const sellerLink = card.querySelector('a[href*="personal?userId="]');
-        const seller = sellerLink && sellerLink.innerText ? sellerLink.innerText.trim() : '';
+      return sellerLinks.map((sellerLink) => {
+        const card = sellerLink.closest('div[class*="container--"]')?.parentElement || sellerLink.closest('div');
+        const seller = sellerLink.innerText ? sellerLink.innerText.trim() : '未知卖家';
+        
         let sellerUserId = '';
-        if (sellerLink) {
-          try {
-            sellerUserId = new URL(sellerLink.href, window.location.origin).searchParams.get('userId') || '';
-          } catch (e) {}
-        }
+        try {
+          sellerUserId = new URL(sellerLink.href, window.location.origin).searchParams.get('userId') || '';
+        } catch (e) {}
 
-        const topBar = card.querySelector('div[class*="container--BwkDKCUY"]');
-        let statusText = topBar && topBar.innerText ? topBar.innerText.replace(seller, '').replace(/\s+/g, ' ').trim() : '';
-        if (!statusText) {
-          const cardText = card.innerText || '';
-          if (cardText.includes('交易成功')) statusText = '交易成功';
-          else if (cardText.includes('交易关闭')) statusText = cardText.includes('有退款') ? '交易关闭(有退款)' : '交易关闭';
-          else if (cardText.includes('等待卖家发货')) statusText = '等待卖家发货';
-          else if (cardText.includes('待收货')) statusText = '待收货';
-          else if (cardText.includes('待付款')) statusText = '待付款';
-          else if (cardText.includes('退款中')) statusText = '退款中';
-          else if (cardText.includes('待评价')) statusText = '待评价';
-          else statusText = '交易完成';
-        }
-
-        const itemLink = card.querySelector('a[href*="order-detail?orderId="]') || card.querySelector('a.info--vYR7LJEk');
+        const itemLink = card ? (card.querySelector('a[href*="order-detail"]') || card.querySelector('a[href*="orderId="]') || card.querySelector('a[class*="info--"]')) : null;
         const orderUrl = (itemLink && itemLink.href && !itemLink.href.startsWith('javascript:')) ? itemLink.href : '';
         let orderId = '';
         if (orderUrl) {
@@ -117,25 +93,37 @@ export const command = cli({
           } catch (e) {}
         }
 
-        const titleEl = card.querySelector('div[class*="name--DMayvjw5"]') || card.querySelector('div[class*="desc--UwIZUPPe"]');
-        let title = titleEl && titleEl.innerText ? titleEl.innerText.trim() : '';
-        if (!title) {
-          const lines = (card.innerText || '').split('\n').map(s => s.trim()).filter(Boolean);
-          const titleCand = lines.find(l => l !== seller && !l.includes('交易') && !l.includes('发货') && !l.startsWith('¥') && !l.startsWith('￥') && !['更多', '联系卖家', '再次购买', '去评价', '查看评价', '查看钱款', '提醒发货'].includes(l));
-          title = titleCand || '';
-        }
+        const cardText = card ? (card.innerText || '') : '';
+        let statusText = '';
+        if (cardText.includes('等待卖家发货')) statusText = '等待卖家发货';
+        else if (cardText.includes('等待见面交易')) statusText = '等待见面交易';
+        else if (cardText.includes('待收货')) statusText = '待收货';
+        else if (cardText.includes('待付款')) statusText = '待付款';
+        else if (cardText.includes('退款中')) statusText = '退款中';
+        else if (cardText.includes('待评价')) statusText = '待评价';
+        else if (cardText.includes('交易成功')) statusText = '交易成功';
+        else if (cardText.includes('交易关闭')) statusText = cardText.includes('有退款') ? '交易关闭(有退款)' : '交易关闭';
+        else statusText = '交易完成';
 
-        const priceEl = card.querySelector('div[class*="price--GDPxbdMU"]') || card.querySelector('div[class*="price--"]');
-        let price = priceEl && priceEl.innerText ? priceEl.innerText.replace(/\s+/g, '') : '';
-        if (!price) {
-          const pMatch = (card.innerText || '').match(/[¥￥]\s*([\d.]+)/);
-          if (pMatch) price = '¥' + pMatch[1];
-        }
+        const lines = cardText.split('\n').map(s => s.trim()).filter(Boolean);
+        const titleCand = lines.find(l => 
+          l !== seller && 
+          !l.includes('交易') && 
+          !l.includes('发货') && 
+          !l.includes('评价') && 
+          !l.startsWith('¥') && 
+          !l.startsWith('￥') && 
+          !['更多', '联系卖家', '再次购买', '去评价', '查看评价', '查看钱款', '提醒发货', '确认收货'].includes(l)
+        );
+        const title = titleCand || '';
 
-        const tagEl = card.querySelector('div[class*="tags--UTjYd9Jr"]') || card.querySelector('div[class*="tags--"]');
+        const pMatch = cardText.match(/[¥￥]\s*([\d.]+)/);
+        const price = pMatch ? '¥' + pMatch[1] : '¥0';
+
+        const tagEl = card ? (card.querySelector('div[class*="tags--"], div[class*="tag--"]') || card.querySelector('span[class*="tag--"]')) : null;
         let specTag = tagEl && tagEl.innerText ? tagEl.innerText.replace(/\n+/g, ' | ').trim() : '';
 
-        const imLink = card.querySelector('a[href*="/im?"]') || card.querySelector('a[href*="itemId="]');
+        const imLink = card ? card.querySelector('a[href*="/im?"]') : null;
         let itemId = '';
         if (imLink) {
           try {
@@ -149,11 +137,11 @@ export const command = cli({
 
         return {
           order_id: orderId || '-',
-          seller: seller || '未知卖家',
+          seller,
           seller_user_id: sellerUserId || '-',
           status: statusText || '交易成功',
           title: title.slice(0, 120),
-          price: price || '¥0',
+          price,
           spec_tag: specTag || '-',
           item_id: itemId || '-',
           order_url: orderUrl || '-',
@@ -164,7 +152,7 @@ export const command = cli({
     const seen = new Set();
     let deduplicated = [];
     for (const ord of (rawOrders || [])) {
-      const key = ord.order_id + '_' + ord.title + '_' + ord.price;
+      const key = ord.order_id !== '-' ? ord.order_id : (ord.seller + '_' + ord.title + '_' + ord.price);
       if (!seen.has(key)) {
         seen.add(key);
         deduplicated.push(ord);
