@@ -1,4 +1,17 @@
-import { AuthRequiredError } from '@jackwener/opencli/errors';
+let _AuthRequiredError;
+try {
+  const errMod = await import('@jackwener/opencli/errors');
+  _AuthRequiredError = errMod.AuthRequiredError;
+} catch {
+  _AuthRequiredError = class AuthRequiredError extends Error {
+    constructor(site) {
+      super(`Authentication required for ${site}`);
+      this.name = 'AuthRequiredError';
+      this.exitCode = 77;
+    }
+  };
+}
+export const AuthRequiredError = _AuthRequiredError;
 
 /**
  * Check if a navigation error is transient and retriable in Chrome CDP / OpenCLI bridge.
@@ -8,11 +21,88 @@ export function isRetriableNavigationError(error) {
   return /Navigation rejected|Detached while handling command|Debugger is not attached|Target closed|Session closed|Cannot access a chrome-extension/i.test(msg);
 }
 
+// Rate limiter state tracking last navigation timestamps by endpoint category
+const _lastNavTimes = {
+  im: 0,
+  item: 0,
+  search: 0,
+  default: 0,
+};
+
+export function isTestEnv() {
+  return process.env.NODE_ENV === 'test' || 
+         process.env.npm_lifecycle_event === 'test' || 
+         process.env.GOOFISH_FAST_TEST === '1' ||
+         Boolean(process.env.NODE_TEST_CONTEXT);
+}
+
+/**
+ * Generate human-like random jitter delay between minMs and maxMs.
+ */
+export async function humanDelay(minMs = 2500, maxMs = 5000) {
+  if (isTestEnv()) {
+    return 0;
+  }
+  const delay = Math.floor(minMs + Math.random() * (maxMs - minMs));
+  await new Promise(r => setTimeout(r, delay));
+  return delay;
+}
+
+/**
+ * Determine endpoint category for rate limiting.
+ */
+export function getEndpointCategory(url) {
+  const u = String(url || '');
+  if (u.includes('/im') || u.includes('/chat')) return 'im';
+  if (u.includes('/item') || u.includes('item?id=')) return 'item';
+  if (u.includes('/search')) return 'search';
+  return 'default';
+}
+
+/**
+ * Enforce minimum cooldown and human jitter between navigations.
+ * Rung 3 Architectural Guard: Prevents silent account bans by Alibaba anti-scraping risk control.
+ */
+export async function enforceRateLimit(url, options = {}) {
+  if (isTestEnv()) {
+    return 0;
+  }
+
+  const category = getEndpointCategory(url);
+  const now = Date.now();
+  const lastTime = _lastNavTimes[category] || 0;
+
+  // Minimum intervals: IM (highest risk) >= 5000ms, Item detail >= 3000ms, Search >= 2500ms
+  const minIntervals = {
+    im: 5500,
+    item: 3500,
+    search: 2500,
+    default: 2000,
+  };
+
+  const minInterval = options.minInterval || minIntervals[category] || 2000;
+  const elapsed = now - lastTime;
+
+  if (elapsed < minInterval) {
+    const waitBase = minInterval - elapsed;
+    const jitter = Math.floor(1000 + Math.random() * 2000); // 1-3s random human jitter
+    const totalWait = waitBase + jitter;
+    await new Promise(r => setTimeout(r, totalWait));
+  }
+
+  _lastNavTimes[category] = Date.now();
+  return Date.now() - now;
+}
+
 /**
  * Resilient page navigation with automatic retry and location.href evaluation fallback.
  * Solves the frequent 'Navigation rejected.' CDP issue on heavy web pages.
+ * Automatically throttles and introduces human behavior jitter to prevent anti-bot bans.
  */
 export async function safeGoto(page, url, options = {}) {
+  // 1. Enforce anti-ban rate limiting and human jitter cooldown
+  await enforceRateLimit(url, options);
+
   const waitSec = options.waitSec ?? 3.5;
   try {
     await page.goto(url);

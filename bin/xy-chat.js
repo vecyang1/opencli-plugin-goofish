@@ -14,6 +14,7 @@ import {
   getDbStats, resolveDbPath 
 } from '../src/db.js';
 import { isAccessoryTitle, inferCategory } from '../src/contract.js';
+import { humanDelay } from '../clis/goofish/_shared.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -413,12 +414,13 @@ async function main() {
       console.log(`🎸 识别到 ${targetSellers.length} 位重点沟通卖家 (包含候选商品卖家与乐器沟通)，正在拉取聊天记录...`);
       for (const s of targetSellers) {
         try {
-          console.log(`  -> 拉取 [${s.contact_name}] 聊天记录...`);
+          console.log(`  -> 拉取 [${s.contact_name}] 聊天记录 (模拟人类随机思考间歇)...`);
           const msgRes = runOpenCli('messages', [s.contact_name, '--limit', '30', '-f', 'json']);
           const msgs = JSON.parse(msgRes.stdout);
           if (Array.isArray(msgs)) {
             saveMessages(s.contact_name, msgs);
           }
+          await humanDelay(3500, 6500);
         } catch (e) {}
       }
 
