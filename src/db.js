@@ -341,14 +341,43 @@ export function saveMessages(contactName, messages) {
   return count;
 }
 
-export function queryMessages(contactName, limit = 100) {
+export function queryMessages(contactOrOpts, maybeOpts = {}) {
   const db = getDb();
-  return db.prepare(`
-    SELECT * FROM messages 
-    WHERE contact_name = ? 
-    ORDER BY id ASC 
-    LIMIT ?
-  `).all(contactName, limit);
+  let contactName = '';
+  let limit = 100;
+  let query = '';
+
+  if (typeof contactOrOpts === 'string') {
+    contactName = contactOrOpts;
+    if (typeof maybeOpts === 'number') {
+      limit = maybeOpts;
+    } else if (maybeOpts && typeof maybeOpts === 'object') {
+      limit = maybeOpts.limit || 100;
+      query = maybeOpts.query || '';
+    }
+  } else if (contactOrOpts && typeof contactOrOpts === 'object') {
+    contactName = contactOrOpts.contactName || contactOrOpts.contact_name || '';
+    limit = contactOrOpts.limit || 100;
+    query = contactOrOpts.query || '';
+  }
+
+  let sql = 'SELECT * FROM messages WHERE 1=1';
+  const params = [];
+
+  if (contactName) {
+    sql += ' AND contact_name = ?';
+    params.push(contactName);
+  }
+
+  if (query) {
+    sql += ' AND (content LIKE ? OR sender LIKE ?)';
+    params.push(`%${query}%`, `%${query}%`);
+  }
+
+  sql += ' ORDER BY id ASC LIMIT ?';
+  params.push(limit);
+
+  return db.prepare(sql).all(...params);
 }
 
 /**
@@ -451,8 +480,17 @@ export function queryCandidates({
   const params = [];
 
   if (category) {
-    sql += ' AND (category = ? OR keyword LIKE ?)';
-    params.push(category, `%${category}%`);
+    const catLower = category.toLowerCase().trim();
+    let mapped = category;
+    if (catLower === 'me4' || catLower === 'me 4' || catLower === 'lava4' || catLower === 'lava 4') {
+      mapped = 'lava_me_4';
+    } else if (catLower === 'air' || catLower === 'lava air') {
+      mapped = 'lava_me_air';
+    } else if (catLower === 'nexg' || catLower === 'nexg2' || catLower === '2n' || catLower === 'nylon') {
+      mapped = 'nexg2_nylon';
+    }
+    sql += ' AND (category = ? OR category LIKE ? OR keyword LIKE ?)';
+    params.push(mapped, `%${category}%`, `%${category}%`);
   }
 
   if (keyword) {
@@ -553,33 +591,29 @@ export function syncSellerReviewsFromSessionsAndMessages() {
     let status = 'unknown';
     let reason = '';
 
+    const unfitRegex = /(?:没有|没有咯|已出|卖了|不在了|下架|缺货|nexg se|卖家关闭了订单|不单出|已坏|故障)/i;
+    const ghostRegex = /(?:没回复说明客服可能在忙|自动回复)/;
+    const responsiveRegex = /(?:全新正品|包邮|专拍价|可以发|明天发|当天发|有货|现货|在的|还在|有奶白|加振款|拿火源|标价.*拿火|\b(?:1\d{3}|2\d{3})\b)/;
+
     if (
-      allText.includes('没有') ||
-      allText.includes('没有咯') ||
-      allText.includes('nexg se') ||
-      allText.includes('卖家关闭了订单') ||
+      unfitRegex.test(allText) ||
       sess.trade_status === '交易关闭'
     ) {
       status = 'unfit';
-      reason = `明确无货或交易关闭: ${allText.match(/(?:没有|没有咯|nexg se|卖家关闭了订单)[^|]*/)?.[0] || lastMsg}`;
+      const m = allText.match(unfitRegex);
+      reason = `明确无货或交易关闭: ${m ? m[0] : lastMsg}`;
     } else if (
-      allText.includes('没回复说明客服可能在忙') ||
+      ghostRegex.test(allText) ||
       (msgs.length >= 1 && sellerMsgs.length === 0) ||
-      (msgs.length >= 1 && sellerMsgs.every(m => m.trim() === '[微笑]'))
+      (msgs.length >= 1 && sellerMsgs.every(m => m.trim() === '[微笑]' || m.trim() === '对方撤回了一条信息'))
     ) {
       status = 'ghosted';
       reason = `已读不回或仅自动回复/表情: ${lastMsg}`;
     } else if (
-      allText.includes('全新正品') ||
-      allText.includes('包邮') ||
-      allText.includes('专拍价') ||
-      allText.includes('可以发') ||
-      allText.includes('有奶白') ||
-      allText.includes('标价拿火源') ||
-      /\b(?:1\d{3}|2\d{3})\b/.test(allText)
+      responsiveRegex.test(allText)
     ) {
       status = 'responsive';
-      const quote = allText.match(/(?:1\d{3}|2\d{3}|全新正品|专拍价|有奶白|标价拿火源)[^|]*/)?.[0] || lastMsg;
+      const quote = allText.match(responsiveRegex)?.[0] || lastMsg;
       reason = `活跃报价与现货确认: ${quote}`;
     }
 

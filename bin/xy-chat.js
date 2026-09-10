@@ -39,6 +39,45 @@ function printTable(rows, columns) {
   console.table(rows, columns);
 }
 
+function parseCliArgs(args) {
+  const flagsWithValue = new Set([
+    '--limit', '-n',
+    '--status', '-s',
+    '--format', '-f',
+    '--tab',
+    '--scrolls',
+    '--category',
+    '--keyword', '-q',
+    '--page-num',
+    '--sort',
+    '--region',
+    '--min-price',
+    '--max-price',
+    '--tags',
+    '--exclude',
+    '--output',
+    '--file-type',
+    '--msg-limit',
+    '--note',
+  ]);
+  const positionals = [];
+  const options = {};
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('-')) {
+      if (flagsWithValue.has(arg) && i + 1 < args.length && !args[i + 1].startsWith('-')) {
+        options[arg] = args[i + 1];
+        i++;
+      } else {
+        options[arg] = true;
+      }
+    } else {
+      positionals.push(arg);
+    }
+  }
+  return { positionals, options };
+}
+
 async function main() {
   switch (command) {
     case 'doctor': {
@@ -55,7 +94,7 @@ async function main() {
           const parsed = JSON.parse(doc.stdout);
           nick = parsed[0]?.nick || '已登录用户';
         } catch (e) {
-          nick = 'Vector_Y';
+          nick = '已登录用户';
         }
       } else if (doc.stdout.includes('AUTH_REQUIRED') || doc.stderr.includes('AUTH_REQUIRED')) {
         bridgeOk = true;
@@ -94,9 +133,11 @@ async function main() {
       // If user asks for live or passes flags, pass through to opencli and cache
       const isLive = subArgs.includes('--live');
       const cleanArgs = subArgs.filter(a => a !== '--live');
-      const query = cleanArgs.find(a => !a.startsWith('-')) || '';
+      const { positionals, options } = parseCliArgs(cleanArgs);
+      const query = positionals[0] || '';
+      const limit = parseInt(options['--limit'] || options['-n'] || '50', 10);
 
-      const localOrders = queryOrders({ query, limit: 50 });
+      const localOrders = queryOrders({ query, limit });
       if (!isLive && localOrders.length > 0) {
         console.log(`📦 从本地 SQLite SSOT 命中 ${localOrders.length} 条订单 (加 --live 强制线上刷新):`);
         printTable(localOrders.map((o, idx) => ({
@@ -119,9 +160,11 @@ async function main() {
     case 'favorites': {
       const isLive = subArgs.includes('--live');
       const cleanArgs = subArgs.filter(a => a !== '--live');
-      const query = cleanArgs.find(a => !a.startsWith('-')) || '';
+      const { positionals, options } = parseCliArgs(cleanArgs);
+      const query = positionals[0] || '';
+      const limit = parseInt(options['--limit'] || options['-n'] || '50', 10);
 
-      const localFavs = queryFavorites({ query, limit: 50 });
+      const localFavs = queryFavorites({ query, limit });
       if (!isLive && localFavs.length > 0) {
         console.log(`⭐ 从本地 SQLite SSOT 命中 ${localFavs.length} 条收藏宝贝 (加 --live 强制线上刷新):`);
         printTable(localFavs.map((f, idx) => ({
@@ -141,13 +184,56 @@ async function main() {
     }
 
     case 'inbox': {
-      const res = spawnSync('opencli', ['xianyu', 'inbox', ...subArgs], { stdio: 'inherit' });
+      const isLive = subArgs.includes('--live');
+      const cleanArgs = subArgs.filter(a => a !== '--live');
+      const { positionals, options } = parseCliArgs(cleanArgs);
+      const query = positionals[0] || '';
+      const limit = parseInt(options['--limit'] || options['-n'] || '50', 10);
+
+      const localSessions = querySessions({ query, limit });
+      if (!isLive && localSessions.length > 0) {
+        console.log(`💬 从本地 SQLite SSOT 命中 ${localSessions.length} 个私信会话 (加 --live 强制线上刷新):`);
+        printTable(localSessions.map((s, idx) => ({
+          '#': idx + 1,
+          '联系人': s.contact_name,
+          '最新消息': (s.last_message || '-').slice(0, 35),
+          '时间': s.time,
+          '未读': s.unread,
+          '关联宝贝': s.has_item,
+        })));
+        process.exit(0);
+      }
+
+      console.log('🔄 正在从闲鱼线上实时拉取私信会话...');
+      const res = spawnSync('opencli', ['xianyu', 'inbox', ...cleanArgs], { stdio: 'inherit' });
       process.exit(res.status ?? 0);
       break;
     }
 
     case 'messages': {
-      const res = spawnSync('opencli', ['xianyu', 'messages', ...subArgs], { stdio: 'inherit' });
+      const isLive = subArgs.includes('--live');
+      const cleanArgs = subArgs.filter(a => a !== '--live');
+      const { positionals, options } = parseCliArgs(cleanArgs);
+      const contact = positionals[0] || '';
+      const limit = parseInt(options['--limit'] || options['-n'] || '50', 10);
+
+      if (contact && !isLive) {
+        const localMsgs = queryMessages(contact, { limit });
+        if (localMsgs.length > 0) {
+          console.log(`✉️ 从本地 SQLite SSOT 命中与 [${contact}] 的 ${localMsgs.length} 条聊天记录 (加 --live 强制线上刷新):`);
+          printTable(localMsgs.map((m, idx) => ({
+            '#': idx + 1,
+            '发送方': m.sender,
+            '我是买家': m.is_self,
+            '内容': m.content.slice(0, 50),
+            '状态': m.read_status,
+          })));
+          process.exit(0);
+        }
+      }
+
+      console.log(`🔄 正在从闲鱼线上实时拉取与 [${contact || '未知'}] 的聊天记录...`);
+      const res = spawnSync('opencli', ['xianyu', 'messages', ...cleanArgs], { stdio: 'inherit' });
       process.exit(res.status ?? 0);
       break;
     }
@@ -230,13 +316,16 @@ async function main() {
     }
 
     case 'candidates': {
-      const category = subArgs.find(a => !a.startsWith('-')) || '';
-      const minPrice = subArgs.includes('--min-price') ? subArgs[subArgs.indexOf('--min-price') + 1] : null;
-      const maxPrice = subArgs.includes('--max-price') ? subArgs[subArgs.indexOf('--max-price') + 1] : null;
-      const excludeGhosted = subArgs.includes('--exclude-ghosted');
-      const sort = subArgs.includes('--sort') ? subArgs[subArgs.indexOf('--sort') + 1] : 'price_asc';
+      const { positionals, options } = parseCliArgs(subArgs);
+      const category = options['--category'] || positionals[0] || '';
+      const keyword = options['--keyword'] || options['-q'] || '';
+      const minPrice = options['--min-price'] || null;
+      const maxPrice = options['--max-price'] || null;
+      const excludeGhosted = !!options['--exclude-ghosted'];
+      const sort = options['--sort'] || 'price_asc';
+      const limit = parseInt(options['--limit'] || options['-n'] || '50', 10);
 
-      const results = queryCandidates({ category, minPrice, maxPrice, excludeGhosted, sort });
+      const results = queryCandidates({ category, keyword, minPrice, maxPrice, excludeGhosted, sort, limit });
       if (results.length === 0) {
         console.log('（本地 SQLite SSOT 中暂无候选宝贝，请运行 xy-chat pick 或 search 同步）');
         process.exit(0);
@@ -257,7 +346,8 @@ async function main() {
     }
 
     case 'reviews': {
-      const seller = subArgs.find(a => !a.startsWith('-')) || '';
+      const { positionals, options } = parseCliArgs(subArgs);
+      const seller = positionals[0] || options['--seller'] || '';
       if (seller) {
         const rev = getSellerReview(seller);
         if (!rev) {
@@ -267,7 +357,8 @@ async function main() {
           console.table([rev]);
         }
       } else {
-        const revs = querySellerReviews();
+        const limit = parseInt(options['--limit'] || options['-n'] || '50', 10);
+        const revs = querySellerReviews({ limit });
         console.log(`📋 卖家沟通评估记录表 (${revs.length} 位卖家):`);
         printTable(revs.map((r, idx) => ({
           '#': idx + 1,
@@ -359,6 +450,9 @@ async function main() {
         });
       }
 
+      const accessoryRegex = /(?:踏板|踩钉|麦克风|话筒|耳麦|耳机|支架|图纸|维修|主板|琴包|背带|网线|插头|零配件|贴纸|图传|接头|书籍)/i;
+      const excludeStr = '踏板,麦克风,话筒,耳麦,耳机,支架,图纸,维修,主板,琴包,背带,网线,插头,零配件,贴纸';
+
       let totalFound = 0;
       for (const sc of searchConfigs) {
         console.log(`\n🔍 [${sc.category}] 正在线上搜索 "${sc.keyword}" (价格区间: ¥${sc.minPrice} - ¥${sc.maxPrice})...`);
@@ -367,7 +461,8 @@ async function main() {
           '--min-price', sc.minPrice,
           '--max-price', sc.maxPrice,
           '--sort', sc.sort,
-          '--limit', '15',
+          '--exclude', excludeStr,
+          '--limit', '20',
           '-f', 'json'
         ]);
 
@@ -380,10 +475,18 @@ async function main() {
         }
 
         if (Array.isArray(items) && items.length > 0) {
-          console.log(`  -> 抓取到 ${items.length} 个原始候选，正在拉取详情与卖家身份补全...`);
-          // Enrich top 5 items with detail if seller missing
-          for (let i = 0; i < Math.min(items.length, 5); i++) {
-            const it = items[i];
+          // Pre-filter accessories and category mismatches
+          const validGuitars = items.filter(it => {
+            const title = it.title || '';
+            if (accessoryRegex.test(title)) return false;
+            if (sc.category === 'lava_me_air' && /play/i.test(title)) return false;
+            return true;
+          });
+
+          console.log(`  -> 抓取到 ${items.length} 个候选 (过滤配件后剩余 ${validGuitars.length} 把吉他)，正在拉取详情与卖家身份补全...`);
+          // Enrich top 5 real guitar items with detail if seller missing
+          for (let i = 0; i < Math.min(validGuitars.length, 5); i++) {
+            const it = validGuitars[i];
             if (!it.seller || it.seller === '-') {
               try {
                 const detRes = runOpenCli('detail', [it.item_id, '-f', 'json']);
@@ -397,15 +500,16 @@ async function main() {
             }
           }
 
-          const saved = saveCandidates(items, { keyword: sc.keyword, category: sc.category });
+          const saved = saveCandidates(validGuitars, { keyword: sc.keyword, category: sc.category });
           totalFound += saved;
-          console.log(`  ✅ 已持久化 ${saved} 个候选至本地 SQLite SSOT`);
+          console.log(`  ✅ 已持久化 ${saved} 把候选吉他至本地 SQLite SSOT`);
         }
       }
 
       // Re-read authoritative candidates from SQLite (SSOT & Unidirectional Data Flow)
       console.log('\n=================== 📊 闲鱼最优吉他候选选购决策全景图 (SSOT 真理库) ===================');
-      const allCandidates = queryCandidates({ limit: 40 });
+      const queryCat = target === 'all' ? '' : (target.includes('nexg') ? 'nexg2_nylon' : (target.includes('air') ? 'lava_me_air' : 'lava_me_4'));
+      const allCandidates = queryCandidates({ category: queryCat, limit: 50 });
       printTable(allCandidates.map((c, idx) => ({
         '#': idx + 1,
         '类别': c.category,
@@ -413,11 +517,34 @@ async function main() {
         '价格': c.price,
         '成色': c.condition,
         '卖家': c.seller,
-        '聊天/信誉风控': c.seller_status === 'responsive' ? '✅ 活跃报价' : (c.seller_status === 'ghosted' ? '⚠️ 已读不回' : (c.seller_status === 'unfit' ? '❌ 明确无货' : '❓ 待深入沟通')),
+        '聊天/信誉风控': c.seller_status === 'responsive' ? '✅ 活跃报价' : (c.seller_status === 'ghosted' ? '⚠️ 曾已读不回' : (c.seller_status === 'unfit' ? '❌ 明确无货' : '❓ 待深入沟通')),
         '标题': c.title.slice(0, 30),
         '所在地': c.location,
-        '链接': c.item_url,
       })));
+
+      // Decision summaries
+      console.log('\n🎯 最优推荐与风控屏蔽决策摘要:');
+      const cats = target === 'all' ? ['nexg2_nylon', 'lava_me_air', 'lava_me_4'] : [queryCat];
+      for (const cat of cats) {
+        const catItems = allCandidates.filter(c => c.category === cat);
+        const safeItems = catItems.filter(c => c.seller_status !== 'ghosted' && c.seller_status !== 'unfit');
+        const lowest = safeItems[0] || catItems[0];
+        const excludedCount = catItems.length - safeItems.length;
+
+        console.log(`\n📌 [${cat.toUpperCase()}]:`);
+        if (lowest) {
+          console.log(`  - 推荐最优底价: ${lowest.price} (商品ID: ${lowest.item_id})`);
+          console.log(`  - 卖家: ${lowest.seller} [${lowest.location}] (风控状态: ${lowest.seller_status})`);
+          console.log(`  - 标题: ${lowest.title}`);
+          console.log(`  - 链接: ${lowest.item_url}`);
+          console.log(`  - 图片: ${lowest.image_url}`);
+        } else {
+          console.log('  - 暂无可推荐候选');
+        }
+        if (excludedCount > 0) {
+          console.log(`  - ⚠️ 已成功根据聊天记录屏蔽 ${excludedCount} 个曾已读不回或明确无货卖家`);
+        }
+      }
 
       process.exit(0);
       break;

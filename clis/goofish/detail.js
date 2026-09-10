@@ -96,7 +96,11 @@ export const command = cli({
           src &&
           (src.includes('alicdn') || src.includes('tbcdn')) &&
           !src.includes('avatar') &&
+          !src.includes('0-mytaobao') &&
+          !src.includes('0-mtopupload') &&
+          !src.includes('110x10000') &&
           !src.includes('TB1') &&
+          !src.includes('TB2') &&
           !src.includes('-tps-') &&
           !images.includes(src)
         ) {

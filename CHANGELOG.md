@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `image_url` and `seller` extraction to search results for instant visual appraisal.
   - Added high-resolution `images` extraction (filtering out Alibaba `-tps-` sprite icons) and `seller_user_id` to detail adapter.
 
+### Fixed
+- **React Input Value Setter Fix (`clis/goofish/search.js`)**: Fixed React synthetic state bypass where direct `.value = min` assignment was ignored upon submission; implemented prototype property descriptor setter (`Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set`) and explicit confirm button click.
+- **Accessory Keyword Filtering (`clis/goofish/search.js`, `bin/xy-chat.js`)**: Added `--exclude` flag and regex filtering (filtering out pedals, wireless mics, headsets, repair motherboards, and stickers) to eliminate non-guitar noise from skewing candidate rankings.
+- **Avatar Photo Exclusion in Detail Adapter (`clis/goofish/detail.js`)**: Filtered out 110px seller avatar thumbnails (`0-mytaobao`, `0-mtopupload`, `TB1`, `TB2`, `110x10000`) so the primary item photo is always an authentic product photo.
+- **Offline-First SSOT Retrieval for Chat & Orders (`bin/xy-chat.js`)**: Enabled instant local SQLite SSOT retrieval for `inbox`, `messages`, `orders`, and `favorites`, with `--live` flag for forced remote fetching.
+- **CLI Argument Parsing Robustness (`bin/xy-chat.js`)**: Implemented `parseCliArgs` separating options with values (`--limit`, `--min-price`, `--max-price`, etc.) from positional arguments, preventing option values (e.g. `--limit 5`) from being mistaken for search queries or category filters.
+- **Polymorphic `queryMessages` & Category Alias Mapping (`src/db.js`)**: Allowed `queryMessages` to accept either `(contact, limit)` or options object `{ contactName, limit, query }`, and mapped colloquial category aliases (`me4`, `air`, `nexg`, `2n`) to authoritative canonical keys.
+- **Regex-Based Seller Risk Scoring (`src/db.js`)**: Replaced brittle substring matching with regexes classifying active seller quotes, stock confirmations, bot auto-replies, and closed trades.
+
 ## [1.2.0] - 2026-09-11
 
 ### Added
