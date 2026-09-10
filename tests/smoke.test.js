@@ -23,7 +23,7 @@ test('all expected CLI command files exist', () => {
 });
 
 test('all CLI command files contain valid OpenCLI structure and non-empty columns', () => {
-  const files = fs.readdirSync(clisDir).filter(f => f.endsWith('.js'));
+  const files = fs.readdirSync(clisDir).filter(f => f.endsWith('.js') && !f.startsWith('_'));
   assert.ok(files.length >= 14, `Expected at least 14 commands, found ${files.length}`);
 
   for (const file of files) {

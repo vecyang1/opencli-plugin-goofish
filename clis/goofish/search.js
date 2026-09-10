@@ -1,5 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError } from '@jackwener/opencli/errors';
+import { safeGoto } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -48,8 +49,7 @@ export const command = cli({
     const pageNum = Math.max(1, Number(kwargs['page-num']) || 1);
 
     const searchUrl = 'https://www.goofish.com/search?q=' + encodeURIComponent(query);
-    await page.goto(searchUrl);
-    await page.wait(4);
+    await safeGoto(page, searchUrl);
 
     // 1. Regional Filter (Only when explicitly specified, defaults to nationwide 全国)
     if (region && region !== '全国') {

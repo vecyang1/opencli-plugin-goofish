@@ -1,5 +1,5 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError } from '@jackwener/opencli/errors';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -25,17 +25,8 @@ export const command = cli({
     const limit = Math.max(10, Math.min(Number(kwargs.limit) || 50, 500));
     const query = String(kwargs.query || '').trim().toLowerCase();
 
-    await page.goto('https://www.goofish.com/bought');
-    await page.wait(4);
-
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('我买到的') || text.includes('全部') || text.includes('我的交易');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
+    await safeGoto(page, 'https://www.goofish.com/bought');
+    await checkAuth(page);
 
     const scrollCycles = Math.ceil(limit / 10);
     for (let s = 0; s < scrollCycles; s++) {

@@ -2,6 +2,9 @@ node_modules/
 *.baiduyun.uploading.cfg
 .DS_Store
 scratch/
+data/
+*.db
+*.sqlite
 
 # Derived Graphify index — never commit (see A-coding/CLAUDE.md)
 graphify-out/

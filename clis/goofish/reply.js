@@ -1,5 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError, ArgumentError } from '@jackwener/opencli/errors';
+import { ArgumentError } from '@jackwener/opencli/errors';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -11,7 +12,7 @@ export const command = cli({
   browser: true,
   navigateBefore: false,
   args: [
-    { name: 'contact', positional: true, required: true, help: '目标联系人昵称或关键词 (如: 吉他小铺)' },
+    { name: 'contact', positional: true, required: true, help: '目标联系人昵称或关键词 (如: 音乐家肖邦)' },
     { name: 'message', positional: true, required: true, help: '要发送的私信文本内容' },
     { name: 'dry-run', type: 'bool', default: false, help: '空跑测试 (只定位会话并填入文本，不触发最终发送)' },
   ],
@@ -27,20 +28,11 @@ export const command = cli({
     const dryRun = Boolean(kwargs['dry-run']);
 
     if (!contactQuery || !messageText) {
-      throw new ArgumentError('请指定联系人和消息内容 (如: opencli xianyu chat "吉他小铺" "你好，请问宝贝还在吗？")');
+      throw new ArgumentError('请指定联系人和消息内容 (如: opencli xianyu reply "音乐家肖邦" "你好，请问宝贝还在吗？")');
     }
 
-    await page.goto('https://www.goofish.com/im');
-    await page.wait(4);
-
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('消息') || text.includes('通知消息') || text.includes('设置');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
+    await safeGoto(page, 'https://www.goofish.com/im');
+    await checkAuth(page);
 
     for (let r = 0; r < 6; r++) {
       const count = await page.evaluate(() => document.querySelectorAll('div[class*="conversation-item--"]').length);

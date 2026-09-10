@@ -1,5 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError, CommandExecutionError } from '@jackwener/opencli/errors';
+import { safeGoto } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -37,8 +38,7 @@ export const command = cli({
       throw new ArgumentError('请指定要查询的闲鱼商品 ID');
     }
 
-    await page.goto('https://www.goofish.com/item?id=' + itemId);
-    await page.wait(4);
+    await safeGoto(page, 'https://www.goofish.com/item?id=' + itemId);
 
     const data = await page.evaluate(() => {
       const text = document.body ? document.body.innerText : '';

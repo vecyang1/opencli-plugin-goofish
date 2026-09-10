@@ -1,5 +1,5 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError } from '@jackwener/opencli/errors';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -20,24 +20,15 @@ export const command = cli({
     'mobile_notice',
   ],
   func: async (page) => {
-    await page.goto('https://www.goofish.com/account');
-    await page.wait(4);
-
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('基本信息') || text.includes('会员名') || text.includes('认证信息');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
+    await safeGoto(page, 'https://www.goofish.com/account');
+    await checkAuth(page);
 
     const data = await page.evaluate(() => {
       const text = document.body ? document.body.innerText : '';
       const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
 
       let nick = '';
-      const nickEl = document.querySelector('div[class*="nick--"], div[class*="name--"]');
+      const nickEl = document.querySelector('span[class*="nick--"], div[class*="nick--"], div[class*="name--"]');
       if (nickEl) nick = nickEl.innerText.trim();
 
       let memberName = '-';
@@ -68,7 +59,7 @@ export const command = cli({
 
       return {
         member_name: memberName,
-        nick: nick || 'Vector_Y',
+        nick: nick || memberName || '已登录用户',
         real_name_auth: realNameAuth,
         alipay_auth: alipayAuth,
         id_info_status: idInfoStatus,

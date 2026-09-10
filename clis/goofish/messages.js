@@ -1,5 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { AuthRequiredError, ArgumentError } from '@jackwener/opencli/errors';
+import { ArgumentError } from '@jackwener/opencli/errors';
+import { safeGoto, checkAuth } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -11,7 +12,7 @@ export const command = cli({
   browser: true,
   navigateBefore: false,
   args: [
-    { name: 'contact', positional: true, required: true, help: '联系人昵称或关键词 (如: 吉他小铺, 数码玩家)' },
+    { name: 'contact', positional: true, required: true, help: '联系人昵称或关键词 (如: 音乐家肖邦, 数码玩家)' },
     { name: 'limit', type: 'int', default: 50, help: '最大读取消息条数 (默认 50)' },
     { name: 'scrolls', type: 'int', default: 5, help: '向上滚动加载更早历史消息的轮数 (默认 5)' },
   ],
@@ -25,71 +26,59 @@ export const command = cli({
   func: async (page, kwargs) => {
     const contactQuery = String(kwargs.contact || kwargs._?.[0] || '').trim();
     if (!contactQuery) {
-      throw new ArgumentError('请指定要查询消息的联系人昵称 (如: opencli xianyu messages "吉他小铺")');
+      throw new ArgumentError('请指定要查询消息的联系人昵称 (如: opencli xianyu messages "音乐家肖邦")');
     }
     const limit = Math.max(5, Math.min(Number(kwargs.limit) || 50, 200));
     const maxScrolls = Math.max(1, Math.min(Number(kwargs.scrolls) || 5, 20));
 
-    await page.goto('https://www.goofish.com/im');
-    await page.wait(4);
+    await safeGoto(page, 'https://www.goofish.com/im');
+    await checkAuth(page);
 
-    const isAuth = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      return text.includes('消息') || text.includes('通知消息') || text.includes('设置');
-    });
-
-    if (!isAuth) {
-      throw new AuthRequiredError('goofish');
-    }
-
-    // Wait until conversation items are rendered
+    // Wait until conversation items have loaded text
     for (let r = 0; r < 6; r++) {
-      const count = await page.evaluate(() => document.querySelectorAll('div[class*="conversation-item--"]').length);
-      if (count > 0) break;
+      const hasText = await page.evaluate(() => {
+        const item = document.querySelector('div[class*="conversation-item--"]');
+        return Boolean(item && item.innerText && item.innerText.trim().length > 0);
+      });
+      if (hasText) break;
       await page.wait(1.5);
     }
 
-    let found = false;
-
-    // Reset scrollTop to 0
-    await page.evaluate(() => {
+    // In-page search and scroll loop for virtual list
+    const found = await page.evaluate(async (targetName) => {
       const holder = document.querySelector('.rc-virtual-list-holder');
       if (holder) {
         holder.scrollTop = 0;
         holder.dispatchEvent(new Event('scroll', { bubbles: true }));
       }
-    });
-    await page.wait(1.5);
+      await new Promise(r => setTimeout(r, 600));
 
-    // Step-by-step search with scroll event dispatch
-    for (let s = 0; s < 15; s++) {
-      const clicked = await page.evaluate((targetName) => {
+      for (let s = 0; s < 30; s++) {
         const items = Array.from(document.querySelectorAll('div[class*="conversation-item--"]'));
-        const target = items.find(it => (it.innerText || '').toLowerCase().includes(targetName.toLowerCase()));
+        const target = items.find(it => {
+          const t = (it.innerText || '').toLowerCase();
+          return t.includes(targetName.toLowerCase());
+        });
+
         if (target) {
           target.click();
           return true;
         }
-        const holder = document.querySelector('.rc-virtual-list-holder');
+
         if (holder) {
-          holder.scrollTop += 350;
+          holder.scrollTop += 320;
           holder.dispatchEvent(new Event('scroll', { bubbles: true }));
         }
-        return false;
-      }, contactQuery);
-
-      if (clicked) {
-        found = true;
-        break;
+        await new Promise(r => setTimeout(r, 500));
       }
-      await page.wait(1.2);
-    }
+      return false;
+    }, contactQuery);
 
     if (!found) {
       throw new ArgumentError('未在私信列表中找到包含 "' + contactQuery + '" 的联系人，请检查昵称或在浏览器中确认会话是否存在');
     }
 
-    await page.wait(3);
+    await page.wait(2.5);
 
     // Scroll up message list container to load older history
     for (let s = 0; s < maxScrolls; s++) {

@@ -1,5 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError } from '@jackwener/opencli/errors';
+import { safeGoto } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -39,10 +40,7 @@ export const command = cli({
     } catch (e) {}
 
     const url = 'https://www.goofish.com/item?id=' + itemId;
-    await page.evaluate((u) => {
-      window.location.href = u;
-    }, url);
-    await page.wait(3.5);
+    await safeGoto(page, url);
 
     // Scroll down to bottom to trigger Vue/React recommendations
     for (let scrollStep = 0; scrollStep < 4; scrollStep++) {
