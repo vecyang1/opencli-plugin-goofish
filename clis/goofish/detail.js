@@ -39,6 +39,7 @@ export const command = cli({
     }
 
     await safeGoto(page, 'https://www.goofish.com/item?id=' + itemId);
+    await page.wait(2.5);
 
     const data = await page.evaluate(() => {
       const text = document.body ? document.body.innerText : '';
@@ -53,22 +54,36 @@ export const command = cli({
       let location = '-';
       let sellerStatsArr = [];
 
-      for (let i = 0; i < Math.min(lines.length, 25); i++) {
-        const l = lines[i];
-        if (l.includes('来闲鱼') || l.includes('卖出') || l.includes('好评率')) {
-          sellerStatsArr.push(l);
-          if (!seller && i > 0) {
-            seller = lines[i - 2] || lines[i - 1];
+      // Semantic extraction from seller personal link
+      const personalLink = document.querySelector('a[href*="/personal?userId="]');
+      if (personalLink && personalLink.innerText) {
+        const sLines = personalLink.innerText.split('\n').map(s => s.trim()).filter(Boolean);
+        if (sLines.length > 0) seller = sLines[0];
+        if (sLines.length > 1) location = sLines[1];
+        if (sLines.length > 2) sellerStatsArr = sLines.slice(2);
+      }
+
+      // Fallback if link not matched
+      if (!seller) {
+        for (let i = 0; i < Math.min(lines.length, 25); i++) {
+          const l = lines[i];
+          if (l.includes('来闲鱼') || l.includes('卖出') || l.includes('好评率')) {
+            if (!sellerStatsArr.includes(l)) sellerStatsArr.push(l);
+            if (!seller && i > 0) {
+              seller = lines[i - 2] || lines[i - 1];
+            }
           }
-        }
-        if (['北京', '上海', '广州', '深圳', '杭州', '成都', '武汉', '南京', '重庆', '西安', '苏州', '天津', '长沙'].includes(l)) {
-          location = l;
         }
       }
 
       let price = '¥0';
-      const priceMatch = text.match(/直接买\s*[￥¥]\s*([\d.]+)/) || text.match(/[¥￥]\s*([\d.]+)/);
-      if (priceMatch) price = '¥' + priceMatch[1];
+      const priceEl = document.querySelector('span[class*="price--"], div[class*="price--"]');
+      if (priceEl && priceEl.innerText && /[\d.]+/.test(priceEl.innerText)) {
+        price = '¥' + priceEl.innerText.replace(/[^\d.]/g, '');
+      } else {
+        const priceMatch = text.match(/直接买\s*[￥¥]\s*([\d.]+)/) || text.match(/[¥￥]\s*([\d.]+)/);
+        if (priceMatch) price = '¥' + priceMatch[1];
+      }
 
       let wantCount = '-';
       let browseCount = '-';

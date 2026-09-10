@@ -224,24 +224,34 @@ export const command = cli({
         if (text.includes('包邮')) guarantees.push('包邮');
         if (text.includes('可小刀')) guarantees.push('可小刀');
 
-        // Location
+        // Location (semantic DOM extraction first)
         let location = '-';
-        const provinces = ['北京', '上海', '广东', '浙江', '江苏', '山东', '四川', '湖北', '湖南', '陕西', '河南', '河北', '辽宁', '福建', '安徽', '重庆', '天津', '江西', '广西', '云南', '贵州', '山西', '吉林', '黑龙江', '内蒙古', '新疆', '甘肃', '海南', '宁夏', '青海', '西藏'];
-        for (const prov of provinces) {
-          if (lines.includes(prov) || text.includes(prov)) {
-            location = prov;
-            break;
-          }
+        const locEl = a.querySelector('div[class*="seller-text--"], div[class*="seller-left--"], span[class*="seller-text--"]');
+        if (locEl && locEl.innerText) {
+          location = locEl.innerText.trim();
         }
 
         // Seller Tag
         let sellerTag = '-';
-        if (text.includes('百分百好评')) sellerTag = '百分百好评';
+        const tagEl = a.querySelector('div[class*="credit-container--"]');
+        if (tagEl && tagEl.innerText) {
+          sellerTag = tagEl.innerText.trim();
+        } else if (text.includes('百分百好评')) sellerTag = '百分百好评';
         else if (text.includes('回头客超85%')) sellerTag = '回头客超85%';
         else if (text.includes('卖家信用极好')) sellerTag = '卖家信用极好';
         else if (text.includes('卖家信用优秀')) sellerTag = '卖家信用优秀';
         else if (text.includes('回复超快')) sellerTag = '回复超快';
         else if (text.includes('发货极快')) sellerTag = '发货极快';
+
+        // Price & Price drop from semantic classes if available
+        const numEl = a.querySelector('span[class*="number--"], div[class*="number--"]');
+        if (numEl && numEl.innerText && /[\d.]+/.test(numEl.innerText)) {
+          price = '¥' + numEl.innerText.trim();
+        }
+        const dropEl = a.querySelector('div[class*="price-desc--"]');
+        if (dropEl && dropEl.innerText) {
+          priceDrop = dropEl.innerText.trim();
+        }
 
         // Condition
         let condition = '-';
@@ -251,7 +261,7 @@ export const command = cli({
         else if (text.includes('轻微使用痕迹')) condition = '轻微使用痕迹';
         else if (text.includes('9成新')) condition = '9成新';
 
-        let title = lines.find(l => l.length > 6 && !l.includes('想要') && !l.includes('信用') && !l.includes('回复') && !l.includes('发货') && !l.includes('累计降价') && !l.includes('发布') && !provinces.includes(l) && !l.startsWith('¥') && !l.startsWith('￥')) || lines[0] || '';
+        let title = lines.find(l => l.length > 6 && !l.includes('想要') && !l.includes('信用') && !l.includes('回复') && !l.includes('发货') && !l.includes('降价') && !l.includes('发布') && !l.startsWith('¥') && !l.startsWith('￥')) || lines[0] || '';
 
         return {
           item_id: itemId || '-',

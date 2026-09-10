@@ -41,3 +41,32 @@ test('all CLI command files contain valid OpenCLI structure and non-empty column
     assert.ok(cols.length > 0, `${file} has 0 columns declared`);
   }
 });
+
+test('ghost logic guard: zero hardcoded user credentials or fake whitelist fallbacks in adapter files', () => {
+  const files = fs.readdirSync(clisDir).filter(f => f.endsWith('.js'));
+  for (const file of files) {
+    const content = fs.readFileSync(path.join(clisDir, file), 'utf-8');
+    assert.strictEqual(
+      content.includes('Vector_Y'),
+      false,
+      `Ghost logic detected in ${file}: hardcoded username 'Vector_Y' must not exist`
+    );
+    assert.strictEqual(
+      /\[\s*['"](?:北京|上海|广州|深圳|越南)['"]/.test(content),
+      false,
+      `Ghost logic detected in ${file}: hardcoded city whitelist array must not exist`
+    );
+  }
+});
+
+test('navigation resilience guard: all browser navigations route through safeGoto', () => {
+  const files = fs.readdirSync(clisDir).filter(f => f.endsWith('.js') && !f.startsWith('_'));
+  for (const file of files) {
+    const content = fs.readFileSync(path.join(clisDir, file), 'utf-8');
+    assert.strictEqual(
+      content.includes('page.goto('),
+      false,
+      `Unsafe navigation detected in ${file}: must use safeGoto(page, url) instead of raw page.goto()`
+    );
+  }
+});
