@@ -103,32 +103,38 @@ export async function safeGoto(page, url, options = {}) {
   // 1. Enforce anti-ban rate limiting and human jitter cooldown
   await enforceRateLimit(url, options);
 
-  const waitSec = options.waitSec ?? 3.5;
+  const waitSec = options.waitSec ?? 3;
+  const settleMs = options.settleMs ?? 2000;
+
   try {
-    await page.goto(url);
+    await page.goto(url, { settleMs });
     await page.wait(waitSec);
     return;
   } catch (error) {
     if (!isRetriableNavigationError(error)) {
+      // Fallback: evaluate location.href in the active page context
+      try {
+        if (typeof page.evaluate === 'function') {
+          await page.evaluate((targetUrl) => {
+            if (window.location.href !== targetUrl) {
+              window.location.href = targetUrl;
+            }
+          }, url);
+          await page.wait(waitSec + 1);
+          return;
+        }
+      } catch (evalError) {
+        // Retry with waitUntil none
+        await page.wait(1);
+        await page.goto(url, { waitUntil: 'none' });
+        await page.wait(waitSec);
+        return;
+      }
       throw error;
     }
-  }
-
-  // First fallback: evaluate location.href in the active page context
-  try {
-    if (typeof page.evaluate === 'function') {
-      await page.evaluate((targetUrl) => {
-        if (window.location.href !== targetUrl) {
-          window.location.href = targetUrl;
-        }
-      }, url);
-      await page.wait(waitSec + 1);
-      return;
-    }
-  } catch (evalError) {
-    // Secondary fallback: wait and retry goto
+    // Retry once on retriable navigation error
     await page.wait(1.5);
-    await page.goto(url);
+    await page.goto(url, { settleMs });
     await page.wait(waitSec);
   }
 }

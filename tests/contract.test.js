@@ -111,6 +111,11 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(isAccessoryTitle('恩雅NEXG 2代古典版静音吉他尼龙弦自用闲置'), false);
     assert.equal(isAccessoryTitle('拿火LAVA ME air智能吉他 黑色碳纤维面板36寸'), false);
     assert.equal(isAccessoryTitle('拿火吉他四代 LAVA ME 4四代碳纤维智能吉他'), false);
+
+    // 3C Digital Hub items and custom exclusion
+    assert.equal(isAccessoryTitle('绿联 15375 Type-C扩展坞转千兆有线网口拓展坞', 'ugreen_hub'), false);
+    assert.equal(isAccessoryTitle('绿联 15375 包装盒 空盒 出售', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 6合1 扩展坞 4K30Hz 15375', 'ugreen_hub', ['6合1']), true);
   });
 
   await t.test('inferCategory normalizes category slugs and aliases', async () => {
@@ -120,6 +125,8 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(inferCategory({ keyword: 'lava me air' }), 'lava_me_air');
     assert.equal(inferCategory({ keyword: 'me4' }), 'lava_me_4');
     assert.equal(inferCategory({ keyword: 'lava 4' }), 'lava_me_4');
+    assert.equal(inferCategory({ keyword: '绿联 15375' }), 'ugreen_hub');
+    assert.equal(inferCategory({ keyword: 'macbook pro 16', category: 'laptop' }), 'laptop');
   });
 
   await t.test('classifySellerCommunication accurately attributes seller responses vs buyer questions', async () => {

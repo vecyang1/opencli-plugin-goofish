@@ -225,18 +225,61 @@ export function generateDdl() {
 }
 
 /**
- * Standard authoritative accessory regex pattern.
- * Excludes pedals, foot-switches, microphones, cables, earphones, brackets, parts, blueprints, etc.
+ * Universal junk/noise regex pattern across all product categories.
+ * Excludes packaging boxes, manual fees, repair services, blueprints, deposit/postage adjustments, model dummies.
  */
-export const ACCESSORY_REGEX = /(?:踏板|踩钉|麦克风|话筒|耳麦|耳机|支架|图纸|维修|主板|琴包|背带|网线|插头|零配件|贴纸|图传|接头|书籍|音箱线|连接线|电源适配器|充电线|拾音器|琴弦|指套|换弦器|防尘罩)/i;
+export const UNIVERSAL_JUNK_REGEX = /(?:图纸|维修费|手工费|专拍链接|邮费补差|补差价|补运费|定金|包装盒|空盒子|空盒|包装箱|说明书|模型机|展示机壳|保护膜|贴膜|自提专拍)/i;
 
 /**
- * Check if a title indicates an accessory or non-guitar product.
+ * Standard guitar accessory regex pattern.
+ * Excludes pedals, foot-switches, microphones, cables, earphones, brackets, parts, gig bags, pickups, strings, etc.
  */
-export function isAccessoryTitle(title, category = '') {
+export const GUITAR_ACCESSORY_REGEX = /(?:踏板|踩钉|麦克风|话筒|耳麦|耳机|支架|主板|琴包|背带|网线|插头|零配件|贴纸|图传|接头|书籍|音箱线|连接线|电源适配器|充电线|拾音器|琴弦|指套|换弦器|防尘罩|变调夹|拨片)/i;
+
+/**
+ * Standard digital 3C noise regex pattern.
+ * Excludes phone cases, silicone sleeves, lanyards, dummy shells.
+ */
+export const DIGITAL_NOISE_REGEX = /(?:手机壳|保护套|挂绳|收纳包|纯包装|展示壳)/i;
+
+// Backward-compatible alias for existing imports
+export const ACCESSORY_REGEX = GUITAR_ACCESSORY_REGEX;
+
+/**
+ * Check if a title indicates an accessory or non-target product.
+ * Supports category-aware filtering and user-supplied custom exclusions.
+ */
+export function isAccessoryTitle(title, category = '', customExclude = []) {
   if (!title || typeof title !== 'string') return false;
-  if (ACCESSORY_REGEX.test(title)) return true;
-  if (category === 'lava_me_air' && /play/i.test(title) && !/air/i.test(title)) return true;
+
+  // 1. Universal junk across all categories
+  if (UNIVERSAL_JUNK_REGEX.test(title)) return true;
+
+  // 2. User-specified custom exclusions
+  if (Array.isArray(customExclude) && customExclude.length > 0) {
+    const lower = title.toLowerCase();
+    for (const kw of customExclude) {
+      if (kw && lower.includes(String(kw).toLowerCase().trim())) {
+        return true;
+      }
+    }
+  }
+
+  // 3. Category-specific noise filtering
+  const cat = String(category || '').toLowerCase();
+  const isGuitarCategory = !cat || 
+                           cat.includes('guitar') || 
+                           cat.includes('nexg') || 
+                           cat.includes('lava') || 
+                           cat === 'other';
+
+  if (isGuitarCategory) {
+    if (GUITAR_ACCESSORY_REGEX.test(title)) return true;
+    if (cat === 'lava_me_air' && /play/i.test(title) && !/air/i.test(title)) return true;
+  } else if (cat.includes('hub') || cat.includes('dock') || cat.includes('digital') || cat.includes('15375') || cat.includes('electronic')) {
+    if (DIGITAL_NOISE_REGEX.test(title)) return true;
+  }
+
   return false;
 }
 
@@ -254,9 +297,16 @@ export function inferCategory({ category = '', keyword = '', title = '' } = {}) 
   if (text.includes('nexg') || text.includes('2n') || text.includes('nylon') || text.includes('尼龙')) {
     return 'nexg2_nylon';
   }
+  if (text.includes('扩展坞') || text.includes('拓展坞') || text.includes('hub') || text.includes('15375')) {
+    return 'ugreen_hub';
+  }
   const cleanCat = String(category || '').trim().toLowerCase();
   if (cleanCat && cleanCat !== 'all' && cleanCat !== '全部') {
     return category;
+  }
+  const kw = String(keyword || '').trim().toLowerCase();
+  if (kw) {
+    return kw.replace(/\s+/g, '_');
   }
   return 'other';
 }
