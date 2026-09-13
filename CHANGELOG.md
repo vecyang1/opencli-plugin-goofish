@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] - 2026-09-14
+
+### Added & Hardened (E2E Multi-Generation Hardware Inspection & High-Precision Visual Pipeline)
+- **Multi-Generation Second-Hand Hardware Inspection Protocol**:
+  - Validated against live market search on Xianyu for high-precision digital drawing displays (XPPen Artist Pro 16 Gen 2 2.5K vs. Gen 1 1080P).
+  - Codified the three-tier hardware verification protocol:
+    1. Title & spec filtering: Eliminates Gen 1 1080P listings falsely labeled or ambiguous in second-hand titles.
+    2. Dead-link & placeholder purging: Instantly rejects invalid listings (`price === '¥0' || title.includes('闲鱼 - 闲不住') || description.includes('已经卖了')`).
+    3. Multi-angle ground-truth visual confirmation: Cross-checks front shell (Gen 2 has no physical dial/side buttons; Gen 1 has physical red dial + 8 buttons), driver screen (X3 Pro chip / 16,384 levels vs 8,192), and critical accessories (ACK05 wireless shortcut remote valued at ~¥160).
+- **Zero-Dependency High-Resolution Image Pipeline**:
+  - Established CDN thumbnail stripper (`url.replace(/_[0-9]+x[0-9]+.*$/, '')`) to retrieve original lossless camera images (HEIC/JPEG) directly from Alibaba CDN.
+  - Leveraged macOS native `sips -s format jpeg` for instant local format conversion without external heavy imaging dependencies.
+- **Canonical Skill Alignment (`goofish-ops`)**:
+  - Hardened Section 8 in `/Users/vecsatfoxmailcom/.gemini/antigravity/skills/goofish-ops/SKILL.md` following the Choosing the Rung framework: Rung 1 (prose trade-offs) for negotiation and bundling decisions vs. Rung 2 (decidable code predicates) for dead-link rejection, image cleanup, and physical hardware invariant checks.
+
 ## [1.7.2] - 2026-09-13
 
 ### Fixed & Hardened (Adversarial Negation Disambiguation, Wear Preservation & False Defect Elimination)
