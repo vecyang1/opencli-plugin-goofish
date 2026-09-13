@@ -49,6 +49,17 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(valid.status, 'active');
     assert.ok(valid.item_url.includes('12345678'));
 
+    // Supports multi-image and defect inspection notes
+    const withDefect = validateCandidate({
+      item_id: '998877',
+      title: '商品',
+      price: '100',
+      images: 'https://img1.jpg | https://img2.jpg',
+      defect_notes: '图2背面有划痕',
+    });
+    assert.equal(withDefect.images, 'https://img1.jpg | https://img2.jpg');
+    assert.equal(withDefect.defect_notes, '图2背面有划痕');
+
     // Rejects missing item_id
     assert.throws(() => {
       validateCandidate({ title: '无ID商品', price: '¥100' });

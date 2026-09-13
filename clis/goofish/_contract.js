@@ -114,6 +114,8 @@ export const SCHEMA_CONTRACT = {
         guarantee: { type: 'TEXT', default: '普通', description: '保障标签 (如 验货宝 / 包邮)' },
         item_url: { type: 'TEXT', notNull: true, description: '商品详情页完整链接' },
         image_url: { type: 'TEXT', default: '', description: '商品主图链接' },
+        images: { type: 'TEXT', default: '', description: '全部实拍图片链接列表 (以 | 分隔)' },
+        defect_notes: { type: 'TEXT', default: '', description: '全量多图成色客观质检注记 (如 背面划痕/磕碰说明)' },
         seller_status: { type: 'TEXT', default: 'unknown', description: '保留兼容字段，真理投影见 candidates_view' },
         seller_note: { type: 'TEXT', default: '', description: '保留兼容字段，真理投影见 candidates_view' },
         status: { type: 'TEXT', default: 'active', description: '候选状态: active | sold | hidden' },
@@ -143,6 +145,8 @@ export const SCHEMA_CONTRACT = {
         c.guarantee,
         c.item_url,
         c.image_url,
+        COALESCE(c.images, c.image_url, '') AS images,
+        COALESCE(c.defect_notes, '') AS defect_notes,
         COALESCE(r.status, c.seller_status, 'unknown') AS seller_status,
         COALESCE(r.reason, c.seller_note, '') AS seller_note,
         c.status,
@@ -315,7 +319,7 @@ export function inferCategory({ category = '', keyword = '', title = '' } = {}) 
  * Regex patterns for seller communication analysis.
  * Uses negative lookbehinds/lookaheads to prevent matching questions like '有没有' or '没有问题'.
  */
-export const UNFIT_SELLER_REGEX = /(?:(?<!有)没有(?!问题|毛病|瑕疵|损坏)|没有咯|已出|卖了|不在了|下架|缺货|只有se|仅se|卖家关闭了订单|不单出|已坏|故障)/i;
+export const UNFIT_SELLER_REGEX = /(?:(?<!有)没有(?!问题|毛病|瑕疵|损坏)|没有咯|已出|卖了|不在了|下架|缺货|出掉了|出完了|无货|暂时没货|只有se|仅se|卖家关闭了订单|不单出|已坏|故障)/i;
 export const GHOST_SELLER_REGEX = /(?:没回复说明客服可能在忙|自动回复|智能客服)/;
 export const RESPONSIVE_SELLER_REGEX = /(?:全新正品|包邮|专拍价|可以发|明天发|当天发|有货|现货|在的|还在|有奶白|加振款|拿火源|标价.*拿火|\b(?:1\d{3}|2\d{3})\b)/;
 
@@ -405,7 +409,7 @@ export function classifySellerCommunication({ session = {}, messages = [] }) {
  * Type validation and normalization for Candidates.
  */
 export function validateCandidate(data) {
-  if (!data || typeof data !== 'object') {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw new TypeError('Candidate data must be a valid object');
   }
   const itemId = String(data.item_id || '').trim();
@@ -417,10 +421,18 @@ export function validateCandidate(data) {
     throw new Error('Candidate title is required');
   }
 
-  const rawPrice = String(data.price || '¥0').trim();
+  const rawPrice = String(data.price ?? '¥0').trim();
+  const priceClean = rawPrice.replace(/,/g, '').replace(/[^\d.]/g, '');
   const priceNum = typeof data.price_num === 'number' && !Number.isNaN(data.price_num)
     ? data.price_num
-    : parseFloat(rawPrice.replace(/[^\d.]/g, '')) || 0;
+    : (parseFloat(priceClean) || 0);
+
+  let formattedPrice = rawPrice;
+  if (!formattedPrice || formattedPrice === '-' || formattedPrice === '0' || !/\d/.test(formattedPrice)) {
+    formattedPrice = '¥0';
+  } else if (!formattedPrice.startsWith('¥') && !formattedPrice.startsWith('￥')) {
+    formattedPrice = `¥${formattedPrice}`;
+  }
 
   const keyword = String(data.keyword || '').trim();
   let category = String(data.category || '').trim();
@@ -433,7 +445,7 @@ export function validateCandidate(data) {
     keyword,
     category,
     title,
-    price: rawPrice.startsWith('¥') || rawPrice.startsWith('￥') ? rawPrice : `¥${rawPrice}`,
+    price: formattedPrice,
     price_num: priceNum,
     original_price: String(data.original_price || '-').trim(),
     price_drop: String(data.price_drop || '-').trim(),
@@ -446,6 +458,8 @@ export function validateCandidate(data) {
     guarantee: String(data.guarantee || '普通').trim(),
     item_url: String(data.item_url || `https://www.goofish.com/item?id=${itemId}`).trim(),
     image_url: String(data.image_url || '').trim(),
+    images: String(data.images || data.image_url || '').trim(),
+    defect_notes: String(data.defect_notes || '').trim(),
     seller_status: String(data.seller_status || 'unknown').trim(),
     seller_note: String(data.seller_note || '').trim(),
     status: String(data.status || 'active').trim(),
@@ -457,7 +471,7 @@ export function validateCandidate(data) {
  * Type validation for Seller Reviews.
  */
 export function validateSellerReview(data) {
-  if (!data || typeof data !== 'object') {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw new TypeError('Seller review data must be an object');
   }
   const seller = String(data.seller || '').trim();
@@ -486,7 +500,7 @@ export function validateSellerReview(data) {
  * Type validation for Orders.
  */
 export function validateOrder(data) {
-  if (!data || typeof data !== 'object') {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw new TypeError('Order data must be an object');
   }
   const orderId = String(data.order_id || '').trim();

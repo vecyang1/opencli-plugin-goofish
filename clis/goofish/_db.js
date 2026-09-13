@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { EventEmitter } from 'node:events';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { 
   SCHEMA_CONTRACT,
   generateDdl, 
@@ -21,13 +22,22 @@ dbEmitter.setMaxListeners(100);
 
 /**
  * Resolve the SQLite database path with configurable environment precedence:
- * GOOFISH_DB > GOOFISH_DATA_DIR > <cwd>/data/goofish.db
+ * 1. GOOFISH_DB environment variable
+ * 2. GOOFISH_DATA_DIR environment variable
+ * 3. User SSOT (~/data/goofish.db) if ~/data directory exists
+ * 4. Local workspace data directory (<cwd>/data/goofish.db)
  */
 export function resolveDbPath() {
   if (process.env.GOOFISH_DB) return path.resolve(process.env.GOOFISH_DB);
-  const dir = process.env.GOOFISH_DATA_DIR
-    ? path.resolve(process.env.GOOFISH_DATA_DIR)
-    : path.resolve(process.cwd(), 'data');
+  if (process.env.GOOFISH_DATA_DIR) {
+    return path.join(path.resolve(process.env.GOOFISH_DATA_DIR), 'goofish.db');
+  }
+  const homeDataDir = path.join(os.homedir(), 'data');
+  const homeDbPath = path.join(homeDataDir, 'goofish.db');
+  if (fs.existsSync(homeDbPath) || fs.existsSync(homeDataDir)) {
+    return homeDbPath;
+  }
+  const dir = path.resolve(process.cwd(), 'data');
   return path.join(dir, 'goofish.db');
 }
 
@@ -67,6 +77,20 @@ export function initSchema(db) {
       db.exec("ALTER TABLE seller_reviews ADD COLUMN seller_user_id TEXT DEFAULT '';");
     }
   } catch (e) {}
+
+  // Migrate existing candidates table if images or defect_notes columns are missing
+  try {
+    const cCols = db.prepare("PRAGMA table_info('candidates');").all();
+    if (cCols.length > 0) {
+      if (!cCols.some(c => c.name === 'images')) {
+        db.exec("ALTER TABLE candidates ADD COLUMN images TEXT DEFAULT '';");
+      }
+      if (!cCols.some(c => c.name === 'defect_notes')) {
+        db.exec("ALTER TABLE candidates ADD COLUMN defect_notes TEXT DEFAULT '';");
+      }
+    }
+  } catch (e) {}
+
 
   // Drop views before recreating so view definitions always stay synchronized with SCHEMA_CONTRACT
   for (const viewName of Object.keys(SCHEMA_CONTRACT.views)) {
@@ -424,25 +448,28 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
       item_id, keyword, category, title, price, price_num, original_price,
       price_drop, publish_time, location, seller, seller_user_id,
       seller_tag, condition, guarantee, item_url, image_url,
+      images, defect_notes,
       seller_status, seller_note, status, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(item_id) DO UPDATE SET
       keyword = COALESCE(NULLIF(excluded.keyword, ''), candidates.keyword),
-      category = COALESCE(NULLIF(excluded.category, ''), candidates.category),
-      title = excluded.title,
-      price = excluded.price,
-      price_num = excluded.price_num,
-      original_price = excluded.original_price,
-      price_drop = excluded.price_drop,
-      publish_time = excluded.publish_time,
-      location = excluded.location,
-      seller = excluded.seller,
-      seller_user_id = excluded.seller_user_id,
-      seller_tag = excluded.seller_tag,
-      condition = excluded.condition,
-      guarantee = excluded.guarantee,
+      category = CASE WHEN excluded.category != 'other' AND excluded.category != '' THEN excluded.category ELSE candidates.category END,
+      title = CASE WHEN excluded.title != '闲鱼商品' AND excluded.title != '' THEN excluded.title ELSE candidates.title END,
+      price = CASE WHEN excluded.price != '¥0' AND excluded.price != '' THEN excluded.price ELSE candidates.price END,
+      price_num = CASE WHEN excluded.price_num > 0 THEN excluded.price_num ELSE candidates.price_num END,
+      original_price = COALESCE(NULLIF(excluded.original_price, '-'), candidates.original_price),
+      price_drop = COALESCE(NULLIF(excluded.price_drop, '-'), candidates.price_drop),
+      publish_time = COALESCE(NULLIF(excluded.publish_time, '-'), candidates.publish_time),
+      location = COALESCE(NULLIF(excluded.location, '-'), candidates.location),
+      seller = CASE WHEN excluded.seller != '闲鱼卖家' AND excluded.seller != '-' AND excluded.seller != '' THEN excluded.seller ELSE candidates.seller END,
+      seller_user_id = COALESCE(NULLIF(excluded.seller_user_id, '-'), candidates.seller_user_id),
+      seller_tag = COALESCE(NULLIF(excluded.seller_tag, '-'), candidates.seller_tag),
+      condition = COALESCE(NULLIF(excluded.condition, '-'), candidates.condition),
+      guarantee = COALESCE(NULLIF(excluded.guarantee, '普通'), candidates.guarantee),
       item_url = excluded.item_url,
-      image_url = excluded.image_url,
+      image_url = COALESCE(NULLIF(excluded.image_url, ''), candidates.image_url),
+      images = COALESCE(NULLIF(excluded.images, ''), candidates.images),
+      defect_notes = COALESCE(NULLIF(excluded.defect_notes, ''), candidates.defect_notes),
       status = excluded.status,
       updated_at = excluded.updated_at;
   `);
@@ -493,6 +520,8 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
       valid.guarantee,
       valid.item_url,
       valid.image_url,
+      valid.images,
+      valid.defect_notes,
       valid.seller_status,
       valid.seller_note,
       valid.status,

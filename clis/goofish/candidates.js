@@ -1,5 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { queryCandidates } from './_db.js';
+import { inferCategory } from './_contract.js';
 
 export const command = cli({
   site: 'goofish',
@@ -10,8 +11,8 @@ export const command = cli({
   strategy: Strategy.LOCAL,
   browser: false,
   args: [
-    { name: 'query', positional: true, required: false, help: '品类或关键词 (如 nexg2_nylon / lava_me_air / lava_me_4 / me4 / air / 2n / all)' },
-    { name: 'category', type: 'str', required: false, help: '指定品类过滤 (如 nexg2_nylon / lava_me_air / lava_me_4 / all)' },
+    { name: 'query', positional: true, required: false, help: '品类或关键词 (如 nexg2_nylon / lava_me_air / lava_me_4 / me4 / air / 2n / ugreen_hub / all)' },
+    { name: 'category', type: 'str', required: false, help: '指定品类过滤 (如 nexg2_nylon / lava_me_air / lava_me_4 / ugreen_hub / all)' },
     { name: 'keyword', type: 'str', required: false, help: '商品标题或卖家关键词过滤' },
     { name: 'min-price', type: 'str', required: false, help: '最低价格过滤' },
     { name: 'max-price', type: 'str', required: false, help: '最高价格过滤' },
@@ -35,13 +36,14 @@ export const command = cli({
     const kwargs = (second && typeof second === 'object' && !second.isContext) ? second : (first || {});
     const rawPos = String(kwargs.query || kwargs._?.[0] || '').trim();
     
-    const knownCats = ['all', '全部', 'nexg', 'nexg2', '2n', 'nylon', '尼龙', 'air', 'lava air', 'me4', 'me 4', 'lava4', 'lava 4', 'nexg2_nylon', 'lava_me_air', 'lava_me_4'];
+    const knownCats = ['all', '全部', 'nexg', 'nexg2', '2n', 'nylon', '尼龙', 'air', 'lava air', 'me4', 'me 4', 'lava4', 'lava 4', 'nexg2_nylon', 'lava_me_air', 'lava_me_4', 'ugreen_hub'];
     let category = kwargs.category ? String(kwargs.category).trim() : '';
     let keyword = String(kwargs.keyword || kwargs.q || '').trim();
 
     if (!category && rawPos) {
-      if (knownCats.includes(rawPos.toLowerCase())) {
-        category = rawPos;
+      const inferred = inferCategory({ category: rawPos, keyword: rawPos });
+      if (inferred !== 'other' || knownCats.includes(rawPos.toLowerCase())) {
+        category = (inferred !== 'other') ? inferred : rawPos;
       } else {
         keyword = keyword ? `${keyword} ${rawPos}` : rawPos;
       }

@@ -10,7 +10,9 @@ export const command = cli({
   strategy: Strategy.COOKIE,
   browser: true,
   navigateBefore: false,
-  args: [],
+  args: [
+    { name: 'timeout', type: 'int', default: 120, help: '超时时间 (秒，支持多页面连环抓取)' },
+  ],
   columns: [
     'nick',
     'location',
@@ -20,9 +22,9 @@ export const command = cli({
     'unread_messages',
     'credit_rating',
   ],
-  func: async (page) => {
+  func: async (page, kwargs) => {
     // 1. Get personal stats
-    await safeGoto(page, 'https://www.goofish.com/personal');
+    await safeGoto(page, 'https://www.goofish.com/personal', { waitSec: 1.5, settleMs: 1000 });
     await checkAuth(page);
 
     const pData = await page.evaluate(() => {
@@ -64,7 +66,7 @@ export const command = cli({
     });
 
     // 2. Get orders spent and pending
-    await safeGoto(page, 'https://www.goofish.com/bought');
+    await safeGoto(page, 'https://www.goofish.com/bought', { waitSec: 1.5, settleMs: 1000 });
 
     const orderData = await page.evaluate(() => {
       const cards = Array.from(document.querySelectorAll('a[href*="personal?userId="], div[class*="container--Bhfvcld8"]'));
@@ -87,7 +89,7 @@ export const command = cli({
     });
 
     // 3. Get unread messages count
-    await safeGoto(page, 'https://www.goofish.com/im');
+    await safeGoto(page, 'https://www.goofish.com/im', { waitSec: 1.5, settleMs: 1000 });
 
     const unreadCount = await page.evaluate(() => {
       const badge = document.querySelector('div[class*="badge--"], span[class*="ant-badge"] sup, sup');

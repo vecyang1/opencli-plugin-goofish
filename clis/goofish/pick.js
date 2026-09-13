@@ -29,6 +29,8 @@ export const command = cli({
     'category',
     'best_item_id',
     'lowest_price',
+    'condition',
+    'defect_notes',
     'seller',
     'seller_status',
     'title',
@@ -248,6 +250,8 @@ export const command = cli({
           category: cat,
           best_item_id: best.item_id,
           lowest_price: best.price,
+          condition: best.condition || '-',
+          defect_notes: best.defect_notes ? (best.defect_notes.length > 30 ? best.defect_notes.slice(0, 30) + '...' : best.defect_notes) : '封面完好',
           seller: best.seller,
           seller_status: best.seller_status === 'responsive' 
             ? '✅ 活跃报价' 
