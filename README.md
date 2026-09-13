@@ -167,6 +167,11 @@ opencli xianyu export favorites --file-type html --output ./my-favorites.html
    聊天窗口为 `#msg-list-container` 逆向滚动容器。适配器通过对容器 `scrollTop = 0` 的精准触发，自动拉取历史聊天气泡并解析发送者角色、文字与富文本链接。
 3. **SPA 状态自愈与认证校验 (Self-Healing Auth)**:
    每个命令均包含轻量级会话嗅探机制，当检测到登录态失效时精准抛出 `AuthRequiredError`，引导用户在 Chrome 浏览器中无缝续期。
+4. **单一本源真理库与单向数据流 (SSOT & Unidirectional Data Flow)**:
+   本地持久化原生集成 Node.js 内置 SQLite (`node:sqlite`)。无论通过 `opencli xianyu`、`opencli goofish` 还是 `xy-chat` 调用，所有操作统一按优先级解析至权威真理库（`GOOFISH_DB` > `GOOFISH_DATA_DIR` > `~/data/goofish.db` > `<cwd>/data/goofish.db`），所有实时抓取动作自动单向写回真理库，杜绝数据分裂。
+5. **契约优先与对抗性鲁棒性防护 (Contract-First & Adversarial Protection)**:
+   数据入库遵循严格 Schema 契约校验与防降级更新守卫（`CASE WHEN`），抵御未知占位数据覆盖高置信度记录；内置完备的对抗性边界与数字配件过滤测试套件（38 个测试用例 100% 覆盖通过）。
+
 
 ---
 

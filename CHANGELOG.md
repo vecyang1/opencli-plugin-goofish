@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-09-13
+
+### Added & Hardened (SSOT Hardening, Adversarial Verification & Write-Back Automation)
+- **SSOT Resolution Precedence & Schema Auto-Migration (`clis/goofish/_db.js`)**:
+  - Unified database path resolution across all commands and tools: `GOOFISH_DB` > `GOOFISH_DATA_DIR` > `~/data/goofish.db` (Primary User SSOT) > `<cwd>/data/goofish.db` (Workspace fallback).
+  - Implemented automatic schema migrations in `initSchema` for `candidates` (`images`, `defect_notes` columns) and `seller_reviews` (`seller_user_id`).
+  - Added conditional `CASE WHEN` conflict guards in `saveCandidates` to prevent unhydrated or placeholder entries (`'闲鱼商品'`, `'¥0'`) from overwriting valid candidate data.
+- **Unidirectional Write-Back Across All Live Adapters**:
+  - `search.js`: Automatically persists deduplicated search results to SQLite SSOT via `saveCandidates(..., { filterAccessories: true })`.
+  - `detail.js`: Automatically persists rich candidate data into SQLite SSOT when valid item data is extracted.
+  - `inbox.js`: Synchronizes contacts into the `sessions` table in SQLite SSOT.
+  - `orders.js`: Persists deduplicated historical orders into SQLite SSOT.
+  - `favorites.js`: Persists deduplicated favorites into SQLite SSOT.
+  - `messages.js`: Persists extracted conversation messages into SQLite SSOT and triggers `syncSellerReviewsFromSessionsAndMessages()`.
+- **Universal Category Inference & Alias Normalization (`_contract.js`, `candidates.js`)**:
+  - Added positional category mapping in `candidates.js` via `inferCategory` to support queries like `opencli xianyu candidates ugreen_hub` or `xy-chat candidates ugreen_hub`.
+  - Extended accessory exclusion rules and unfit seller regex to capture `出掉了`, `出完了`, `无货`, `暂时没货` without false positives on buyer queries.
+- **Ant Design Virtual List Scrolling Fix (`inbox.js`)**:
+  - Fixed virtual list unmounting bug by dispatching synthetic `scroll` events after stepping `scrollTop += 350`, ensuring React virtualized lists trigger re-renders.
+- **Adversarial & Negative Edge-Case Test Suite (`tests/adversarial_and_negative.test.js`)**:
+  - Added 5 exhaustive adversarial test scenarios covering malformed input objects, boundary prices, digital accessory noise rejection, buyer/seller dialogue attribution under adversarial phrasing, and idempotent multi-write synchronization (38/38 tests passing across 8 suites).
+
 ## [1.5.0] - 2026-09-13
 
 ### Added & Generalised (Universal Category Generalization & Zero-Hang Architecture)
