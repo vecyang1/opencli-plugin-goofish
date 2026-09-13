@@ -324,7 +324,7 @@ async function main() {
     case 'candidates': {
       const { positionals, options } = parseCliArgs(subArgs);
       const rawPos = positionals[0] || '';
-      const knownCats = ['all', '全部', 'nexg', 'nexg2', '2n', 'nylon', '尼龙', 'air', 'lava air', 'me4', 'me 4', 'lava4', 'lava 4', 'nexg2_nylon', 'lava_me_air', 'lava_me_4', 'ugreen_hub', 'hub', 'dock', '15375'];
+      const knownCats = ['all', '全部', 'nexg', 'nexg2', '2n', 'nylon', '尼龙', 'air', 'lava air', 'me4', 'me 4', 'lava4', 'lava 4', 'nexg2_nylon', 'lava_me_air', 'lava_me_4', 'ugreen_hub', 'hub', 'dock', '15375', '绿联', '拓展坞', '扩展坞', 'ugreen'];
       let category = options['--category'] || '';
       let keyword = options['--keyword'] || options['-q'] || '';
 
@@ -361,6 +361,17 @@ async function main() {
         '卖家状态': c.seller_status === 'responsive' ? '✅ 活跃报价' : (c.seller_status === 'ghosted' ? '⚠️ 已读不回' : (c.seller_status === 'unfit' ? '❌ 明确无货' : '❓ 待沟通')),
         '所在地': c.location,
       })));
+      process.exit(0);
+      break;
+    }
+
+    case 'purge':
+    case 'clean': {
+      console.log('🧹 正在清理本地 SQLite SSOT 中的配件、噪音及异常低价无效记录...');
+      const purged = purgeJunkCandidates();
+      console.log(`✅ 已清理 ${purged} 条无效候选记录！`);
+      console.log('\n📊 当前本地离线知识库统计:');
+      console.table([getDbStats()]);
       process.exit(0);
       break;
     }
@@ -416,10 +427,12 @@ async function main() {
         const name = s.contact_name;
         if (candSellers.has(name)) return true;
         const msg = s.last_message || '';
-        return msg.includes('吉他') || msg.includes('nexg') || msg.includes('lava') || msg.includes('琴') || msg.includes('air') || name.includes('琴') || name.includes('乐器') || name.includes('吉他') || name.includes('音乐');
+        return msg.includes('吉他') || msg.includes('nexg') || msg.includes('lava') || msg.includes('琴') || msg.includes('air') || 
+               msg.includes('拓展坞') || msg.includes('扩展坞') || msg.includes('绿联') || msg.includes('15375') || msg.includes('hub') || msg.includes('dock') ||
+               name.includes('琴') || name.includes('乐器') || name.includes('吉他') || name.includes('音乐') || name.includes('数码') || name.includes('绿联');
       });
 
-      console.log(`🎸 识别到 ${targetSellers.length} 位重点沟通卖家 (包含候选商品卖家与乐器沟通)，正在拉取聊天记录...`);
+      console.log(`🎸 识别到 ${targetSellers.length} 位重点沟通卖家 (包含候选商品卖家、乐器与 3C 拓展坞沟通)，正在拉取聊天记录...`);
       for (const s of targetSellers) {
         try {
           console.log(`  -> 拉取 [${s.contact_name}] 聊天记录 (模拟人类随机思考间歇)...`);
@@ -471,11 +484,12 @@ async function main() {
   xy-chat search <关键词>            全网多维度二手搜索
   xy-chat detail <商品ID>            查看商品详情与卖家信用档案
   xy-chat seller <卖家ID/商品链接>   深度分析卖家在售SKU与砍价策略
-  xy-chat candidates [category]      查询已沉淀的吉他候选库 (SSOT)
+  xy-chat candidates [category]      查询已沉淀的候选商品库 (SSOT, 支持吉他与 3C 拓展坞)
   xy-chat reviews [卖家]             查询卖家聊天评估档案 (排除已读不回/无货卖家)
-  xy-chat sync-chats                 全量同步私信记录并分析卖家沟通状态
+  xy-chat sync-chats                 全量同步私信记录并分析卖家沟通状态 (支持吉他与数码卖家)
   xy-chat pick [target] [options]    全自动搜索、比价、风控过滤并输出最优推荐 (支持吉他预设或任意关键词如 "绿联 15375")
   xy-chat watch [query] [options]    周期性/实时监听新上架宝贝与降价动态 (支持 --webhook, --notify, --diff-only, --category, --max-price, --exclude, --iterations)
+  xy-chat purge                      清理本地 SQLite SSOT 中的配件、噪音及异常低价无效记录
   xy-chat sync                       全量同步线上资产至本地 SQLite SSOT
   xy-chat stats                      查看本地离线库统计数据
       `);

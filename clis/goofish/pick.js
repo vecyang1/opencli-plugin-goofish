@@ -50,13 +50,15 @@ export const command = cli({
 
     // 2. Determine target search configs
     const searchConfigs = [];
-    const isGuitarPreset = targetLower === 'all' || 
-                           targetLower === '全部' || 
-                           targetLower.includes('nexg') || 
-                           targetLower.includes('air') || 
-                           targetLower.includes('me4') || 
-                           targetLower.includes('me 4') || 
-                           targetLower.includes('lava');
+    const explicitCat = kwargs.category ? String(kwargs.category).trim() : '';
+    const isGuitarPreset = (!explicitCat || explicitCat === 'all' || explicitCat === '全部' || explicitCat.includes('guitar') || explicitCat.includes('nexg') || explicitCat.includes('lava')) &&
+                           (targetLower === 'all' || 
+                            targetLower === '全部' || 
+                            targetLower.includes('nexg') || 
+                            targetLower.includes('air') || 
+                            targetLower.includes('me4') || 
+                            targetLower.includes('me 4') || 
+                            targetLower.includes('lava'));
 
     if (isGuitarPreset) {
       if (targetLower === 'all' || targetLower === '全部' || targetLower.includes('nexg')) {
@@ -95,12 +97,13 @@ export const command = cli({
       }
     } else {
       // General purpose custom product pick!
-      const cat = kwargs.category || inferCategory({ keyword: rawTarget, title: rawTarget });
+      const cat = explicitCat || inferCategory({ keyword: rawTarget, title: rawTarget });
+      const kw = (rawTarget === 'all' || rawTarget === '全部') ? (cat === 'ugreen_hub' ? '绿联 15375' : cat) : rawTarget;
       searchConfigs.push({
         category: cat,
-        keyword: rawTarget,
-        minPrice: kwargs['min-price'] || '',
-        maxPrice: kwargs['max-price'] || '',
+        keyword: kw,
+        minPrice: kwargs['min-price'] || (cat === 'ugreen_hub' ? '60' : ''),
+        maxPrice: kwargs['max-price'] || (cat === 'ugreen_hub' ? '160' : ''),
         exclude: customExclude,
       });
     }
@@ -240,23 +243,22 @@ export const command = cli({
     }
 
     // Unidirectional Data Flow: Re-read authoritative candidates from SQLite view
-    const targetCategories = isGuitarPreset
-      ? (targetLower === 'all' || targetLower === '全部'
-          ? ['nexg2_nylon', 'lava_me_air', 'lava_me_4'] 
-          : [targetLower.includes('nexg') ? 'nexg2_nylon' : (targetLower.includes('air') ? 'lava_me_air' : 'lava_me_4')])
-      : [searchConfigs[0].category];
-
     const results = [];
-    for (const cat of targetCategories) {
+    const seenItemIds = new Set();
+    for (const sc of searchConfigs) {
       const candidates = queryCandidates({ 
-        category: cat, 
+        category: sc.category, 
+        minPrice: sc.minPrice || kwargs['min-price'] || null,
+        maxPrice: sc.maxPrice || kwargs['max-price'] || null,
         excludeGhosted: true, 
         sort: sortKey, 
         limit 
       });
       for (const best of candidates) {
+        if (seenItemIds.has(best.item_id)) continue;
+        seenItemIds.add(best.item_id);
         results.push({
-          category: cat,
+          category: sc.category,
           best_item_id: best.item_id,
           lowest_price: best.price,
           condition: best.condition || '-',
