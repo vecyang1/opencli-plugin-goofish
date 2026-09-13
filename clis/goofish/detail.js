@@ -1,6 +1,7 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError, CommandExecutionError } from '@jackwener/opencli/errors';
 import { safeGoto } from './_shared.js';
+import { saveCandidates } from './_db.js';
 
 export const command = cli({
   site: 'goofish',
@@ -154,6 +155,25 @@ export const command = cli({
 
     if (!data || data.ok === false) {
       throw new CommandExecutionError('查询商品详情失败: ' + (data ? data.message : '商品可能已失效或下架'));
+    }
+
+    // Unidirectional write-back into SQLite SSOT only when valid product data is present
+    if (data && data.title && data.title !== '闲鱼商品' && data.price && data.price !== '¥0') {
+      try {
+        saveCandidates([{
+          item_id: itemId,
+          title: data.title,
+          price: data.price,
+          seller: data.seller,
+          seller_user_id: data.seller_user_id,
+          location: data.location,
+          seller_tag: data.seller_stats,
+          item_url: `https://www.goofish.com/item?id=${itemId}`,
+          image_url: (data.images && data.images !== '-') ? data.images.split(' | ')[0] : '',
+          images: (data.images && data.images !== '-') ? data.images : '',
+          defect_notes: data.defect_notes || '',
+        }], { filterAccessories: false });
+      } catch (e) {}
     }
 
     return [{

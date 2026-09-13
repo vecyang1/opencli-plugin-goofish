@@ -1,5 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { safeGoto, checkAuth } from './_shared.js';
+import { saveFavorites } from './_db.js';
 
 export const command = cli({
   site: 'goofish',
@@ -121,6 +122,13 @@ export const command = cli({
         seen.add(it.item_id);
         deduplicated.push(it);
       }
+    }
+
+    // Unidirectional write-back into SQLite SSOT
+    if (deduplicated.length > 0) {
+      try {
+        saveFavorites(deduplicated);
+      } catch (e) {}
     }
 
     if (query) {

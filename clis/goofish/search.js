@@ -1,6 +1,7 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError } from '@jackwener/opencli/errors';
 import { safeGoto } from './_shared.js';
+import { saveCandidates } from './_db.js';
 
 export const command = cli({
   site: 'goofish',
@@ -311,6 +312,13 @@ export const command = cli({
         seen.add(key);
         deduplicated.push(it);
       }
+    }
+
+    // Unidirectional write-back into SQLite SSOT
+    if (deduplicated.length > 0) {
+      try {
+        saveCandidates(deduplicated, { keyword: query, filterAccessories: true });
+      } catch (e) {}
     }
 
     if (excludeKeywords.length > 0) {

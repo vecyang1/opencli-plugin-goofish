@@ -1,5 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { safeGoto, checkAuth } from './_shared.js';
+import { saveSessions } from './_db.js';
 
 export const command = cli({
   site: 'goofish',
@@ -41,6 +42,16 @@ export const command = cli({
       if (hasItems) break;
       await page.wait(1.5);
     }
+
+    // Reset virtual list position
+    await page.evaluate(() => {
+      const holder = document.querySelector('.rc-virtual-list-holder');
+      if (holder) {
+        holder.scrollTop = 0;
+        holder.dispatchEvent(new Event('scroll', { bubbles: true }));
+      }
+    });
+    await page.wait(1);
 
     const collectedMap = new Map();
 
@@ -93,7 +104,8 @@ export const command = cli({
         });
 
         if (holder) {
-          holder.scrollTop += 500;
+          holder.scrollTop += 350;
+          holder.dispatchEvent(new Event('scroll', { bubbles: true }));
         }
 
         return extracted;
@@ -110,6 +122,20 @@ export const command = cli({
     }
 
     let contacts = Array.from(collectedMap.values());
+
+    // Unidirectional write-back into SQLite SSOT
+    if (contacts.length > 0) {
+      try {
+        saveSessions(contacts.map(c => ({
+          contact_name: c.name,
+          trade_status: c.trade_status,
+          last_message: c.last_message,
+          time: c.time,
+          unread: c.unread,
+          has_item: c.has_item,
+        })));
+      } catch (e) {}
+    }
 
     if (query) {
       contacts = contacts.filter(c => c.name.toLowerCase().includes(query) || c.last_message.toLowerCase().includes(query) || c.trade_status.includes(query));

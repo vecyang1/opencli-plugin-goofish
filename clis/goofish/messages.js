@@ -1,6 +1,7 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError } from '@jackwener/opencli/errors';
 import { safeGoto, checkAuth } from './_shared.js';
+import { saveMessages, syncSellerReviewsFromSessionsAndMessages } from './_db.js';
 
 export const command = cli({
   site: 'goofish',
@@ -117,6 +118,14 @@ export const command = cli({
         };
       });
     });
+
+    // Unidirectional write-back into SQLite SSOT
+    if (messages && messages.length > 0) {
+      try {
+        saveMessages(contactQuery, messages);
+        syncSellerReviewsFromSessionsAndMessages();
+      } catch (e) {}
+    }
 
     return (messages || []).slice(0, limit).map((m, idx) => ({
       index: idx + 1,

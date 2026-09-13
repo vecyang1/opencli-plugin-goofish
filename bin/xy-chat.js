@@ -351,11 +351,12 @@ async function main() {
       printTable(results.map((c, idx) => ({
         '#': idx + 1,
         '商品ID': c.item_id,
-        '标题': c.title.slice(0, 32),
+        '标题': c.title.slice(0, 26),
         '价格': c.price,
+        '成色': c.condition,
+        '多图质检注记': c.defect_notes ? (c.defect_notes.length > 25 ? c.defect_notes.slice(0, 25) + '...' : c.defect_notes) : '封面完好待深检',
         '卖家': c.seller,
         '卖家状态': c.seller_status === 'responsive' ? '✅ 活跃报价' : (c.seller_status === 'ghosted' ? '⚠️ 已读不回' : (c.seller_status === 'unfit' ? '❌ 明确无货' : '❓ 待沟通')),
-        '成色': c.condition,
         '所在地': c.location,
       })));
       process.exit(0);
