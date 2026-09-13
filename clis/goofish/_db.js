@@ -184,30 +184,37 @@ export function saveOrders(orders) {
   const insertFts = db.prepare(`INSERT INTO orders_fts (order_id, title, seller, spec_tag, status) VALUES (?, ?, ?, ?, ?);`);
 
   let count = 0;
-  for (const raw of orders) {
-    if (!raw.order_id || raw.order_id === '-') continue;
-    let o;
-    try {
-      o = validateOrder(raw);
-    } catch (e) {
-      continue;
-    }
+  db.exec('BEGIN TRANSACTION;');
+  try {
+    for (const raw of orders) {
+      if (!raw.order_id || raw.order_id === '-') continue;
+      let o;
+      try {
+        o = validateOrder(raw);
+      } catch (e) {
+        continue;
+      }
 
-    insertOrder.run(
-      o.order_id,
-      o.seller || '',
-      o.seller_user_id || '',
-      o.status || '',
-      o.title || '',
-      o.price || '',
-      o.spec_tag || '',
-      o.item_id || '',
-      o.order_url || '',
-      now
-    );
-    deleteFts.run(o.order_id);
-    insertFts.run(o.order_id, o.title || '', o.seller || '', o.spec_tag || '', o.status || '');
-    count++;
+      insertOrder.run(
+        o.order_id,
+        o.seller || '',
+        o.seller_user_id || '',
+        o.status || '',
+        o.title || '',
+        o.price || '',
+        o.spec_tag || '',
+        o.item_id || '',
+        o.order_url || '',
+        now
+      );
+      deleteFts.run(o.order_id);
+      insertFts.run(o.order_id, o.title || '', o.seller || '', o.spec_tag || '', o.status || '');
+      count++;
+    }
+    db.exec('COMMIT;');
+  } catch (err) {
+    db.exec('ROLLBACK;');
+    throw err;
   }
 
   if (count > 0) {
@@ -259,18 +266,25 @@ export function saveFavorites(items) {
   `);
 
   let count = 0;
-  for (const it of items) {
-    if (!it.item_id || it.item_id === '-') continue;
-    insertFav.run(
-      String(it.item_id).trim(),
-      it.title || '',
-      it.price || '',
-      it.discount || '',
-      it.status || '',
-      it.item_url || '',
-      now
-    );
-    count++;
+  db.exec('BEGIN TRANSACTION;');
+  try {
+    for (const it of items) {
+      if (!it.item_id || it.item_id === '-') continue;
+      insertFav.run(
+        String(it.item_id).trim(),
+        it.title || '',
+        it.price || '',
+        it.discount || '',
+        it.status || '',
+        it.item_url || '',
+        now
+      );
+      count++;
+    }
+    db.exec('COMMIT;');
+  } catch (err) {
+    db.exec('ROLLBACK;');
+    throw err;
   }
 
   if (count > 0) {
@@ -317,18 +331,25 @@ export function saveSessions(sessions) {
   `);
 
   let count = 0;
-  for (const s of sessions) {
-    if (!s.contact_name || s.contact_name === '未知联系人') continue;
-    insertSess.run(
-      s.contact_name,
-      s.trade_status || '-',
-      s.last_message || '-',
-      s.time || '-',
-      s.unread || '-',
-      s.has_item || '-',
-      now
-    );
-    count++;
+  db.exec('BEGIN TRANSACTION;');
+  try {
+    for (const s of sessions) {
+      if (!s.contact_name || s.contact_name === '未知联系人') continue;
+      insertSess.run(
+        s.contact_name,
+        s.trade_status || '-',
+        s.last_message || '-',
+        s.time || '-',
+        s.unread || '-',
+        s.has_item || '-',
+        now
+      );
+      count++;
+    }
+    db.exec('COMMIT;');
+  } catch (err) {
+    db.exec('ROLLBACK;');
+    throw err;
   }
 
   if (count > 0) {
@@ -369,23 +390,32 @@ export function saveMessages(contactName, messages) {
       read_status = excluded.read_status;
   `);
 
+  const deleteFts = db.prepare(`DELETE FROM messages_fts WHERE contact_name = ? AND sender = ? AND content = ?;`);
   const insertFts = db.prepare(`INSERT INTO messages_fts (contact_name, sender, content) VALUES (?, ?, ?);`);
 
   let count = 0;
-  for (const m of messages) {
-    if (!m.content) continue;
-    try {
-      insertMsg.run(
-        contactName,
-        m.sender || '',
-        m.is_self || '否',
-        m.content || '',
-        m.read_status || '-',
-        now
-      );
-      insertFts.run(contactName, m.sender || '', m.content || '');
-      count++;
-    } catch (e) {}
+  db.exec('BEGIN TRANSACTION;');
+  try {
+    for (const m of messages) {
+      if (!m.content) continue;
+      try {
+        insertMsg.run(
+          contactName,
+          m.sender || '',
+          m.is_self || '否',
+          m.content || '',
+          m.read_status || '-',
+          now
+        );
+        deleteFts.run(contactName, m.sender || '', m.content || '');
+        insertFts.run(contactName, m.sender || '', m.content || '');
+        count++;
+      } catch (e) {}
+    }
+    db.exec('COMMIT;');
+  } catch (err) {
+    db.exec('ROLLBACK;');
+    throw err;
   }
 
   if (count > 0) {
@@ -478,64 +508,74 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
   const insertFts = db.prepare(`INSERT INTO candidates_fts (item_id, title, seller, keyword, category) VALUES (?, ?, ?, ?, ?);`);
 
   let count = 0;
-  for (const raw of items) {
-    if (!raw.item_id || raw.item_id === '-') continue;
+  db.exec('BEGIN TRANSACTION;');
+  try {
+    for (const raw of items) {
+      if (!raw.item_id || raw.item_id === '-') continue;
 
-    // Filter out accessories before writing to SSOT
-    if (filterAccessories && isAccessoryTitle(raw.title, category || raw.category)) {
-      continue;
-    }
-
-    let valid;
-    try {
-      valid = validateCandidate({
-        ...raw,
-        keyword: keyword || raw.keyword,
-        category: category || raw.category,
-      });
-    } catch (e) {
-      continue;
-    }
-
-    // Sanity check: reject cheap non-target items under category price floor
-    if (filterAccessories && valid.price_num > 0) {
-      if (valid.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(valid.category)) {
+      // Filter out accessories before writing to SSOT
+      if (filterAccessories && isAccessoryTitle(raw.title, category || raw.category)) {
         continue;
       }
-      if (valid.price_num < 60 && valid.category === 'ugreen_hub') {
+
+      let valid;
+      try {
+        valid = validateCandidate({
+          ...raw,
+          keyword: keyword || raw.keyword,
+          category: category || raw.category,
+        });
+      } catch (e) {
         continue;
       }
+
+      // Sanity check: reject invalid zero/negative price items or items under category price floor
+      if (filterAccessories) {
+        if (valid.price_num <= 0) {
+          continue;
+        }
+        if (valid.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(valid.category)) {
+          continue;
+        }
+        if (valid.price_num < 60 && valid.category === 'ugreen_hub') {
+          continue;
+        }
+      }
+
+      insertCandidate.run(
+        valid.item_id,
+        valid.keyword,
+        valid.category,
+        valid.title,
+        valid.price,
+        valid.price_num,
+        valid.original_price,
+        valid.price_drop,
+        valid.publish_time,
+        valid.location,
+        valid.seller,
+        valid.seller_user_id,
+        valid.seller_tag,
+        valid.condition,
+        valid.guarantee,
+        valid.item_url,
+        valid.image_url,
+        valid.images,
+        valid.defect_notes,
+        valid.seller_status,
+        valid.seller_note,
+        valid.status,
+        now
+      );
+
+      deleteFts.run(valid.item_id);
+      insertFts.run(valid.item_id, valid.title, valid.seller, valid.keyword, valid.category);
+      count++;
     }
-
-    insertCandidate.run(
-      valid.item_id,
-      valid.keyword,
-      valid.category,
-      valid.title,
-      valid.price,
-      valid.price_num,
-      valid.original_price,
-      valid.price_drop,
-      valid.publish_time,
-      valid.location,
-      valid.seller,
-      valid.seller_user_id,
-      valid.seller_tag,
-      valid.condition,
-      valid.guarantee,
-      valid.item_url,
-      valid.image_url,
-      valid.images,
-      valid.defect_notes,
-      valid.seller_status,
-      valid.seller_note,
-      valid.status,
-      now
-    );
-
-    deleteFts.run(valid.item_id);
-    insertFts.run(valid.item_id, valid.title, valid.seller, valid.keyword, valid.category);
-    count++;
+    db.exec('COMMIT;');
+  } catch (err) {
+    db.exec('ROLLBACK;');
+    throw err;
   }
 
   if (count > 0) {
@@ -585,13 +625,21 @@ export function queryCandidates({
   }
 
   if (minPrice !== null && minPrice !== undefined && minPrice !== '') {
-    sql += ' AND price_num >= ?';
-    params.push(Number(minPrice));
+    const numMin = typeof minPrice === 'number' ? minPrice : parseFloat(String(minPrice).replace(/[^\d.]/g, ''));
+    if (!Number.isNaN(numMin)) {
+      sql += ' AND price_num >= ?';
+      params.push(numMin);
+    }
+  } else {
+    sql += ' AND price_num > 0';
   }
 
   if (maxPrice !== null && maxPrice !== undefined && maxPrice !== '') {
-    sql += ' AND price_num <= ?';
-    params.push(Number(maxPrice));
+    const numMax = typeof maxPrice === 'number' ? maxPrice : parseFloat(String(maxPrice).replace(/[^\d.]/g, ''));
+    if (!Number.isNaN(numMax)) {
+      sql += ' AND price_num <= ?';
+      params.push(numMax);
+    }
   }
 
   if (excludeGhosted) {
@@ -629,15 +677,23 @@ export function purgeJunkCandidates() {
   const deleteCand = db.prepare('DELETE FROM candidates WHERE item_id = ?');
   const deleteFts = db.prepare('DELETE FROM candidates_fts WHERE item_id = ?');
 
-  for (const it of all) {
-    const isJunk = isAccessoryTitle(it.title, it.category) || 
-      (it.price_num > 0 && it.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(it.category)) ||
-      (it.price_num > 0 && it.price_num < 60 && it.category === 'ugreen_hub');
-    if (isJunk) {
-      deleteCand.run(it.item_id);
-      try { deleteFts.run(it.item_id); } catch (e) {}
-      purged++;
+  db.exec('BEGIN TRANSACTION;');
+  try {
+    for (const it of all) {
+      const isJunk = isAccessoryTitle(it.title, it.category) || 
+        it.price_num <= 0 ||
+        (it.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(it.category)) ||
+        (it.price_num < 60 && it.category === 'ugreen_hub');
+      if (isJunk) {
+        deleteCand.run(it.item_id);
+        try { deleteFts.run(it.item_id); } catch (e) {}
+        purged++;
+      }
     }
+    db.exec('COMMIT;');
+  } catch (err) {
+    db.exec('ROLLBACK;');
+    throw err;
   }
 
   if (purged > 0) {

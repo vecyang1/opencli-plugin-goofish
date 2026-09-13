@@ -2,13 +2,13 @@ import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError, CommandExecutionError } from '@jackwener/opencli/errors';
 import { safeGoto } from './_shared.js';
 import { saveCandidates } from './_db.js';
-import { extractDefectNotes } from './_contract.js';
+import { extractDefectNotes, extractMultiImageDefects, inferCategory } from './_contract.js';
 
 export const command = cli({
   site: 'goofish',
   name: 'detail',
   access: 'read',
-  description: '获取闲鱼商品详情 (标题、售价、卖家信誉档案、想要/浏览数、规格及描述)',
+  description: '获取闲鱼商品详情 (标题、售价、成色、卖家信誉档案、想要/浏览数、规格及描述)',
   domain: 'www.goofish.com',
   strategy: Strategy.COOKIE,
   browser: true,
@@ -20,6 +20,7 @@ export const command = cli({
     'item_id',
     'title',
     'price',
+    'condition',
     'seller',
     'seller_user_id',
     'location',
@@ -159,23 +160,30 @@ export const command = cli({
       throw new CommandExecutionError('查询商品详情失败: ' + (data ? data.message : '商品可能已失效或下架'));
     }
 
+    const category = inferCategory({ keyword: data.title, title: data.title });
+    const imgList = (data.images && data.images !== '-') ? data.images.split(' | ').map(s => s.trim()).filter(Boolean) : [];
+    const multiInspection = extractMultiImageDefects(data.description || data.title, imgList, category);
     const defectNotes = extractDefectNotes(data.title, data.description);
+    const finalNotes = defectNotes !== '封面完好待深检' ? defectNotes : multiInspection.defect_notes;
+    const finalCondition = multiInspection.condition;
 
     // Unidirectional write-back into SQLite SSOT only when valid product data is present
     if (data && data.title && data.title !== '闲鱼商品' && data.price && data.price !== '¥0') {
       try {
         saveCandidates([{
           item_id: itemId,
+          category,
           title: data.title,
           price: data.price,
           seller: data.seller,
           seller_user_id: data.seller_user_id,
           location: data.location,
           seller_tag: data.seller_stats,
+          condition: finalCondition,
           item_url: `https://www.goofish.com/item?id=${itemId}`,
-          image_url: (data.images && data.images !== '-') ? data.images.split(' | ')[0] : '',
-          images: (data.images && data.images !== '-') ? data.images : '',
-          defect_notes: defectNotes,
+          image_url: imgList[0] || '',
+          images: imgList.join('|'),
+          defect_notes: finalNotes,
         }], { filterAccessories: false });
       } catch (e) {}
     }
@@ -184,6 +192,7 @@ export const command = cli({
       item_id: itemId,
       title: data.title,
       price: data.price,
+      condition: finalCondition,
       seller: data.seller,
       seller_user_id: data.seller_user_id,
       location: data.location,
@@ -192,7 +201,7 @@ export const command = cli({
       browse_count: data.browse_count,
       specs: data.specs,
       images: data.images,
-      defect_notes: defectNotes,
+      defect_notes: finalNotes,
       description: data.description,
     }];
   },

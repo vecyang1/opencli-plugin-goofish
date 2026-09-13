@@ -12,6 +12,7 @@ import {
   inferCategory,
   classifySellerCommunication,
   extractDefectNotes,
+  extractMultiImageDefects,
   UNIVERSAL_JUNK_REGEX,
   GUITAR_ACCESSORY_REGEX,
   DIGITAL_NOISE_REGEX
@@ -99,37 +100,86 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
     assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 4K60Hz 千兆网口', 'ugreen_hub'), false);
     assert.equal(isAccessoryTitle('苹果 iPad Pro 11寸 M2芯片 128G', 'tablet'), false);
 
-    // Negative paths: Universal junk
+    // Two-sided positive paths: Legitimate 15375 features must NOT be falsely filtered!
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 4K60Hz向下兼容1080P', 'ugreen_hub'), false, '1080P backward compatibility must not reject 4K60Hz dock');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 4K 60Hz 兼容 2K', 'ugreen_hub'), false, '2K compatibility must not reject 4K60Hz dock');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 读卡速度100MB/s', 'ugreen_hub'), false, '100MB/s card reader speed must not trigger 100M Ethernet mismatch');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 铝合金外壳 全新', 'ugreen_hub'), false, 'Aluminum alloy casing must not be rejected as dummy shell');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 铝外壳 全新', 'ugreen_hub'), false, 'Aluminum casing synonym must not be rejected as dummy shell');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 全铝外壳', 'ugreen_hub'), false, 'All-aluminum casing must not be rejected');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 外壳无划痕 功能正常', 'ugreen_hub'), false, 'Casing cosmetic assertion must not be rejected');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 外壳有划痕 功能正常', 'ugreen_hub'), false, 'Casing wear disclosure must not be rejected');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 外壳有些许划痕 功能完好', 'ugreen_hub'), false, 'Casing slight scratch must not be rejected');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 外壳有轻微磕碰', 'ugreen_hub'), false, 'Casing slight bump must not be rejected');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 外壳磨损 功能正常', 'ugreen_hub'), false, 'Casing abrasion must not be rejected');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 外壳有细微划痕', 'ugreen_hub'), false, 'Casing fine scratch must not be rejected');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 4K 非30Hz 千兆网口', 'ugreen_hub'), false, 'Negated 30Hz must not reject genuine dock');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 非百兆网口 4K60Hz', 'ugreen_hub'), false, 'Negated 100M must not reject genuine dock');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 吊打5合1 4K60Hz', 'ugreen_hub'), false, 'Superiority comparison must not trigger mismatch');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 秒杀6合1', 'ugreen_hub'), false, 'Comparison must not trigger mismatch');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 刚收到拆封自用出', 'ugreen_hub'), false, 'Recently received自用 must not be rejected as wanted post');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 Type-C 转换器 4K60Hz 千兆', 'ugreen_hub'), false, 'Type-C converter synonym must not be rejected');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 编织线款 送网线', ''), false, 'Empty category must not falsely classify UGREEN hub as guitar accessory');
+    assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 非6合1', 'ugreen_hub'), false, 'Negated port count must not reject genuine dock');
+
+    // Negative paths: Universal junk & buyer wanted posts
     assert.equal(isAccessoryTitle('补差价专拍链接1元'), true);
     assert.equal(isAccessoryTitle('自提专拍 勿拍'), true);
     assert.equal(isAccessoryTitle('图纸手工费 维修服务'), true);
     assert.equal(isAccessoryTitle('原装包装盒 空盒子 出售'), true);
     assert.equal(isAccessoryTitle('展示机壳 模型机 保护膜'), true);
+    assert.equal(isAccessoryTitle('求购 绿联 15375 拓展坞', 'ugreen_hub'), true, 'Buyer wanted posts must be rejected');
+    assert.equal(isAccessoryTitle('收购 绿联 15375 拓展坞', 'ugreen_hub'), true, 'Acquisition posts must be rejected');
+    assert.equal(isAccessoryTitle('带价收 绿联 15375', 'ugreen_hub'), true, 'Priced collection posts must be rejected');
+    assert.equal(isAccessoryTitle('求收 恩雅 nexg 2n', 'nexg2_nylon'), true, 'Guitar collection posts must be rejected');
+    assert.equal(isAccessoryTitle('收一台 恩雅 nexg 2n 智能吉他', 'nexg2_nylon'), true, 'Buyer guitar wanted posts must be rejected');
 
-    // Negative paths: Guitar accessories
+    // Negative paths: Guitar accessories & non-nylon steel strings
     assert.equal(isAccessoryTitle('恩雅NEXG2四键踩钉踏板', 'nexg2_nylon'), true);
     assert.equal(isAccessoryTitle('拿火原装加厚琴包双肩背包', 'lava_me_air'), true);
     assert.equal(isAccessoryTitle('监听耳机 专用耳机 音箱线', 'nexg2_nylon'), true);
     assert.equal(isAccessoryTitle('吉他变调夹 拨片 拾音器', 'lava_me_4'), true);
     assert.equal(isAccessoryTitle('吉他音箱电源适配器充电线', 'nexg2_nylon'), true);
     assert.equal(isAccessoryTitle('LAVA ME Play 智能吉他 36寸', 'lava_me_air'), true);
+    assert.equal(isAccessoryTitle('恩雅 nexg 2 钢弦款 非2N 非尼龙', 'nexg2_nylon'), true, 'Steel string with 非2N must be rejected from nylon');
+    assert.equal(isAccessoryTitle('恩雅 nexg 2 钢弦款 不带尼龙弦', 'nexg2_nylon'), true, 'Steel string with 不带尼龙弦 must be rejected from nylon');
+    assert.equal(isAccessoryTitle('恩雅 nexg 2 钢弦款 没有尼龙弦', 'nexg2_nylon'), true, 'Steel string with 没有尼龙弦 must be rejected from nylon');
+    assert.equal(isAccessoryTitle('恩雅 nexg 2 钢弦款 绝非2N', 'nexg2_nylon'), true, 'Steel string with 绝非2N must be rejected from nylon');
+    assert.equal(isAccessoryTitle('恩雅 nexg 2 钢弦款 并非古典', 'nexg2_nylon'), true, 'Steel string with 并非古典 must be rejected from nylon');
 
-    // Negative paths: Digital accessories
+    // Negative paths: Digital accessories & dummy shells
     assert.equal(isAccessoryTitle('绿联 15375 拓展坞硅胶保护套收纳包', 'ugreen_hub'), true);
     assert.equal(isAccessoryTitle('绿联 15375 拓展坞收纳袋', 'ugreen_hub'), true);
     assert.equal(isAccessoryTitle('绿联 15375 拓展坞保护壳', 'ugreen_hub'), true);
     assert.equal(isAccessoryTitle('绿联 拓展坞硅胶套', 'ugreen_hub'), true);
     assert.equal(isAccessoryTitle('绿联拓展坞防尘塞', 'ugreen_hub'), true);
     assert.equal(isAccessoryTitle('绿联拓展坞外壳', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 15375 拓展坞 纯外壳', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 15375 拓展坞 替换外壳', 'ugreen_hub'), true);
     assert.equal(isAccessoryTitle('绿联Type-C转接头', 'ugreen_hub'), true);
     assert.equal(isAccessoryTitle('手机壳 保护套 挂绳', 'ugreen_hub'), true);
 
-    // Negative paths: UGREEN 15375 specification mismatch (rejecting 5合1, 6合1, 10合1, 百兆网口, 4K30Hz)
+    // Negative paths: UGREEN 15375 specification mismatch (digits, Chinese numerals, English, and negation bypass)
     assert.equal(isAccessoryTitle('绿联 拓展坞 6合1 4K30Hz', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 拓展坞 6合一', 'ugreen_hub'), true, '6合一 Chinese numeral must be rejected');
+    assert.equal(isAccessoryTitle('绿联 拓展坞 六合一', 'ugreen_hub'), true, '六合一 Chinese numeral must be rejected');
     assert.equal(isAccessoryTitle('绿联 拓展坞 5合1', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 拓展坞 5合一', 'ugreen_hub'), true, '5合一 Chinese numeral must be rejected');
+    assert.equal(isAccessoryTitle('绿联 拓展坞 五合一', 'ugreen_hub'), true, '五合一 Chinese numeral must be rejected');
+    assert.equal(isAccessoryTitle('绿联 拓展坞 6 in 1', 'ugreen_hub'), true, '6 in 1 English must be rejected');
     assert.equal(isAccessoryTitle('绿联 10合1 拓展坞', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 10合一 拓展坞', 'ugreen_hub'), true, '10合一 must be rejected');
+    assert.equal(isAccessoryTitle('绿联 十合一 拓展坞', 'ugreen_hub'), true, '十合一 must be rejected');
+    assert.equal(isAccessoryTitle('绿联 15375 拓展坞 6合1', 'ugreen_hub'), true, '15375 6合1 port mismatch must be rejected');
+    assert.equal(isAccessoryTitle('绿联 15375 拓展坞 5合一', 'ugreen_hub'), true, '15375 5合一 port mismatch must be rejected');
+    assert.equal(isAccessoryTitle('绿联 6合1 拓展坞 非15375', 'ugreen_hub'), true, '6合1 非15375 must be rejected');
     assert.equal(isAccessoryTitle('绿联 9合1 拓展坞 百兆网口', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 9合1 拓展坞 100兆网口', 'ugreen_hub'), true, '100兆网口 must be rejected');
+    assert.equal(isAccessoryTitle('绿联 拓展坞 百兆网口 非千兆', 'ugreen_hub'), true, '百兆网口 非千兆 must be rejected');
     assert.equal(isAccessoryTitle('绿联 9合1 拓展坞 4K30Hz', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 拓展坞 4K@30Hz', 'ugreen_hub'), true, '4K@30Hz must be rejected');
+    assert.equal(isAccessoryTitle('绿联 拓展坞 4K/30Hz', 'ugreen_hub'), true, '4K/30Hz must be rejected');
+    assert.equal(isAccessoryTitle('绿联 拓展坞 4K 30Hz 非60Hz', 'ugreen_hub'), true, '4K 30Hz 非60Hz must be rejected');
 
     // Custom exclusion keywords
     assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 4K60Hz', 'ugreen_hub', ['6合1']), false);
@@ -173,6 +223,15 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
       seller: '配件商',
     }], { category: 'ugreen_hub', filterAccessories: true });
     assert.equal(hubJunkSaved, 0, 'Spurious low-price digital accessory must be rejected');
+
+    // Zero-price unpriced / display / wanted post rejection (price_num <= 0)
+    const zeroJunkSaved = saveCandidates([{
+      item_id: 'HUB_ZERO_01',
+      title: '绿联 15375 拓展坞 个人自用',
+      price: '¥0',
+      seller: '展示用户',
+    }], { category: 'ugreen_hub', filterAccessories: true });
+    assert.equal(zeroJunkSaved, 0, 'Zero price display/wanted post must be rejected from candidate SSOT');
 
     // Query confirms legitimate guitar and hub exist
     const candsGuitar = queryCandidates({ category: 'nexg2_nylon' });
@@ -238,6 +297,96 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
       ]
     });
     assert.equal(dialog5.status, 'ghosted');
+
+    // Case 6: Digital price quote (110出 / 120包邮)
+    const dialog6 = classifySellerCommunication({
+      session: { contact_name: '拓展坞卖家', last_message: '110出', trade_status: '-' },
+      messages: [
+        { sender: 'Buyer', is_self: '是', content: '最低多少能出？' },
+        { sender: '拓展坞卖家', is_self: '否', content: '110出' },
+      ]
+    });
+    assert.equal(dialog6.status, 'responsive', 'Sub-4-digit digital price quote must be classified as responsive');
+
+    // Case 7: Seller confirms stock with '在的，可以拍'
+    const dialog7 = classifySellerCommunication({
+      session: { contact_name: '现货卖家', last_message: '在的，随时可以拍，当天发', trade_status: '-' },
+      messages: [
+        { sender: 'Buyer', is_self: '是', content: '还有吗？' },
+        { sender: '现货卖家', is_self: '否', content: '在的，随时可以拍，当天发' },
+      ]
+    });
+    assert.equal(dialog7.status, 'responsive');
+
+    // Case 8: Seller explicitly replies "不好意思，刚卖掉了"
+    const dialog8 = classifySellerCommunication({
+      session: { contact_name: '卖掉卖家', last_message: '不好意思，刚卖掉了', trade_status: '-' },
+      messages: [
+        { sender: 'Buyer', is_self: '是', content: '在吗' },
+        { sender: '卖掉卖家', is_self: '否', content: '不好意思，刚卖掉了' },
+      ]
+    });
+    assert.equal(dialog8.status, 'unfit', '卖掉了 must be classified as unfit');
+
+    // Case 9: Seller explicitly replies "被人拍了" / "出给别人了"
+    const dialog9 = classifySellerCommunication({
+      session: { contact_name: '被拍卖家', last_message: '已经出给别人了，被人拍了', trade_status: '-' },
+      messages: [
+        { sender: 'Buyer', is_self: '是', content: '我要了' },
+        { sender: '被拍卖家', is_self: '否', content: '已经出给别人了，被人拍了' },
+      ]
+    });
+    assert.equal(dialog9.status, 'unfit', '被人拍了 / 出给别人了 must be classified as unfit');
+
+    // Case 10: Seller answers defect inquiry with "没有暗病，成色很好可以拍" (MUST NOT be misclassified as unfit!)
+    const dialog10 = classifySellerCommunication({
+      session: { contact_name: '良品卖家', last_message: '没有暗病，成色很好可以拍', trade_status: '-' },
+      messages: [
+        { sender: 'Buyer', is_self: '是', content: '请问有暗病吗？' },
+        { sender: '良品卖家', is_self: '否', content: '没有暗病，成色很好可以拍' },
+      ]
+    });
+    assert.equal(dialog10.status, 'responsive', '没有暗病 must be classified as responsive, not unfit');
+
+    // Case 11: Seller answers with "没有任何问题，包邮" (MUST NOT be misclassified as unfit!)
+    const dialog11 = classifySellerCommunication({
+      session: { contact_name: '正品卖家2', last_message: '没有任何问题，包邮', trade_status: '-' },
+      messages: [
+        { sender: 'Buyer', is_self: '是', content: '成色怎么样？有毛病吗？' },
+        { sender: '正品卖家2', is_self: '否', content: '没有任何问题，包邮' },
+      ]
+    });
+    assert.equal(dialog11.status, 'responsive', '没有任何问题 must be classified as responsive, not unfit');
+
+    // Case 12: Seller replies "随时可拍，当天可发"
+    const dialog12 = classifySellerCommunication({
+      session: { contact_name: '极速发货', last_message: '随时可拍，当天可发', trade_status: '-' },
+      messages: [
+        { sender: 'Buyer', is_self: '是', content: '什么时候能发？' },
+        { sender: '极速发货', is_self: '否', content: '随时可拍，当天可发' },
+      ]
+    });
+    assert.equal(dialog12.status, 'responsive', '随时可拍当天可发 must be classified as responsive');
+
+    // Case 13: Seller replies "都在，随时可以拍"
+    const dialog13 = classifySellerCommunication({
+      session: { contact_name: '库存充足', last_message: '都在，随时可以拍', trade_status: '-' },
+      messages: [
+        { sender: 'Buyer', is_self: '是', content: '东西还在吗' },
+        { sender: '库存充足', is_self: '否', content: '都在，随时可以拍' },
+      ]
+    });
+    assert.equal(dialog13.status, 'responsive', '都在随时可以拍 must be classified as responsive');
+
+    // Case 14: Seller replies "东西都在，没有任何暗病"
+    const dialog14 = classifySellerCommunication({
+      session: { contact_name: '完好卖家', last_message: '东西都在，没有任何暗病', trade_status: '-' },
+      messages: [
+        { sender: 'Buyer', is_self: '是', content: '琴有问题吗' },
+        { sender: '完好卖家', is_self: '否', content: '东西都在，没有任何暗病' },
+      ]
+    });
+    assert.equal(dialog14.status, 'responsive', '没有任何暗病 must be classified as responsive, not unfit');
   });
 
   await t.test('5. Idempotent Writes & FTS Synchronization', () => {
@@ -289,6 +438,18 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
     // Empty / neutral description
     const note4 = extractDefectNotes('', '');
     assert.equal(note4, '封面完好待深检');
+
+    // Negation protection: "无明显划痕，无明显磕碰，从没修过，箱说齐全" must NEVER flag defects!
+    const note5 = extractDefectNotes('绿联 15375 拓展坞', '自用成色很好，无明显划痕，无明显磕碰，从没修过，箱说齐全');
+    assert.ok(!note5.includes('⚠️ 检视注记'), 'Negated scratches/bumps must not produce defect warning');
+    assert.ok(note5.includes('✨ 成色良好'), 'Flawless condition must be recognized as pristine');
+    assert.ok(note5.includes('无明显划痕磕碰'), 'Must recognize pristine casing assertion');
+    assert.ok(note5.includes('箱说配件全'), '箱说齐全 must be recognized as complete accessories');
+
+    // Negation protection: "没有任何划痕，没有任何磕碰，从未拆修"
+    const note6 = extractDefectNotes('恩雅 NEXG 2N 智能吉他', '成色99新，没有任何划痕，没有任何磕碰，从未拆修，配件齐全');
+    assert.ok(!note6.includes('⚠️ 检视注记'), '没有任何划痕/磕碰 must not produce defect warning');
+    assert.ok(note6.includes('✨ 成色良好'));
   });
 
   await t.test('7. Uncategorized Non-Guitar Candidates Retention in Purge', () => {
@@ -308,6 +469,65 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
     const cands = queryCandidates({ category: 'ugreen_hub' });
     const found = cands.find(c => c.item_id === 'OTHER_HUB_109');
     assert.ok(found, 'Valid ¥109 UGREEN hub must be retained after purge');
+  });
+
+  await t.test('8. Price Range Boundaries in Candidate Queries', () => {
+    saveCandidates([
+      { item_id: 'PR_HUB_90', title: '绿联 15375 拓展坞 90', price: '¥90', category: 'ugreen_hub', seller: 'S1' },
+      { item_id: 'PR_HUB_110', title: '绿联 15375 拓展坞 110', price: '¥110', category: 'ugreen_hub', seller: 'S2' },
+      { item_id: 'PR_HUB_130', title: '绿联 15375 拓展坞 130', price: '¥130', category: 'ugreen_hub', seller: 'S3' },
+      { item_id: 'PR_HUB_150', title: '绿联 15375 拓展坞 150', price: '¥150', category: 'ugreen_hub', seller: 'S4' },
+    ], { filterAccessories: false });
+
+    // String price boundary
+    const res1 = queryCandidates({ category: 'ugreen_hub', minPrice: '100', maxPrice: '140' });
+    const ids1 = res1.map(r => r.item_id);
+    assert.ok(ids1.includes('PR_HUB_110'));
+    assert.ok(ids1.includes('PR_HUB_130'));
+    assert.ok(!ids1.includes('PR_HUB_90'));
+    assert.ok(!ids1.includes('PR_HUB_150'));
+
+    // Formatted currency boundary string (¥120)
+    const res2 = queryCandidates({ category: 'ugreen_hub', maxPrice: '¥120' });
+    const ids2 = res2.map(r => r.item_id);
+    assert.ok(ids2.includes('PR_HUB_90'));
+    assert.ok(ids2.includes('PR_HUB_110'));
+    assert.ok(!ids2.includes('PR_HUB_130'));
+    assert.ok(!ids2.includes('PR_HUB_150'));
+  });
+
+  await t.test('9. Category-Aware Condition and Defect Neutralization', () => {
+    // 9a. Pristine condition on 3C digital hub must be recognized as 全新未拆封
+    const hubPristine = extractMultiImageDefects('全新未拆封原封未拆，箱说全，包邮', ['https://img.alicdn.com/h1.jpg'], 'ugreen_hub');
+    assert.equal(hubPristine.condition, '全新未拆封');
+    assert.ok(hubPristine.defect_notes.includes('全新未拆封'));
+    assert.ok(hubPristine.defect_notes.includes('箱说配件全'));
+
+    // 9b. Non-guitar product with '无暗病' must NEVER produce '琴颈笔直'
+    const hubDefect = extractMultiImageDefects('绿联 15375 9合1 拓展坞 功能全好无暗病', [], 'ugreen_hub');
+    assert.ok(!hubDefect.defect_notes.includes('琴颈'), 'Hub defect notes must NOT mention guitar neck');
+    assert.ok(hubDefect.defect_notes.includes('功能全好无暗病'));
+
+    // 9c. Guitar product with '无暗病' properly recognizes neck condition
+    const guitarDefect = extractMultiImageDefects('恩雅 NEXG 2N 智能吉他 琴颈笔直没有任何暗病', [], 'nexg2_nylon');
+    assert.ok(guitarDefect.defect_notes.includes('琴颈笔直无暗病'));
+
+    // 9d. Category inference handles various aliases
+    assert.equal(inferCategory({ keyword: '绿联 9合1' }), 'ugreen_hub');
+    assert.equal(inferCategory({ keyword: '绿联 15375 拓展坞' }), 'ugreen_hub');
+    assert.equal(inferCategory({ category: '绿联' }), 'ugreen_hub');
+
+    // 9e. Multi-image defect extraction on flawless item with negations ("无明显划痕，无明显磕碰，从没修过，箱说齐全")
+    const hubFlawless = extractMultiImageDefects('自用成色很好，无明显划痕，无明显磕碰，从没修过，箱说齐全，包邮', ['https://img.alicdn.com/h2.jpg'], 'ugreen_hub');
+    assert.equal(hubFlawless.condition, '95新(外观完好)', 'Flawless condition with negated scratches/bumps must not be downgraded to 85新');
+    assert.ok(hubFlawless.defect_notes.includes('箱说配件全'), '箱说齐全 must be recognized as complete accessories in multi-image engine');
+    assert.ok(!hubFlawless.defect_notes.includes('划痕'), 'Negated scratches must not produce scratch defect note');
+    assert.ok(!hubFlawless.defect_notes.includes('磕碰'), 'Negated bumps must not produce bump defect note');
+
+    // 9f. Cross-domain category inference boundary tests
+    assert.equal(inferCategory({ title: '绿联 15375 9合1 拓展坞 尼龙编织线款' }), 'ugreen_hub', 'Nylon cable hub must not be misclassified as nylon guitar');
+    assert.equal(inferCategory({ title: 'iPad Air 5 64G 蜂窝版' }), 'other', 'iPad Air must not be misclassified as LAVA ME Air guitar');
+    assert.equal(inferCategory({ title: 'MacBook Air M2 16G 银色' }), 'other', 'MacBook Air must not be misclassified as LAVA ME Air guitar');
   });
 
   // Cleanup

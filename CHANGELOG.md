@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] - 2026-09-13
+
+### Fixed & Hardened (Adversarial Negation Disambiguation, Wear Preservation & False Defect Elimination)
+- **Casing Wear vs. Dummy Shell Disambiguation (`clis/goofish/_contract.js`)**:
+  - Replaced overly restrictive negative lookahead whitelist in `DIGITAL_NOISE_REGEX` with a comprehensive character lookahead covering all real-world cosmetic wear descriptors (`有`, `微`, `细`, `轻`, `磨损`, `划痕`, `划伤`, `磕碰`, `磕伤`, `掉漆`, `完好`, `正常`, `成色`, `全新`, `9\\d新`, `良好`, `氧化`, `保护`).
+  - Genuine second-hand listings describing honest casing wear (`外壳有划痕 功能正常`, `外壳有些许划痕`, `外壳有轻微磕碰`, `外壳磨损`) are now preserved 100%, while empty/dummy shells (`拓展坞外壳 出售`, `纯外壳`, `空壳`, `单卖外壳`, `外壳配件`) are strictly rejected.
+- **Negation Leaks in Refresh Rate (30Hz) & Ethernet (100M) (`clis/goofish/_contract.js`)**:
+  - Added negative lookbehind `(?<!(?:非|不是|不支持|无|并非|绝非))` to `REFRESH_RATE_30HZ_REGEX` and replaced JS ASCII word boundary `\\b` with Unicode-safe `(?<![\\w])`, preventing Chinese negation words (`非30Hz`, `不是30Hz`) from falsely matching 30Hz downgrade patterns.
+  - Added negative lookbehind `(?<!(?:非|不是|并非|绝非|无|不带))` to `ETHERNET_100M_REGEX`, preventing `非百兆网口 4K60Hz` from false rejection.
+  - Aligned `UGREEN_15375_MISMATCH_REGEX` and port count mismatch lookbehinds (`(?<!(?:非|不是|并非|绝非|比|吊打|秒杀|胜过|远超))`) to allow superiority comparisons (`吊打5合1`, `秒杀6合1`).
+- **Defect Extraction Engine False Penalty Elimination (`clis/goofish/_contract.js`)**:
+  - Expanded negative lookbehinds in both `extractDefectNotes` and `extractMultiImageDefects` for scratches and bumps to cover two-character compound negations (`无明显`, `没有明显`, `没明显`, `无任何`, `没有任何`, `基本无`, `几乎无`, `未见`, `防`).
+  - Fixed critical bug where sellers describing pristine condition as `"无明显划痕，无明显磕碰，从没修过，箱说齐全"` were previously penalized with `85新(有磕碰)` and flagged with defect warnings.
+  - Added `箱说齐全` / `原包装齐全` to box and manual indicators in both single-text and multi-image inspection routines.
+- **Nylon vs. Steel String Negation Guard (`clis/goofish/_contract.js`)**:
+  - Added `无|没有|不带` to negative lookbehind before `尼龙|2N|古典`, ensuring steel string models stating `不带尼龙弦` or `没有尼龙弦` are strictly rejected from `nexg2_nylon`.
+- **Wanted Posts Buyer Noise Rejection (`clis/goofish/_contract.js`)**:
+  - Expanded `UNIVERSAL_JUNK_REGEX` to cover acquisition and wanted prefixes (`收购`, `回收`, `求收`, `带价收`, `只收不卖`), while preserving genuine recent purchase statements (`刚收到拆封自用出`).
+- **Seller Communication Affirmation Expansion (`clis/goofish/_contract.js`)**:
+  - Expanded `RESPONSIVE_SELLER_REGEX` to include `可拍`, `随时可拍`, `随时可发`, `都在`, `东西都在`, preventing responsive sellers using concise affirmative speech from falling into `unknown`.
+- **Default Category Query in Watch Engine (`clis/goofish/watch.js`)**:
+  - Added `defaultQueryMap` so `--category ugreen_hub` defaults search query to `'绿联 15375'` instead of guitar default `'nexg 2n'`.
+- **Zero-Price Candidate Leak Guard in Queries (`clis/goofish/_db.js`)**:
+  - Enforced `price_num > 0` on all candidate queries when `minPrice` is unspecified, preventing unpriced or display placeholder listings from leaking through `price_desc` or `updated` sorts.
+
+## [1.7.1] - 2026-09-13
+
+### Fixed & Hardened (Cross-Domain Noise Disambiguation, Mismatch Precision & Transaction Atomicity)
+- **Cross-Domain Noise Disambiguation (`clis/goofish/_contract.js`)**:
+  - Resolved false rejection bug where items with empty category `""` or `'other'` defaulted to `isGuitarCategory = true`, previously rejecting legitimate UGREEN docks that mentioned `网线`, `连接线`, `充电线`, or `插头`.
+  - Added smart category disambiguation based on title keywords when category is unspecified.
+  - Refined `DIGITAL_NOISE_REGEX` to permit metal and aluminum alloy casing (`铝合金外壳`, `金属外壳`) while strictly rejecting standalone dummy shells (`单机壳`, `纯外壳`, `替换壳`, `拓展坞外壳`).
+  - Allowed docking station converter synonyms (`Type-C 转换器`) for multi-function hubs while rejecting standalone dongles.
+- **Exhaustive Mismatch Detection for UGREEN 15375 (`clis/goofish/_contract.js`)**:
+  - Expanded port count mismatch rejection to cover Chinese numerals (`5合一`, `6合一`, `7合一`, `8合一`, `10合一`, `五合一`, `六合一`, `七合一`, `八合一`, `十合一`) and English notation (`6 in 1`, `5 in 1`).
+  - Added refresh rate downgrade detection (`4K@30Hz`, `4K/30Hz`, `4K 30帧`) while preserving legitimate listings with 60Hz and backward compatibility (`4K60Hz向下兼容1080P`, `兼容2K`).
+  - Added Ethernet downgrade detection (`100兆网口`, `100M网口`, `百兆`) without falsely matching high-speed card readers (`100MB/s`).
+- **Category-Aware Defect Inspection & Condition Normalization (`clis/goofish/_contract.js`, `detail.js`, `watch.js`)**:
+  - Upgraded `extractMultiImageDefects` with category awareness: 3C digital products now receive `'功能全好无暗病'` instead of instrument-specific `'琴颈笔直无暗病'`.
+  - Added pristine condition extraction (`全新未拆封`, `99新(准新仅拆)`) to prevent downgrading brand new sealed items to `'95新'`.
+  - Wired `condition`, `category`, and `defect_notes` into `detail.js` output and SQLite SSOT write-back.
+- **Seller Communication Intelligence (`clis/goofish/_contract.js`)**:
+  - Expanded `RESPONSIVE_SELLER_REGEX` to recognize sub-4-digit digital price quotes (`110出`, `120包邮`, `109元`) and active stock confirmations (`在的，可以拍`, `能发`, `随时发`).
+  - Expanded `UNFIT_SELLER_REGEX` to catch common Xianyu seller sold-out idioms (`不好意思，刚卖掉了`, `被人拍了`, `出给别人了`).
+- **SQLite SSOT ACID Transactions (`clis/goofish/_db.js`)**:
+  - Wrapped batch operations (`saveOrders`, `saveCandidates`, `purgeJunkCandidates`) inside atomic `BEGIN TRANSACTION` / `COMMIT` blocks with rollback protection.
+  - Hardened `queryCandidates` numeric price parsing to handle string prices, currency symbols (`¥120`), and numbers uniformly.
+- **Pick Engine & CLI Enhancements (`clis/goofish/pick.js`, `bin/xy-chat.js`)**:
+  - Fixed issue where default `target = 'all'` hijacked explicit `--category ugreen_hub`.
+  - Propagated category-specific `minPrice` and `maxPrice` to `queryCandidates` on authoritative read-back.
+  - Added `xy-chat purge` / `xy-chat clean` command to prune accessories and invalid low-price items.
+  - Expanded test suite from 46 to 48 passing tests (100% pass rate).
+
 ## [1.7.0] - 2026-09-13
 
 ### Added & Hardened (Digital Spec Hardening, Defect Extraction, & Watch Push Engine)

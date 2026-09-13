@@ -55,10 +55,16 @@ export const command = cli({
     'item_url',
   ],
   func: async (page, kwargs) => {
-    const query = String(kwargs.query || kwargs._?.[0] || 'nexg 2n').trim();
-    const category = kwargs.category ? String(kwargs.category).trim() : inferCategory({ keyword: query });
+    const category = kwargs.category ? String(kwargs.category).trim() : inferCategory({ keyword: kwargs.query || kwargs._?.[0] || '' });
+    const defaultQueryMap = {
+      ugreen_hub: '绿联 15375',
+      nexg2_nylon: 'nexg 2n',
+      lava_me_air: 'lava me air',
+      lava_me_4: 'lava me 4',
+    };
+    const query = String(kwargs.query || kwargs._?.[0] || defaultQueryMap[category] || 'nexg 2n').trim();
     const isGuitarTarget = ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(category);
-    const minPrice = kwargs['min-price'] || (isGuitarTarget ? '700' : null);
+    const minPrice = kwargs['min-price'] || (isGuitarTarget ? '700' : (category === 'ugreen_hub' ? '60' : null));
     const maxPrice = kwargs['max-price'] || null;
     const maxPriceNum = maxPrice ? parseFloat(String(maxPrice).replace(/[^\d.]/g, '')) : null;
     const customExclude = kwargs.exclude ? String(kwargs.exclude).split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -98,7 +104,8 @@ export const command = cli({
             eventType = '🆕 新上架';
             seenPrices.set(it.item_id, it.price_num);
           } else if (it.price_num < oldPrice) {
-            priceDropText = `¥${oldPrice - it.price_num}`;
+            const dropNum = +(oldPrice - it.price_num).toFixed(2);
+            priceDropText = `¥${dropNum}`;
             eventType = `📉 降价 (¥${oldPrice} -> ${it.price})`;
             seenPrices.set(it.item_id, it.price_num);
           }
@@ -249,7 +256,7 @@ export const command = cli({
             if (inspectImages) {
               for (const cand of validCandidates) {
                 if (!seenPrices.has(cand.item_id)) {
-                  const defect = extractMultiImageDefects(cand.title, cand.images);
+                  const defect = extractMultiImageDefects(cand.title, cand.images, category);
                   cand.defect_notes = defect.defect_notes;
                   cand.condition = defect.condition;
                 }

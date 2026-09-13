@@ -84,7 +84,7 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu reviews` | `[read]` | 卖家信誉与沟通记录评估 (活跃报价/已读不回/无货标注) | `[seller] [--status responsive/ghosted/unfit] [--sync] [--limit 50]` |
 | `opencli xianyu pick` | `[read/write]` | 自动化跨品类候选聚合、详情补全、风险卖家过滤与最优解推荐 | `[target nexg2_nylon/lava_me_air/lava_me_4/all] [--min-price N] [--max-price N] [--limit 20]` |
 | `opencli xianyu watch` | `[read/write]` | 实时监听新上架宝贝与降价动态 (推送式实时订阅与离线真理库同步) | `[query] [--category <cat>] [--interval 10] [--min-price N] [--max-price N] [--iterations 1]` |
-| `xy-chat <cmd>` | `[all]` | 统一独立可执行命令行表面，与 OpenCLI 共享相同底层契约与 SSOT 数据库 | `xy-chat <doctor/whoami/personal/orders/favorites/search/detail/seller/candidates/reviews/pick/watch/sync/stats>` |
+| `xy-chat <cmd>` | `[all]` | 统一独立可执行命令行表面，与 OpenCLI 共享相同底层契约与 SSOT 数据库 | `xy-chat <doctor/whoami/personal/orders/favorites/search/detail/seller/candidates/reviews/pick/watch/purge/sync/stats>` |
 
 ---
 

@@ -232,9 +232,9 @@ export function generateDdl() {
 
 /**
  * Universal junk/noise regex pattern across all product categories.
- * Excludes packaging boxes, manual fees, repair services, blueprints, deposit/postage adjustments, model dummies.
+ * Excludes packaging boxes, manual fees, repair services, blueprints, deposit/postage adjustments, model dummies, wanted posts.
  */
-export const UNIVERSAL_JUNK_REGEX = /(?:图纸|维修费|手工费|专拍链接|邮费补差|补差价|补运费|定金|包装盒|空盒子|空盒|空包装|包装箱|说明书|模型机|展示机壳|保护膜|贴膜|自提专拍)/i;
+export const UNIVERSAL_JUNK_REGEX = /(?:图纸|维修费|手工费|专拍链接|邮费补差|补差价|补运费|定金|包装盒|空盒子|空盒|空包装|包装箱|说明书|模型机|展示机壳|保护膜|贴膜|自提专拍|求购|收购|回收|诚收|诚心收|想收|求收|带价收|只收不卖|收一个|收一台|收把|收个|求一件|求一个)/i;
 
 /**
  * Standard guitar accessory regex pattern.
@@ -244,9 +244,9 @@ export const GUITAR_ACCESSORY_REGEX = /(?:踏板|踩钉|麦克风|话筒|耳麦|
 
 /**
  * Standard digital 3C noise regex pattern.
- * Excludes cases, bags, sleeves, dust plugs, dummy shells.
+ * Excludes cases, bags, sleeves, dust plugs, dummy shells while preserving genuine alloy casing and condition descriptors.
  */
-export const DIGITAL_NOISE_REGEX = /(?:手机壳|保护套|保护壳|硅胶套|硅胶壳|挂绳|收纳包|收纳袋|收纳盒|内胆包|纯包装|展示壳|防尘塞|防尘套|贴膜|展示机|模型机|单机壳|纯外壳|替换壳)/i;
+export const DIGITAL_NOISE_REGEX = /(?:手机壳|保护套|保护壳|硅胶套|硅胶壳|挂绳|收纳包|收纳袋|收纳盒|内胆包|纯包装|展示壳|防尘塞|防尘套|贴膜|展示机|模型机|单机壳|纯外壳|替换壳|单壳|空壳|单独外壳|仅外壳|仅出外壳|只出外壳|单卖外壳|替换外壳|外壳配件|无主板外壳|(?:拓展坞|扩展坞)\s*(?:单?外壳|空壳|机壳)(?!\s*(?:无|没有|有|微|细|轻|磨损|划痕|划伤|磕碰|磕伤|掉漆|完好|正常|成色|全新|9\d新|良好|氧化|保护)))/i;
 
 /**
  * Standalone dongle/cable regex when the item is NOT a multi-function docking station.
@@ -254,24 +254,24 @@ export const DIGITAL_NOISE_REGEX = /(?:手机壳|保护套|保护壳|硅胶套|�
 export const STANDALONE_DONGLE_CABLE_REGEX = /(?:转接头|转换头|纯线|延长线|纯数据线|单充头)/i;
 
 /**
- * Port count mismatch pattern for UGREEN 15375 9-in-1 (catches 3-8, 10-12 in digits, Chinese, and English).
+ * Port count mismatch pattern for UGREEN 15375 9-in-1 (catches 3-8, 10-12 in digits, Chinese, and English, unless negated).
  */
-export const PORT_COUNT_MISMATCH_REGEX = /(?:(?:[3-8]|1[0-2])\s*合\s*[1一]|(?:[三四五六七八]|十[一二]?)\s*合\s*[1一]|(?:[3-8]|1[0-2])\s*[-_ ]?in[-_ ]?1)/i;
+export const PORT_COUNT_MISMATCH_REGEX = /(?:(?<!(?:非|不是|并非|绝非|比|吊打|秒杀|胜过|远超))(?:[3-8]|1[0-2])\s*合\s*[1一]|(?<!(?:非|不是|并非|绝非|比|吊打|秒杀|胜过|远超))(?:[三四五六七八]|十[一二]?)\s*合\s*[1一]|(?<!(?:非|不是|并非|绝非|比|吊打|秒杀|胜过|远超))(?:[3-8]|1[0-2])\s*[-_ ]?in[-_ ]?1)/i;
 
 /**
  * Refresh rate downgrade pattern (30Hz when 60Hz is not present).
  */
-export const REFRESH_RATE_30HZ_REGEX = /(?:4K\s*[@/xX_]?\s*30Hz|4K\s*30帧|\b30Hz\b|\b30帧\b)/i;
+export const REFRESH_RATE_30HZ_REGEX = /(?<!(?:非|不是|不支持|无|并非|绝非))\s*(?:4K\s*[@/xX_]?\s*30Hz|4K\s*30帧|(?<!(?:非|不是|不支持|无|并非|绝非|\w))30Hz|(?<!(?:非|不是|不支持|无|并非|绝非|\w))30帧)/i;
 
 /**
  * Ethernet downgrade pattern (100M/百兆 when Gigabit/1000M is not present).
  */
-export const ETHERNET_100M_REGEX = /(?:百兆网口|百兆网卡|百兆网|100M(?:bps)?\s*网[口卡]|100兆网[口卡]?)/i;
+export const ETHERNET_100M_REGEX = /(?<!(?:非|不是|并非|绝非|无|不带))\s*(?:百兆网口|百兆网卡|百兆网|100M(?:bps)?\s*网[口卡]|100兆网[口卡]?)/i;
 
 /**
  * UGREEN 15375 Hub specification mismatch regex pattern for backward-compatibility.
  */
-export const UGREEN_15375_MISMATCH_REGEX = /(?:(?:[3-8]|1[0-2])\s*合\s*[1一]|(?:[三四五六七八]|十[一二]?)\s*合\s*[1一]|(?:[3-8]|1[0-2])\s*[-_ ]?in[-_ ]?1|(?:4K\s*[@/xX_]?\s*30Hz|4K\s*30帧)|(?:百兆网口|百兆网卡|百兆网|100M(?:bps)?\s*网[口卡]|100兆网[口卡]?))/i;
+export const UGREEN_15375_MISMATCH_REGEX = /(?:(?<!(?:非|不是|并非|绝非|比|吊打|秒杀|胜过|远超))(?:[3-8]|1[0-2])\s*合\s*[1一]|(?<!(?:非|不是|并非|绝非|比|吊打|秒杀|胜过|远超))(?:[三四五六七八]|十[一二]?)\s*合\s*[1一]|(?<!(?:非|不是|并非|绝非|比|吊打|秒杀|胜过|远超))(?:[3-8]|1[0-2])\s*[-_ ]?in[-_ ]?1|(?<!(?:非|不是|不支持|无|并非|绝非))\s*(?:4K\s*[@/xX_]?\s*30Hz|4K\s*30帧|(?<!(?:非|不是|不支持|无|并非|绝非|\w))30Hz|(?<!(?:非|不是|不支持|无|并非|绝非|\w))30帧)|(?<!(?:非|不是|并非|绝非|无|不带))\s*(?:百兆网口|百兆网卡|百兆网|100M(?:bps)?\s*网[口卡]|100兆网[口卡]?))/i;
 
 // Backward-compatible alias for existing imports
 export const ACCESSORY_REGEX = GUITAR_ACCESSORY_REGEX;
@@ -309,7 +309,7 @@ export function isAccessoryTitle(title, category = '', customExclude = []) {
     if (GUITAR_ACCESSORY_REGEX.test(title)) return true;
     if (cat === 'lava_me_air' && /play/i.test(title) && !/air/i.test(title)) return true;
     if (cat === 'nexg2_nylon' || (isGuitar && /(?:nexg|2n)/i.test(title))) {
-      if (/(?:非尼龙|钢弦|民谣|电吉他)/i.test(title) && !/(?:(?<!非)尼龙|2N|古典)/i.test(title)) return true;
+      if (/(?:非尼龙|钢弦|民谣|电吉他)/i.test(title) && !/(?:(?<!(?:非|不是|并非|绝非|无|没有|不带))\s*(?:尼龙|2N|古典))/i.test(title)) return true;
     }
   }
 
@@ -323,16 +323,15 @@ export function isAccessoryTitle(title, category = '', customExclude = []) {
     // UGREEN 15375 Specific Mismatch Guards
     const is15375Target = cat === 'ugreen_hub' || cat.includes('15375') || /(?:15375|绿联.*(?:9合1|9合一|九合一|拓展坞|扩展坞))/i.test(title);
     if (is15375Target) {
-      // Port count mismatch (e.g. 5-in-1, 6-in-1, 10-in-1) unless 9-in-1 or 15375 is present
-      const has9In1 = /(?:9\s*合\s*[1一]|九\s*合\s*[1一]|9\s*[-_ ]?in[-_ ]?1|15375)/i.test(title);
-      if (PORT_COUNT_MISMATCH_REGEX.test(title) && !has9In1) return true;
+      // Port count mismatch (e.g. 5-in-1, 6-in-1, 10-in-1) unless un-negated
+      if (PORT_COUNT_MISMATCH_REGEX.test(title)) return true;
 
       // Refresh rate downgrade (30Hz) unless 60Hz is explicitly supported
-      const has60Hz = /(?:60Hz|60帧)/i.test(title);
+      const has60Hz = /(?<!(?:非|不是|不支持|无|并非|绝非))\s*(?:60Hz|60帧)/i.test(title);
       if (REFRESH_RATE_30HZ_REGEX.test(title) && !has60Hz) return true;
 
       // Ethernet downgrade (100M / 百兆) unless Gigabit is explicitly supported
-      const hasGigabit = /(?:千兆|1000M|gigabit)/i.test(title);
+      const hasGigabit = /(?<!(?:非|不是|无|不带|并非|绝非))\s*(?:千兆|1000M|gigabit)/i.test(title);
       if (ETHERNET_100M_REGEX.test(title) && !hasGigabit) return true;
     }
   }
@@ -354,21 +353,21 @@ export function extractDefectNotes(title = '', description = '') {
   // 1. Pristine condition indicators
   if (/(?:全新未拆封|原封未拆|全新原盒|没拆封|全新未拆)/.test(text)) pristine.push('全新未拆封');
   else if (/(?:仅拆封|仅通电|未使用|充新|99新|98新)/.test(text)) pristine.push('准新仅拆/高成色');
-  if (/(?:箱说全|原盒原装|配件齐全)/.test(text)) pristine.push('箱说配件全');
-  if (/(?:无磕碰|无划痕|完美成色|保护良好)/.test(text)) pristine.push('无明显划痕磕碰');
+  if (/(?:箱说全|箱说齐全|原盒原装|原包装齐全|配件齐全|配件全)/.test(text)) pristine.push('箱说配件全');
+  if (/(?:无明显磕碰|无明显划痕|无磕碰|无划痕|无任何划痕|无任何磕碰|完美成色|保护良好)/.test(text)) pristine.push('无明显划痕磕碰');
 
-  // 2. Defect indicators
-  const scratchMatch = text.match(/(?:细微划痕|微小划痕|轻微划痕|有些许划痕|背面划痕|屏幕划痕|外壳划痕|划痕)/);
-  if (scratchMatch) flaws.push(scratchMatch[0]);
+  // 2. Defect indicators (with negative lookbehind to avoid flagging negation like 无明显划痕 / 没有任何划痕 / 从没修过)
+  const scratchMatch = text.match(/(?<!(?:无|没有|没有任何|无任何|绝无|毫无|免受|防|基本无|几乎无|无明显|没有明显|没明显|未见))\s*(?:细微划痕|微小划痕|轻微划痕|有些许划痕|背面划痕|屏幕划痕|外壳划痕|划痕)/);
+  if (scratchMatch) flaws.push(scratchMatch[0].trim());
 
-  const bumpMatch = text.match(/(?:轻微磕碰|微小磕碰|边角磕碰|小磕碰|磕碰|掉漆|凹痕|磨损)/);
-  if (bumpMatch) flaws.push(bumpMatch[0]);
+  const bumpMatch = text.match(/(?<!(?:无|没有|没有任何|无任何|绝无|毫无|免受|防|基本无|几乎无|无明显|没有明显|没明显|未见))\s*(?:轻微磕碰|微小磕碰|边角磕碰|小磕碰|磕碰|掉漆|凹痕|磨损)/);
+  if (bumpMatch) flaws.push(bumpMatch[0].trim());
 
-  const repairMatch = text.match(/(?:拆过|修过|进水|维修|换过|接触不良|坏了|故障)/);
-  if (repairMatch) flaws.push(repairMatch[0]);
+  const repairMatch = text.match(/(?<!(?:无|从没|未|没有|没有任何|无任何|绝无|毫无|免受|非|从未|从无|未曾))\s*(?:拆修|修过|进水|维修|换过|接触不良|坏了|故障)/);
+  if (repairMatch) flaws.push(repairMatch[0].trim());
 
-  const missingMatch = text.match(/(?:无包装|无盒子|裸机|缺配件|单机|无箱说|无说明书)/);
-  if (missingMatch) flaws.push(missingMatch[0]);
+  const missingMatch = text.match(/(?<!(?:非|不|带|配|有))\s*(?:无包装|无盒子|裸机|缺配件|单机|无箱说|无说明书)/);
+  if (missingMatch) flaws.push(missingMatch[0].trim());
 
   if (flaws.length > 0) {
     return `⚠️ 检视注记: ${flaws.join(' / ')}`;
@@ -383,33 +382,39 @@ export function extractDefectNotes(title = '', description = '') {
  * Infer or normalize canonical category slug from keyword, title, or raw category string.
  */
 export function inferCategory({ category = '', keyword = '', title = '' } = {}) {
-  const text = `${category} ${keyword} ${title}`.toLowerCase().trim();
-  if (text.includes('me4') || text.includes('me 4') || text.includes('lava4') || text.includes('lava 4') || text.includes('拿火4') || text.includes('拿火 4')) {
-    return 'lava_me_4';
-  }
-  if (text.includes('air') || text.includes('拿火air') || text.includes('拿火 air')) {
-    return 'lava_me_air';
-  }
-  if (text.includes('nexg') || text.includes('2n') || text.includes('nylon') || text.includes('尼龙')) {
-    return 'nexg2_nylon';
-  }
+  const cat = String(category || '').trim().toLowerCase();
+  const kw = String(keyword || '').trim().toLowerCase();
+  const t = String(title || '').trim().toLowerCase();
+  const all = `${cat} ${kw} ${t}`.toLowerCase();
+
+  // Explicit category takes precedence
+  if (cat === 'ugreen_hub' || cat === 'hub' || cat === 'dock' || cat === '15375' || cat === '绿联') return 'ugreen_hub';
+  if (cat === 'nexg2_nylon' || cat === 'nexg' || cat === 'nexg2' || cat === '2n') return 'nexg2_nylon';
+  if (cat === 'lava_me_air' || cat === 'air') return 'lava_me_air';
+  if (cat === 'lava_me_4' || cat === 'me4' || cat === 'lava4') return 'lava_me_4';
+
+  // Digital hub detection
   if (
-    text.includes('扩展坞') || 
-    text.includes('拓展坞') || 
-    text.includes('hub') || 
-    text.includes('dock') || 
-    text.includes('15375') || 
-    (text.includes('绿联') && (text.includes('9合1') || text.includes('9合一') || text.includes('九合一') || text.includes('分线器') || text.includes('转换器'))) ||
-    text === 'ugreen' || 
-    text === '绿联'
+    /(?:拓展坞|扩展坞|分线器|15375)/i.test(all) || 
+    (/(?:绿联|ugreen)/i.test(all) && /(?:9合[1一]|hub|dock|转换器|转接头|千兆|4k60)/i.test(all))
   ) {
     return 'ugreen_hub';
   }
-  const cleanCat = String(category || '').trim().toLowerCase();
-  if (cleanCat && cleanCat !== 'all' && cleanCat !== '全部') {
+
+  // Guitar detection
+  if (/(?:lava\s*me\s*4|lava\s*4|拿火\s*4|me\s*4)/i.test(all)) {
+    return 'lava_me_4';
+  }
+  if (/(?:lava\s*(?:me\s*)?air|拿火\s*air)/i.test(all) || (/(?:lava|拿火)/i.test(all) && /air/i.test(all))) {
+    return 'lava_me_air';
+  }
+  if (/(?:nexg\s*2n|nexg2|nexg)/i.test(all) || (/(?:恩雅|enya)/i.test(all) && /(?:2n|尼龙|古典)/i.test(all))) {
+    return 'nexg2_nylon';
+  }
+
+  if (cat && cat !== 'all' && cat !== '全部') {
     return category;
   }
-  const kw = String(keyword || '').trim().toLowerCase();
   if (kw) {
     return kw.replace(/\s+/g, '_');
   }
@@ -418,11 +423,11 @@ export function inferCategory({ category = '', keyword = '', title = '' } = {}) 
 
 /**
  * Regex patterns for seller communication analysis.
- * Uses negative lookbehinds/lookaheads to prevent matching questions like '有没有' or '没有问题'.
+ * Uses negative lookbehinds/lookaheads to prevent matching questions like '有没有' or flawless assertions like '没有暗病'.
  */
-export const UNFIT_SELLER_REGEX = /(?:(?<!有)没有(?!问题|毛病|瑕疵|损坏)|没有咯|已出|卖了|卖掉了|不在了|下架|缺货|出掉了|出完了|出给别人了|被人拍了|已被拍|无货|暂时没货|只有se|仅se|卖家关闭了订单|不单出|不卖了|已坏|故障)/i;
+export const UNFIT_SELLER_REGEX = /(?:(?<!(?:有|包))(?:暂时|已经)?没有(?:了|货|啦|哈|哦|呢|呀|咯|\s*[!！。~]*$)|没货|缺货|已出|卖了|卖掉了|不在了|下架|出掉了|出完了|出给别人了|被人拍了|已被拍|无货|暂时没货|只有se|仅se|卖家关闭了订单|不单出|不卖了|已坏|故障)/i;
 export const GHOST_SELLER_REGEX = /(?:没回复说明客服可能在忙|自动回复|智能客服)/;
-export const RESPONSIVE_SELLER_REGEX = /(?:全新正品|包邮|专拍价|可以发|明天发|当天发|有货|现货|在的|还在|可以拍|能发|随时发|保真|正品|原封|未拆|有奶白|加振款|拿火源|标价.*拿火|(?:\b(?:[6-9]\d|1\d{2}|2\d{2}|3\d{2}|[12]\d{3})\b\s*(?:元|块|出|包邮|发顺丰|拿走|直接拍)?))/;
+export const RESPONSIVE_SELLER_REGEX = /(?:全新正品|包邮|专拍价|可以发|可发|明天发|当天发|随时(?:可)?发|有货|现货|在的|还在|都在|东西都在|可以拍|可拍|随时(?:可)?拍|直接拍|能发|保真|正品|原封|未拆|有奶白|加振款|拿火源|标价.*拿火|功能全好|功能正常|功能完好|全正常|(?:\b(?:[6-9]\d|1\d{2}|2\d{2}|3\d{2}|[12]\d{3})\b\s*(?:元|块|出|包邮|发顺丰|拿走|直接拍)?))/;
 
 /**
  * Classifies a seller's communication status based on session metadata and messages.
@@ -625,33 +630,59 @@ export function validateOrder(data) {
 
 /**
  * Analyzes item descriptions and image sets to neutralize seller self-praise
- * and extract objective defect notes (scratches, dents, neck conditions).
+ * and extract objective defect notes (scratches, dents, neck/hardware conditions).
+ * Category-aware: distinguishes musical instruments from 3C digital products.
  */
-export function extractMultiImageDefects(description = '', images = []) {
+export function extractMultiImageDefects(description = '', images = [], category = '') {
   const desc = String(description || '').trim();
   const imgList = Array.isArray(images) 
     ? images 
     : (typeof images === 'string' ? images.split('|').map(s => s.trim()).filter(Boolean) : []);
 
+  const cat = String(category || '').toLowerCase();
+  const isGuitar = cat.includes('guitar') || cat.includes('nexg') || cat.includes('lava') || /(?:吉他|guitar|nexg|lava|琴颈|琴身|拾音器)/i.test(desc);
+
   const notes = [];
   let condition = '95新(外观完好)';
 
-  if (/背面.{0,10}(?:划痕|划伤|磨损|刮痕)/i.test(desc)) {
-    notes.push('背面有细微划痕');
-    condition = '9新(背面细微划痕)';
-  } else if (/划痕|划伤|磨损|刮痕/i.test(desc)) {
-    notes.push('有细微使用划痕');
-    condition = '9新(有划痕)';
+  // 1. Pristine condition check
+  if (/(?:全新未拆封|原封未拆|全新原盒|没拆封|全新未拆)/.test(desc)) {
+    condition = '全新未拆封';
+    notes.push('全新未拆封');
+  } else if (/(?:仅拆封|仅通电|未使用|充新|99新|98新|几乎全新)/.test(desc)) {
+    condition = '99新(准新仅拆)';
+    notes.push('准新仅拆/高成色');
   }
 
-  if (/磕碰|磕伤|凹痕|掉漆/i.test(desc)) {
+  // 2. Box & accessories
+  if (/(?:箱说全|箱说齐全|原盒原装|原包装齐全|配件齐全|配件全|全套)/.test(desc)) {
+    notes.push('箱说配件全');
+  } else if (/(?:无包装|无盒子|裸机|缺配件|单机|无箱说)/.test(desc)) {
+    notes.push('裸机无原装盒');
+  }
+
+  // 3. Flaws: scratches & bumps
+  if (/(?:背面.{0,10}(?<!(?:无|没有|没有任何|无任何|绝无|毫无|防|无明显|没有明显|没明显))\s*(?:细微划痕|划痕|划伤|磨损|刮痕)|(?<!(?:无|没有|没有任何|无任何|绝无|毫无|防|无明显|没有明显|没明显))\s*背面划痕)/i.test(desc)) {
+    notes.push('背面有细微划痕');
+    condition = '9新(背面细微划痕)';
+  } else if (/(?<!(?:无|没有|没有任何|无任何|绝无|毫无|防|无明显|没有明显|没明显|未见))\s*(?:细微划痕|微小划痕|轻微划痕|有些许划痕|有些划痕|划痕|划伤|磨损|刮痕)/i.test(desc)) {
+    notes.push('有细微使用划痕');
+    if (!condition.startsWith('全新')) condition = '9新(有划痕)';
+  }
+
+  if (/(?<!(?:无|没有|没有任何|无任何|绝无|毫无|防|无明显|没有明显|没明显|未见))\s*(?:轻微磕碰|微小磕碰|边角磕碰|小磕碰|磕碰|磕伤|凹痕|掉漆)/i.test(desc)) {
     notes.push('边缘有轻微磕碰/掉漆');
     condition = '85新(有磕碰)';
   }
 
+  // 4. Functional check (Category-aware!)
   if (/暗病|暗伤|修过|维修|打品|故障/i.test(desc)) {
-    if (/没(?:有)?(?:任何)?暗病|无暗病|无暗伤/i.test(desc)) {
-      notes.push('琴颈笔直无暗病');
+    if (/没(?:有)?(?:任何)?(?:暗病|暗伤|故障|问题|毛病|拆修|维修)|从没修过|未拆修|未维修|无暗病|无暗伤|无故障|无维修|无拆修|功能全好|全正常/i.test(desc)) {
+      if (isGuitar) {
+        notes.push('琴颈笔直无暗病');
+      } else {
+        notes.push('功能全好无暗病');
+      }
     } else {
       notes.push('存在暗病或维修史');
       condition = '7新(需注意暗病)';
@@ -683,7 +714,7 @@ export async function sendWebhookNotification(webhookUrl, payload, options = {})
     const token = options.token || process.env.WEBHOOK_BEARER_TOKEN || process.env.WEBHOOK_TOKEN || '';
     const headers = {
       'Content-Type': 'application/json',
-      'User-Agent': 'OpenCLI-Goofish-Watcher/1.6.0',
+      'User-Agent': 'OpenCLI-Goofish-Watcher/1.7.2',
     };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -709,8 +740,8 @@ export async function sendWebhookNotification(webhookUrl, payload, options = {})
  */
 export function sendDesktopNotification(title, message) {
   try {
-    const safeTitle = (title || '闲鱼监控提醒').replace(/["\\]/g, '');
-    const safeMsg = (message || '').replace(/["\\]/g, '');
+    const safeTitle = (title || '闲鱼监控提醒').replace(/[\r\n]+/g, ' ').replace(/["\\]/g, '').trim();
+    const safeMsg = (message || '').replace(/[\r\n]+/g, ' ').replace(/["\\]/g, '').trim();
     spawnSync('osascript', ['-e', `display notification "${safeMsg}" with title "${safeTitle}"`]);
     return true;
   } catch (e) {
