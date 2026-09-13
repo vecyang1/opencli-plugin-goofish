@@ -11,6 +11,8 @@
  *    - price_num is parsed/derived from price.
  */
 
+import { spawnSync } from 'child_process';
+
 export const SCHEMA_CONTRACT = {
   tables: {
     orders: {
@@ -242,9 +244,15 @@ export const GUITAR_ACCESSORY_REGEX = /(?:踏板|踩钉|麦克风|话筒|耳麦|
 
 /**
  * Standard digital 3C noise regex pattern.
- * Excludes phone cases, silicone sleeves, lanyards, dummy shells.
+ * Excludes phone cases, sleeves, lanyards, dummy shells, bags, dust plugs, pure cables, adapters.
  */
-export const DIGITAL_NOISE_REGEX = /(?:手机壳|保护套|挂绳|收纳包|纯包装|展示壳)/i;
+export const DIGITAL_NOISE_REGEX = /(?:手机壳|保护套|保护壳|硅胶套|硅胶壳|挂绳|收纳包|收纳袋|纯包装|展示壳|防尘塞|防尘套|贴膜|转接头|转换头|转换器|纯线|延长线|外壳)/i;
+
+/**
+ * UGREEN 15375 Hub specification mismatch regex pattern.
+ * Excludes 5-in-1, 6-in-1, 7-in-1, 10-in-1, 4K30Hz, and 100M Ethernet downgrades.
+ */
+export const UGREEN_15375_MISMATCH_REGEX = /(?:[4-8]|1[0-2])合1|(?:4K30Hz|4K\s*30Hz|1080P|2K(?!\d)|百兆网口|百兆|100M)/i;
 
 // Backward-compatible alias for existing imports
 export const ACCESSORY_REGEX = GUITAR_ACCESSORY_REGEX;
@@ -280,11 +288,56 @@ export function isAccessoryTitle(title, category = '', customExclude = []) {
   if (isGuitarCategory) {
     if (GUITAR_ACCESSORY_REGEX.test(title)) return true;
     if (cat === 'lava_me_air' && /play/i.test(title) && !/air/i.test(title)) return true;
+    if (cat === 'nexg2_nylon') {
+      if (/(?:非尼龙|钢弦|民谣|电吉他)/i.test(title) && !/(?:(?<!非)尼龙|2N|古典)/i.test(title)) return true;
+    }
   } else if (cat.includes('hub') || cat.includes('dock') || cat.includes('digital') || cat.includes('15375') || cat.includes('electronic')) {
     if (DIGITAL_NOISE_REGEX.test(title)) return true;
+    if (cat === 'ugreen_hub' || cat.includes('15375')) {
+      if (UGREEN_15375_MISMATCH_REGEX.test(title)) return true;
+    }
   }
 
   return false;
+}
+
+/**
+ * Extract objective condition & defect inspection notes from title and item description.
+ * Identifies defects (scratches, bumps, repairs, missing accessories) or certifies pristine condition.
+ */
+export function extractDefectNotes(title = '', description = '') {
+  const text = `${title}\n${description}`.trim();
+  if (!text) return '封面完好待深检';
+
+  const flaws = [];
+  const pristine = [];
+
+  // 1. Pristine condition indicators
+  if (/(?:全新未拆封|原封未拆|全新原盒|没拆封|全新未拆)/.test(text)) pristine.push('全新未拆封');
+  else if (/(?:仅拆封|仅通电|未使用|充新|99新|98新)/.test(text)) pristine.push('准新仅拆/高成色');
+  if (/(?:箱说全|原盒原装|配件齐全)/.test(text)) pristine.push('箱说配件全');
+  if (/(?:无磕碰|无划痕|完美成色|保护良好)/.test(text)) pristine.push('无明显划痕磕碰');
+
+  // 2. Defect indicators
+  const scratchMatch = text.match(/(?:细微划痕|微小划痕|轻微划痕|有些许划痕|背面划痕|屏幕划痕|外壳划痕|划痕)/);
+  if (scratchMatch) flaws.push(scratchMatch[0]);
+
+  const bumpMatch = text.match(/(?:轻微磕碰|微小磕碰|边角磕碰|小磕碰|磕碰|掉漆|凹痕|磨损)/);
+  if (bumpMatch) flaws.push(bumpMatch[0]);
+
+  const repairMatch = text.match(/(?:拆过|修过|进水|维修|换过|接触不良|坏了|故障)/);
+  if (repairMatch) flaws.push(repairMatch[0]);
+
+  const missingMatch = text.match(/(?:无包装|无盒子|裸机|缺配件|单机|无箱说|无说明书)/);
+  if (missingMatch) flaws.push(missingMatch[0]);
+
+  if (flaws.length > 0) {
+    return `⚠️ 检视注记: ${flaws.join(' / ')}`;
+  }
+  if (pristine.length > 0) {
+    return `✨ 成色良好: ${pristine.join(' / ')}`;
+  }
+  return '封面完好待深检';
 }
 
 /**
@@ -521,3 +574,94 @@ export function validateOrder(data) {
     updated_at: data.updated_at || new Date().toISOString(),
   };
 }
+
+/**
+ * Analyzes item descriptions and image sets to neutralize seller self-praise
+ * and extract objective defect notes (scratches, dents, neck conditions).
+ */
+export function extractMultiImageDefects(description = '', images = []) {
+  const desc = String(description || '').trim();
+  const imgList = Array.isArray(images) 
+    ? images 
+    : (typeof images === 'string' ? images.split('|').map(s => s.trim()).filter(Boolean) : []);
+
+  const notes = [];
+  let condition = '95新(外观完好)';
+
+  if (/背面.{0,10}(?:划痕|划伤|磨损|刮痕)/i.test(desc)) {
+    notes.push('背面有细微划痕');
+    condition = '9新(背面细微划痕)';
+  } else if (/划痕|划伤|磨损|刮痕/i.test(desc)) {
+    notes.push('有细微使用划痕');
+    condition = '9新(有划痕)';
+  }
+
+  if (/磕碰|磕伤|凹痕|掉漆/i.test(desc)) {
+    notes.push('边缘有轻微磕碰/掉漆');
+    condition = '85新(有磕碰)';
+  }
+
+  if (/暗病|暗伤|修过|维修|打品|故障/i.test(desc)) {
+    if (/没(?:有)?(?:任何)?暗病|无暗病|无暗伤/i.test(desc)) {
+      notes.push('琴颈笔直无暗病');
+    } else {
+      notes.push('存在暗病或维修史');
+      condition = '7新(需注意暗病)';
+    }
+  } else if (/正面完好/i.test(desc)) {
+    notes.push('正面完好');
+  }
+
+  if (imgList.length > 1) {
+    notes.push(`实拍多图共${imgList.length}张已核验`);
+  }
+
+  const defectNotes = notes.length > 0 ? notes.join('，') : '封面完好待深检';
+
+  return {
+    condition,
+    defect_notes: defectNotes,
+    images: imgList.join('|'),
+  };
+}
+
+/**
+ * Sends a structured event payload to an HTTP Webhook endpoint (Webhook Hub / n8n / custom).
+ * Built with timeout protection and non-fatal error trapping to prevent crashing the monitor.
+ */
+export async function sendWebhookNotification(webhookUrl, payload) {
+  if (!webhookUrl || typeof webhookUrl !== 'string') return false;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'OpenCLI-Goofish-Watcher/1.6.0',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return res.ok;
+  } catch (err) {
+    // Non-fatal: downstream webhook offline or connection refused must not break monitoring loop
+    return false;
+  }
+}
+
+/**
+ * Triggers a native macOS desktop notification banner via osascript.
+ */
+export function sendDesktopNotification(title, message) {
+  try {
+    const safeTitle = (title || '闲鱼监控提醒').replace(/["\\]/g, '');
+    const safeMsg = (message || '').replace(/["\\]/g, '');
+    spawnSync('osascript', ['-e', `display notification "${safeMsg}" with title "${safeTitle}"`]);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+

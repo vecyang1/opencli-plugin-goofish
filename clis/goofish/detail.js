@@ -2,6 +2,7 @@ import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError, CommandExecutionError } from '@jackwener/opencli/errors';
 import { safeGoto } from './_shared.js';
 import { saveCandidates } from './_db.js';
+import { extractDefectNotes } from './_contract.js';
 
 export const command = cli({
   site: 'goofish',
@@ -27,6 +28,7 @@ export const command = cli({
     'browse_count',
     'specs',
     'images',
+    'defect_notes',
     'description',
   ],
   func: async (page, kwargs) => {
@@ -157,6 +159,8 @@ export const command = cli({
       throw new CommandExecutionError('查询商品详情失败: ' + (data ? data.message : '商品可能已失效或下架'));
     }
 
+    const defectNotes = extractDefectNotes(data.title, data.description);
+
     // Unidirectional write-back into SQLite SSOT only when valid product data is present
     if (data && data.title && data.title !== '闲鱼商品' && data.price && data.price !== '¥0') {
       try {
@@ -171,7 +175,7 @@ export const command = cli({
           item_url: `https://www.goofish.com/item?id=${itemId}`,
           image_url: (data.images && data.images !== '-') ? data.images.split(' | ')[0] : '',
           images: (data.images && data.images !== '-') ? data.images : '',
-          defect_notes: data.defect_notes || '',
+          defect_notes: defectNotes,
         }], { filterAccessories: false });
       } catch (e) {}
     }
@@ -188,6 +192,7 @@ export const command = cli({
       browse_count: data.browse_count,
       specs: data.specs,
       images: data.images,
+      defect_notes: defectNotes,
       description: data.description,
     }];
   },

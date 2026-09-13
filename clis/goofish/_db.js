@@ -497,9 +497,14 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
       continue;
     }
 
-    // Sanity check: reject non-guitar cheap items under ¥400 misclassified into guitar categories
-    if (filterAccessories && valid.price_num > 0 && valid.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(valid.category)) {
-      continue;
+    // Sanity check: reject cheap non-target items under category price floor
+    if (filterAccessories && valid.price_num > 0) {
+      if (valid.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(valid.category)) {
+        continue;
+      }
+      if (valid.price_num < 60 && valid.category === 'ugreen_hub') {
+        continue;
+      }
     }
 
     insertCandidate.run(
@@ -626,7 +631,8 @@ export function purgeJunkCandidates() {
 
   for (const it of all) {
     const isJunk = isAccessoryTitle(it.title, it.category) || 
-      (it.price_num > 0 && it.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4', ''].includes(it.category));
+      (it.price_num > 0 && it.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(it.category)) ||
+      (it.price_num > 0 && it.price_num < 60 && it.category === 'ugreen_hub');
     if (isJunk) {
       deleteCand.run(it.item_id);
       try { deleteFts.run(it.item_id); } catch (e) {}

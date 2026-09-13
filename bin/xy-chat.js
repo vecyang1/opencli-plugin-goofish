@@ -63,6 +63,7 @@ function parseCliArgs(args) {
     '--note',
     '--interval',
     '--iterations',
+    '--webhook',
   ]);
   const positionals = [];
   const options = {};
@@ -322,14 +323,14 @@ async function main() {
     case 'candidates': {
       const { positionals, options } = parseCliArgs(subArgs);
       const rawPos = positionals[0] || '';
-      const knownCats = ['all', '全部', 'nexg', 'nexg2', '2n', 'nylon', '尼龙', 'air', 'lava air', 'me4', 'me 4', 'lava4', 'lava 4', 'nexg2_nylon', 'lava_me_air', 'lava_me_4'];
+      const knownCats = ['all', '全部', 'nexg', 'nexg2', '2n', 'nylon', '尼龙', 'air', 'lava air', 'me4', 'me 4', 'lava4', 'lava 4', 'nexg2_nylon', 'lava_me_air', 'lava_me_4', 'ugreen_hub', 'hub', 'dock', '15375'];
       let category = options['--category'] || '';
       let keyword = options['--keyword'] || options['-q'] || '';
 
       if (!category && rawPos) {
         const inferred = inferCategory({ category: rawPos, keyword: rawPos });
         if (inferred !== 'other' || knownCats.includes(rawPos.toLowerCase())) {
-          category = rawPos;
+          category = (inferred !== 'other') ? inferred : rawPos;
         } else {
           keyword = keyword ? `${keyword} ${rawPos}` : rawPos;
         }
@@ -365,6 +366,10 @@ async function main() {
 
     case 'reviews': {
       const { positionals, options } = parseCliArgs(subArgs);
+      if (options['--sync']) {
+        const count = syncSellerReviewsFromSessionsAndMessages();
+        console.log(`🔄 卖家评估档案已同步更新 (${count} 条会话消息分析完成)`);
+      }
       const seller = positionals[0] || options['--seller'] || '';
       if (seller) {
         const rev = getSellerReview(seller);
@@ -469,7 +474,7 @@ async function main() {
   xy-chat reviews [卖家]             查询卖家聊天评估档案 (排除已读不回/无货卖家)
   xy-chat sync-chats                 全量同步私信记录并分析卖家沟通状态
   xy-chat pick [target] [options]    全自动搜索、比价、风控过滤并输出最优推荐 (支持吉他预设或任意关键词如 "绿联 15375")
-  xy-chat watch [query] [--interval] 实时监听新上架宝贝与降价动态 (推送式订阅)
+  xy-chat watch [query] [options]    周期性/实时监听新上架宝贝与降价动态 (支持 --webhook, --notify, --diff-only, --category, --max-price, --exclude, --iterations)
   xy-chat sync                       全量同步线上资产至本地 SQLite SSOT
   xy-chat stats                      查看本地离线库统计数据
       `);

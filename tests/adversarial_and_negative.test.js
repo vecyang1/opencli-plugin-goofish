@@ -11,6 +11,7 @@ import {
   isAccessoryTitle,
   inferCategory,
   classifySellerCommunication,
+  extractDefectNotes,
   UNIVERSAL_JUNK_REGEX,
   GUITAR_ACCESSORY_REGEX,
   DIGITAL_NOISE_REGEX
@@ -115,7 +116,20 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
 
     // Negative paths: Digital accessories
     assert.equal(isAccessoryTitle('绿联 15375 拓展坞硅胶保护套收纳包', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 15375 拓展坞收纳袋', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 15375 拓展坞保护壳', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 拓展坞硅胶套', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联拓展坞防尘塞', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联拓展坞外壳', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联Type-C转接头', 'ugreen_hub'), true);
     assert.equal(isAccessoryTitle('手机壳 保护套 挂绳', 'ugreen_hub'), true);
+
+    // Negative paths: UGREEN 15375 specification mismatch (rejecting 5合1, 6合1, 10合1, 百兆网口, 4K30Hz)
+    assert.equal(isAccessoryTitle('绿联 拓展坞 6合1 4K30Hz', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 拓展坞 5合1', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 10合1 拓展坞', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 9合1 拓展坞 百兆网口', 'ugreen_hub'), true);
+    assert.equal(isAccessoryTitle('绿联 9合1 拓展坞 4K30Hz', 'ugreen_hub'), true);
 
     // Custom exclusion keywords
     assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 4K60Hz', 'ugreen_hub', ['6合1']), false);
@@ -124,7 +138,7 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
   });
 
   await t.test('3. Sanity Price Floor Guard on Save Candidates', () => {
-    // Normal candidate saved
+    // Normal candidate saved (Guitar)
     const okSaved = saveCandidates([{
       item_id: 'GUITAR_OK_01',
       title: '恩雅 NEXG 2N 尼龙静音吉他',
@@ -132,6 +146,15 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
       seller: '好卖家',
     }], { category: 'nexg2_nylon', filterAccessories: true });
     assert.equal(okSaved, 1);
+
+    // Normal candidate saved (UGREEN Hub)
+    const hubOkSaved = saveCandidates([{
+      item_id: 'HUB_OK_01',
+      title: '绿联 15375 9合1 拓展坞 4K60Hz 千兆网口',
+      price: '¥109',
+      seller: '数码卖家',
+    }], { category: 'ugreen_hub', filterAccessories: true });
+    assert.equal(hubOkSaved, 1);
 
     // Accessory attempt disguised with tiny price (e.g. ¥25 pedal or strings)
     const junkSaved = saveCandidates([{
@@ -142,12 +165,25 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
     }], { category: 'nexg2_nylon', filterAccessories: true });
     assert.equal(junkSaved, 0, 'Spurious low-price guitar accessory must be rejected');
 
-    // Query confirms only legitimate guitar exists
-    const cands = queryCandidates({ category: 'nexg2_nylon' });
-    assert.equal(cands.length, 1);
-    assert.equal(cands[0].item_id, 'GUITAR_OK_01');
+    // Low price junk for ugreen_hub (< ¥60)
+    const hubJunkSaved = saveCandidates([{
+      item_id: 'HUB_JUNK_01',
+      title: '绿联 拓展坞 数据线配件 专用线',
+      price: '¥25',
+      seller: '配件商',
+    }], { category: 'ugreen_hub', filterAccessories: true });
+    assert.equal(hubJunkSaved, 0, 'Spurious low-price digital accessory must be rejected');
 
-    // purgeJunkCandidates runs cleanly
+    // Query confirms legitimate guitar and hub exist
+    const candsGuitar = queryCandidates({ category: 'nexg2_nylon' });
+    assert.equal(candsGuitar.length, 1);
+    assert.equal(candsGuitar[0].item_id, 'GUITAR_OK_01');
+
+    const candsHub = queryCandidates({ category: 'ugreen_hub' });
+    assert.equal(candsHub.length, 1);
+    assert.equal(candsHub[0].item_id, 'HUB_OK_01');
+
+    // purgeJunkCandidates runs cleanly without deleting legitimate items
     const purged = purgeJunkCandidates();
     assert.equal(purged, 0);
   });
@@ -232,6 +268,46 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
     // Empty array safety
     assert.equal(saveOrders([]), 0);
     assert.equal(saveCandidates([]), 0);
+  });
+
+  await t.test('6. Objective Condition & Defect Inspection Notes Extraction', () => {
+    // Flaw detection: scratches
+    const note1 = extractDefectNotes('绿联9合1拓展坞', '成色9新，背面有些许划痕，功能一切正常');
+    assert.ok(note1.includes('划痕'));
+    assert.ok(note1.includes('⚠️ 检视注记'));
+
+    // Flaw detection: bumps and missing parts
+    const note2 = extractDefectNotes('恩雅智能吉他', '琴头有小磕碰，裸机无包装');
+    assert.ok(note2.includes('小磕碰'));
+    assert.ok(note2.includes('裸机'));
+
+    // Pristine condition
+    const note3 = extractDefectNotes('绿联 15375', '全新未拆封原封未拆，箱说全，顺丰包邮');
+    assert.ok(note3.includes('全新未拆封'));
+    assert.ok(note3.includes('✨ 成色良好'));
+
+    // Empty / neutral description
+    const note4 = extractDefectNotes('', '');
+    assert.equal(note4, '封面完好待深检');
+  });
+
+  await t.test('7. Uncategorized Non-Guitar Candidates Retention in Purge', () => {
+    // Candidate with 'other' or general category under ¥400 (e.g. ¥109 UGREEN Hub)
+    saveCandidates([{
+      item_id: 'OTHER_HUB_109',
+      title: '绿联 15375 9合1 拓展坞 4K60Hz 千兆网口',
+      price: '¥109',
+      seller: '好卖家',
+      category: 'ugreen_hub',
+    }], { filterAccessories: false });
+
+    // Ensure purge does NOT accidentally wipe valid sub-¥400 non-guitar products
+    const purged = purgeJunkCandidates();
+    assert.equal(purged, 0);
+
+    const cands = queryCandidates({ category: 'ugreen_hub' });
+    const found = cands.find(c => c.item_id === 'OTHER_HUB_109');
+    assert.ok(found, 'Valid ¥109 UGREEN hub must be retained after purge');
   });
 
   // Cleanup
