@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-09-13
+
+### Added & Generalised (Universal Category Generalization & Zero-Hang Architecture)
+- **Universal Multi-Category Support (`_contract.js`, `clis/goofish/pick.js`)**:
+  - Modularized noise filtering into `UNIVERSAL_JUNK_REGEX`, `GUITAR_ACCESSORY_REGEX`, and `DIGITAL_NOISE_REGEX`.
+  - Upgraded `isAccessoryTitle(title, category, customExclude)` with category awareness, eliminating false positives on 3C digital terms (e.g., "千兆网口", "拓展坞", "转接器").
+  - Generalised `pick.js` to accept arbitrary product keywords (e.g., `opencli goofish pick "绿联 15375"`) alongside preset guitar queries, with support for `--category`, `--min-price`, `--max-price`, `--exclude`, `--sort`, and `--limit`.
+- **Navigation Resilience & CDP Hang Elimination (`_shared.js`)**:
+  - Implemented a 6000ms `Promise.race` timeout guard in `safeGoto`.
+  - Eliminates 60s CDP hangs caused by Alibaba's long-polling websockets/trackers by falling back instantly to client-side `window.location.href = url` and DOM content load verification.
+- **Unified Toolchain Harmonization & Zero Snippet Rot (`bin/xy-chat.js`)**:
+  - Harmonized `bin/xy-chat.js` `case 'pick':` to delegate directly to `opencli xianyu pick`, eliminating duplicated scratch logic and unifying CLI entry points.
+  - Removed deprecated one-off scratch scripts.
+- **Contract & Type Safety Expansion (`tests/contract.test.js`)**:
+  - Added unit tests for 3C hub accessories, packaging junk detection, custom exclusion lists, and dynamic category inference (32/32 tests passing with zero install drift).
+
 ## [1.4.2] - 2026-09-11
 
 ### Added & Hardened (Anti-Ban & Human Behavior Simulation)

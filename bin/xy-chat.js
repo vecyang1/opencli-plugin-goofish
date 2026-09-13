@@ -327,7 +327,8 @@ async function main() {
       let keyword = options['--keyword'] || options['-q'] || '';
 
       if (!category && rawPos) {
-        if (knownCats.includes(rawPos.toLowerCase())) {
+        const inferred = inferCategory({ category: rawPos, keyword: rawPos });
+        if (inferred !== 'other' || knownCats.includes(rawPos.toLowerCase())) {
           category = rawPos;
         } else {
           keyword = keyword ? `${keyword} ${rawPos}` : rawPos;
@@ -432,141 +433,11 @@ async function main() {
     }
 
     case 'pick': {
-      const target = (subArgs[0] || 'all').toLowerCase();
-      console.log(`🎸 正在执行闲鱼高性价比吉他智能选购与多维博弈筛选 (目标: ${target})...`);
-
-      // First ensure seller reviews from chat records are fresh
-      syncSellerReviewsFromSessionsAndMessages();
-
-      const searchConfigs = [];
-      if (target === 'all' || target.includes('nexg')) {
-        searchConfigs.push({
-          category: 'nexg2_nylon',
-          keyword: 'nexg 2n',
-          minPrice: '1000',
-          maxPrice: '3800',
-          sort: '价格升序',
-        });
-        searchConfigs.push({
-          category: 'nexg2_nylon',
-          keyword: 'nexg2 尼龙',
-          minPrice: '1000',
-          maxPrice: '3800',
-          sort: '价格升序',
-        });
-      }
-      if (target === 'all' || target.includes('air')) {
-        searchConfigs.push({
-          category: 'lava_me_air',
-          keyword: 'lava me air',
-          minPrice: '1000',
-          maxPrice: '3200',
-          sort: '价格升序',
-        });
-      }
-      if (target === 'all' || target.includes('me4') || target.includes('me 4') || target.includes('lava 4')) {
-        searchConfigs.push({
-          category: 'lava_me_4',
-          keyword: 'lava me 4',
-          minPrice: '1400',
-          maxPrice: '3800',
-          sort: '价格升序',
-        });
-      }
-
-      const excludeStr = '踏板,麦克风,话筒,耳麦,耳机,支架,图纸,维修,主板,琴包,背带,网线,插头,零配件,贴纸';
-
-      let totalFound = 0;
-      for (const sc of searchConfigs) {
-        console.log(`\n🔍 [${sc.category}] 正在线上搜索 "${sc.keyword}" (价格区间: ¥${sc.minPrice} - ¥${sc.maxPrice})...`);
-        const searchRes = runOpenCli('search', [
-          sc.keyword,
-          '--min-price', sc.minPrice,
-          '--max-price', sc.maxPrice,
-          '--sort', sc.sort,
-          '--exclude', excludeStr,
-          '--limit', '20',
-          '-f', 'json'
-        ]);
-
-        let items = [];
-        try {
-          items = JSON.parse(searchRes.stdout);
-        } catch (e) {
-          const m = searchRes.stdout.match(/\[\s*\{[\s\S]*\}\s*\]/);
-          if (m) items = JSON.parse(m[0]);
-        }
-
-        if (Array.isArray(items) && items.length > 0) {
-          // Pre-filter accessories via centralized contract
-          const validGuitars = items.filter(it => !isAccessoryTitle(it.title, sc.category));
-
-          console.log(`  -> 抓取到 ${items.length} 个候选 (过滤配件后剩余 ${validGuitars.length} 把吉他)，正在拉取详情与卖家身份补全...`);
-          // Enrich top 5 real guitar items with detail if seller missing
-          for (let i = 0; i < Math.min(validGuitars.length, 5); i++) {
-            const it = validGuitars[i];
-            if (!it.seller || it.seller === '-') {
-              try {
-                const detRes = runOpenCli('detail', [it.item_id, '-f', 'json']);
-                const det = JSON.parse(detRes.stdout);
-                if (det[0]?.seller) {
-                  it.seller = det[0].seller;
-                  it.seller_user_id = det[0].seller_user_id;
-                  if (det[0].images && det[0].images !== '-') it.image_url = det[0].images.split('|')[0].trim();
-                }
-              } catch (e) {}
-            }
-          }
-
-          const saved = saveCandidates(validGuitars, { keyword: sc.keyword, category: sc.category });
-          totalFound += saved;
-          console.log(`  ✅ 已持久化 ${saved} 把候选吉他至本地 SQLite SSOT`);
-        }
-      }
-
-      // Re-read authoritative candidates from SQLite (SSOT & Unidirectional Data Flow)
-      console.log('\n=================== 📊 闲鱼最优吉他候选选购决策全景图 (SSOT 真理库) ===================');
-      const queryCat = target === 'all' ? '' : (target.includes('nexg') ? 'nexg2_nylon' : (target.includes('air') ? 'lava_me_air' : 'lava_me_4'));
-      const allCandidates = queryCandidates({ category: queryCat, limit: 50 });
-      printTable(allCandidates.map((c, idx) => ({
-        '#': idx + 1,
-        '类别': c.category,
-        '商品ID': c.item_id,
-        '价格': c.price,
-        '成色': c.condition,
-        '卖家': c.seller,
-        '聊天/信誉风控': c.seller_status === 'responsive' ? '✅ 活跃报价' : (c.seller_status === 'ghosted' ? '⚠️ 曾已读不回' : (c.seller_status === 'unfit' ? '❌ 明确无货' : '❓ 待深入沟通')),
-        '标题': c.title.slice(0, 30),
-        '所在地': c.location,
-      })));
-
-      // Decision summaries
-      console.log('\n🎯 最优推荐与风控屏蔽决策摘要:');
-      const cats = target === 'all' ? ['nexg2_nylon', 'lava_me_air', 'lava_me_4'] : [queryCat];
-      for (const cat of cats) {
-        const catItems = allCandidates.filter(c => c.category === cat);
-        const safeItems = catItems.filter(c => c.seller_status !== 'ghosted' && c.seller_status !== 'unfit');
-        const lowest = safeItems[0] || catItems[0];
-        const excludedCount = catItems.length - safeItems.length;
-
-        console.log(`\n📌 [${cat.toUpperCase()}]:`);
-        if (lowest) {
-          console.log(`  - 推荐最优底价: ${lowest.price} (商品ID: ${lowest.item_id})`);
-          console.log(`  - 卖家: ${lowest.seller} [${lowest.location}] (风控状态: ${lowest.seller_status})`);
-          console.log(`  - 标题: ${lowest.title}`);
-          console.log(`  - 链接: ${lowest.item_url}`);
-          console.log(`  - 图片: ${lowest.image_url}`);
-        } else {
-          console.log('  - 暂无可推荐候选');
-        }
-        if (excludedCount > 0) {
-          console.log(`  - ⚠️ 已成功根据聊天记录屏蔽 ${excludedCount} 个曾已读不回或明确无货卖家`);
-        }
-      }
-
-      process.exit(0);
+      const res = spawnSync('opencli', ['xianyu', 'pick', ...subArgs], { stdio: 'inherit' });
+      process.exit(res.status ?? 0);
       break;
     }
+
 
     case 'watch': {
       console.log('📡 正在启动闲鱼新上架与降价实时监听 (推送式实时订阅)...');
@@ -596,7 +467,7 @@ async function main() {
   xy-chat candidates [category]      查询已沉淀的吉他候选库 (SSOT)
   xy-chat reviews [卖家]             查询卖家聊天评估档案 (排除已读不回/无货卖家)
   xy-chat sync-chats                 全量同步私信记录并分析卖家沟通状态
-  xy-chat pick [nexg|air|me4|all]    全自动搜索、比价、风控过滤并输出最优推荐
+  xy-chat pick [target] [options]    全自动搜索、比价、风控过滤并输出最优推荐 (支持吉他预设或任意关键词如 "绿联 15375")
   xy-chat watch [query] [--interval] 实时监听新上架宝贝与降价动态 (推送式订阅)
   xy-chat sync                       全量同步线上资产至本地 SQLite SSOT
   xy-chat stats                      查看本地离线库统计数据
