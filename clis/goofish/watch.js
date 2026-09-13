@@ -37,6 +37,7 @@ export const command = cli({
     { name: 'iterations', type: 'int', default: 1, help: '最大执行轮次 (默认 1 用于 Cadence 定时任务，传入如 10 进行多次轮询)' },
     { name: 'daemon', type: 'bool', default: false, help: '是否作为常驻守护进程持续轮询' },
     { name: 'webhook', type: 'str', help: 'Webhook 接收端 URL (如 http://127.0.0.1:9423/webhook/goofish)' },
+    { name: 'webhook-token', type: 'str', help: 'Webhook 鉴权 Bearer Token (默认自动读取环境变量 WEBHOOK_BEARER_TOKEN)' },
     { name: 'notify', type: 'bool', default: false, help: '触发 macOS 桌面横幅系统通知' },
     { name: 'diff-only', type: 'bool', default: false, help: '仅在产生新上架或降价事件时输出结果 (稳态静默)' },
     { name: 'inspect-images', type: 'bool', default: false, help: '对新上架候选执行多图深度客观瑕疵质检' },
@@ -65,6 +66,7 @@ export const command = cli({
     const isDaemon = Boolean(kwargs.daemon);
     const maxIterations = isDaemon ? 999999 : Math.max(1, Math.min(Number(kwargs.iterations) || 1, 100));
     const webhookUrl = kwargs.webhook ? String(kwargs.webhook).trim() : null;
+    const webhookToken = kwargs['webhook-token'] ? String(kwargs['webhook-token']).trim() : null;
     const enableNotify = Boolean(kwargs.notify);
     const diffOnly = Boolean(kwargs['diff-only']);
     const inspectImages = Boolean(kwargs['inspect-images']);
@@ -141,7 +143,7 @@ export const command = cli({
                   item_url: it.item_url,
                 },
               };
-              await sendWebhookNotification(webhookUrl, payload);
+              await sendWebhookNotification(webhookUrl, payload, { token: webhookToken });
             }
 
             if (enableNotify) {

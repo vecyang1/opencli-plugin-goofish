@@ -148,7 +148,23 @@ opencli xianyu chat "吉他小铺" "你好，请问宝贝还在吗？" --dry-run
 opencli xianyu chat "吉他小铺" "你好，请问宝贝还在吗？" -f table
 ```
 
-### 6. 数据报表导出
+### 6. 全自动周期监控、多图质检与 Webhook 告警
+```bash
+# 周期性监控「恩雅 NEXG 2N 尼龙款」，自动剔除钢弦版与配件，超预算不报警，推送 Webhook 与桌面横幅
+xy-chat watch "nexg 2n 尼龙" \
+  --category nexg2_nylon \
+  --max-price 2500 \
+  --iterations 1 \
+  --diff-only \
+  --webhook http://127.0.0.1:9423/webhook/goofish \
+  --webhook-token "$WEBHOOK_BEARER_TOKEN" \
+  --notify
+
+# 配合 Cadence 定时任务卡片 (CAD-20260913-goofish-nexg2n-watch)
+python3 /Users/vecsatfoxmailcom/Documents/A-coding/vec-productivity-skills/scheduled-task-rescheduler/scripts/validate_cadence_card.py cadence-records.md
+```
+
+### 7. 数据报表导出
 ```bash
 # 导出历史订单为 Markdown 流水清单
 opencli xianyu export orders --limit 50 --output ./my-orders.md

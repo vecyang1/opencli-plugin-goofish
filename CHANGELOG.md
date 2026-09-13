@@ -22,11 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Toolchain Alignment (`bin/xy-chat.js`)**:
   - Aligned `knownCats` and category normalization with `inferCategory`, adding `ugreen_hub`, `15375`, `hub`, `dock`.
   - Added `--sync` option to `xy-chat reviews` for on-demand seller review synchronization.
-- **Monitoring & Watch Push Architecture (`clis/goofish/watch.js`, `tests/watch_and_monitoring.test.js`)**:
-  - Enhanced `watch.js` with HTTP Webhook notification dispatch (`sendWebhookNotification`) with timeout protection.
-  - Added native macOS desktop alert banner integration (`sendDesktopNotification`).
-  - Added anti-bot risk challenge detection (`sec.taobao.com`, `login.m.taobao.com`) with graceful cooldown.
-  - Added full test suite verifying category inference, nylon/steel filtering, reactive live query emissions, and webhook dispatch (46/46 tests passing).
+- **Periodic Monitoring & Watch Push Architecture (`clis/goofish/watch.js`, `tests/watch_and_monitoring.test.js`)**:
+  - Enhanced `watch.js` with HTTP Webhook notification dispatch (`sendWebhookNotification`) supporting Bearer authentication (`--webhook-token` / `WEBHOOK_BEARER_TOKEN`) and 4s timeout protection.
+  - Added native macOS desktop alert banner integration (`sendDesktopNotification`) via `osascript`.
+  - Hardened steel-vs-nylon string discrimination in `isAccessoryTitle` for `nexg2_nylon` (`非尼龙|钢弦|民谣|电吉他` strictly blocked; `尼龙|2N|古典` preserved).
+  - Added anti-bot risk challenge detection (`sec.taobao.com`, `login.m.taobao.com`) with graceful cooldown and Gaussian jittered polling intervals.
+  - Registered durable Cadence card `CAD-20260913-goofish-nexg2n-watch` in `cadence-records.md` (validated with 0 errors via `validate_cadence_card.py`).
+  - Successfully verified live E2E probe against Xianyu for `"nexg 2n 尼龙"` (capturing authentic listings at ¥2699/¥2999 with zero steel string/accessory leakage).
+  - Full test suite expanded to 46 automated tests with 100% pass rate and 0 install drift across 50 served files.
 
 ## [1.6.0] - 2026-09-13
 
