@@ -64,6 +64,7 @@ function parseCliArgs(args) {
     '--interval',
     '--iterations',
     '--webhook',
+    '--webhook-token',
   ]);
   const positionals = [];
   const options = {};

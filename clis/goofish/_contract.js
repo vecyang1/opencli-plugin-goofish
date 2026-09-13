@@ -234,7 +234,7 @@ export function generateDdl() {
  * Universal junk/noise regex pattern across all product categories.
  * Excludes packaging boxes, manual fees, repair services, blueprints, deposit/postage adjustments, model dummies.
  */
-export const UNIVERSAL_JUNK_REGEX = /(?:图纸|维修费|手工费|专拍链接|邮费补差|补差价|补运费|定金|包装盒|空盒子|空盒|包装箱|说明书|模型机|展示机壳|保护膜|贴膜|自提专拍)/i;
+export const UNIVERSAL_JUNK_REGEX = /(?:图纸|维修费|手工费|专拍链接|邮费补差|补差价|补运费|定金|包装盒|空盒子|空盒|空包装|包装箱|说明书|模型机|展示机壳|保护膜|贴膜|自提专拍)/i;
 
 /**
  * Standard guitar accessory regex pattern.
@@ -244,22 +244,41 @@ export const GUITAR_ACCESSORY_REGEX = /(?:踏板|踩钉|麦克风|话筒|耳麦|
 
 /**
  * Standard digital 3C noise regex pattern.
- * Excludes phone cases, sleeves, lanyards, dummy shells, bags, dust plugs, pure cables, adapters.
+ * Excludes cases, bags, sleeves, dust plugs, dummy shells.
  */
-export const DIGITAL_NOISE_REGEX = /(?:手机壳|保护套|保护壳|硅胶套|硅胶壳|挂绳|收纳包|收纳袋|纯包装|展示壳|防尘塞|防尘套|贴膜|转接头|转换头|转换器|纯线|延长线|外壳)/i;
+export const DIGITAL_NOISE_REGEX = /(?:手机壳|保护套|保护壳|硅胶套|硅胶壳|挂绳|收纳包|收纳袋|收纳盒|内胆包|纯包装|展示壳|防尘塞|防尘套|贴膜|展示机|模型机|单机壳|纯外壳|替换壳)/i;
 
 /**
- * UGREEN 15375 Hub specification mismatch regex pattern.
- * Excludes 5-in-1, 6-in-1, 7-in-1, 10-in-1, 4K30Hz, and 100M Ethernet downgrades.
+ * Standalone dongle/cable regex when the item is NOT a multi-function docking station.
  */
-export const UGREEN_15375_MISMATCH_REGEX = /(?:[4-8]|1[0-2])合1|(?:4K30Hz|4K\s*30Hz|1080P|2K(?!\d)|百兆网口|百兆|100M)/i;
+export const STANDALONE_DONGLE_CABLE_REGEX = /(?:转接头|转换头|纯线|延长线|纯数据线|单充头)/i;
+
+/**
+ * Port count mismatch pattern for UGREEN 15375 9-in-1 (catches 3-8, 10-12 in digits, Chinese, and English).
+ */
+export const PORT_COUNT_MISMATCH_REGEX = /(?:(?:[3-8]|1[0-2])\s*合\s*[1一]|(?:[三四五六七八]|十[一二]?)\s*合\s*[1一]|(?:[3-8]|1[0-2])\s*[-_ ]?in[-_ ]?1)/i;
+
+/**
+ * Refresh rate downgrade pattern (30Hz when 60Hz is not present).
+ */
+export const REFRESH_RATE_30HZ_REGEX = /(?:4K\s*[@/xX_]?\s*30Hz|4K\s*30帧|\b30Hz\b|\b30帧\b)/i;
+
+/**
+ * Ethernet downgrade pattern (100M/百兆 when Gigabit/1000M is not present).
+ */
+export const ETHERNET_100M_REGEX = /(?:百兆网口|百兆网卡|百兆网|100M(?:bps)?\s*网[口卡]|100兆网[口卡]?)/i;
+
+/**
+ * UGREEN 15375 Hub specification mismatch regex pattern for backward-compatibility.
+ */
+export const UGREEN_15375_MISMATCH_REGEX = /(?:(?:[3-8]|1[0-2])\s*合\s*[1一]|(?:[三四五六七八]|十[一二]?)\s*合\s*[1一]|(?:[3-8]|1[0-2])\s*[-_ ]?in[-_ ]?1|(?:4K\s*[@/xX_]?\s*30Hz|4K\s*30帧)|(?:百兆网口|百兆网卡|百兆网|100M(?:bps)?\s*网[口卡]|100兆网[口卡]?))/i;
 
 // Backward-compatible alias for existing imports
 export const ACCESSORY_REGEX = GUITAR_ACCESSORY_REGEX;
 
 /**
  * Check if a title indicates an accessory or non-target product.
- * Supports category-aware filtering and user-supplied custom exclusions.
+ * Supports category-aware filtering, disambiguation, and user-supplied custom exclusions.
  */
 export function isAccessoryTitle(title, category = '', customExclude = []) {
   if (!title || typeof title !== 'string') return false;
@@ -277,24 +296,44 @@ export function isAccessoryTitle(title, category = '', customExclude = []) {
     }
   }
 
-  // 3. Category-specific noise filtering
+  // 3. Category resolution & cross-domain noise isolation
   const cat = String(category || '').toLowerCase();
-  const isGuitarCategory = !cat || 
-                           cat.includes('guitar') || 
-                           cat.includes('nexg') || 
-                           cat.includes('lava') || 
-                           cat === 'other';
+  const isGuitarExplicit = cat.includes('guitar') || cat.includes('nexg') || cat.includes('lava');
+  const isDigitalExplicit = cat.includes('hub') || cat.includes('dock') || cat.includes('digital') || cat.includes('15375') || cat.includes('electronic') || cat.includes('ugreen');
 
-  if (isGuitarCategory) {
+  // If category is not explicitly known or is 'other', disambiguate based on title keywords
+  const isGuitar = isGuitarExplicit || (!isDigitalExplicit && /(?:吉他|guitar|nexg|lava|拿火|恩雅|民谣|古典|开声)/i.test(title));
+  const isDigital = isDigitalExplicit || (!isGuitarExplicit && /(?:拓展坞|扩展坞|分线器|转接器|hub|dock|15375|绿联|type-c)/i.test(title));
+
+  if (isGuitar) {
     if (GUITAR_ACCESSORY_REGEX.test(title)) return true;
     if (cat === 'lava_me_air' && /play/i.test(title) && !/air/i.test(title)) return true;
-    if (cat === 'nexg2_nylon') {
+    if (cat === 'nexg2_nylon' || (isGuitar && /(?:nexg|2n)/i.test(title))) {
       if (/(?:非尼龙|钢弦|民谣|电吉他)/i.test(title) && !/(?:(?<!非)尼龙|2N|古典)/i.test(title)) return true;
     }
-  } else if (cat.includes('hub') || cat.includes('dock') || cat.includes('digital') || cat.includes('15375') || cat.includes('electronic')) {
+  }
+
+  if (isDigital) {
     if (DIGITAL_NOISE_REGEX.test(title)) return true;
-    if (cat === 'ugreen_hub' || cat.includes('15375')) {
-      if (UGREEN_15375_MISMATCH_REGEX.test(title)) return true;
+
+    // Check standalone dongles/cables when title does NOT represent a dock/hub
+    const isDockHub = /(?:[9九]\s*合\s*[1一]|9\s*[-_ ]?in[-_ ]?1|15375|拓展坞|扩展坞|分线器)/i.test(title);
+    if (!isDockHub && STANDALONE_DONGLE_CABLE_REGEX.test(title)) return true;
+
+    // UGREEN 15375 Specific Mismatch Guards
+    const is15375Target = cat === 'ugreen_hub' || cat.includes('15375') || /(?:15375|绿联.*(?:9合1|9合一|九合一|拓展坞|扩展坞))/i.test(title);
+    if (is15375Target) {
+      // Port count mismatch (e.g. 5-in-1, 6-in-1, 10-in-1) unless 9-in-1 or 15375 is present
+      const has9In1 = /(?:9\s*合\s*[1一]|九\s*合\s*[1一]|9\s*[-_ ]?in[-_ ]?1|15375)/i.test(title);
+      if (PORT_COUNT_MISMATCH_REGEX.test(title) && !has9In1) return true;
+
+      // Refresh rate downgrade (30Hz) unless 60Hz is explicitly supported
+      const has60Hz = /(?:60Hz|60帧)/i.test(title);
+      if (REFRESH_RATE_30HZ_REGEX.test(title) && !has60Hz) return true;
+
+      // Ethernet downgrade (100M / 百兆) unless Gigabit is explicitly supported
+      const hasGigabit = /(?:千兆|1000M|gigabit)/i.test(title);
+      if (ETHERNET_100M_REGEX.test(title) && !hasGigabit) return true;
     }
   }
 
@@ -354,7 +393,16 @@ export function inferCategory({ category = '', keyword = '', title = '' } = {}) 
   if (text.includes('nexg') || text.includes('2n') || text.includes('nylon') || text.includes('尼龙')) {
     return 'nexg2_nylon';
   }
-  if (text.includes('扩展坞') || text.includes('拓展坞') || text.includes('hub') || text.includes('15375')) {
+  if (
+    text.includes('扩展坞') || 
+    text.includes('拓展坞') || 
+    text.includes('hub') || 
+    text.includes('dock') || 
+    text.includes('15375') || 
+    (text.includes('绿联') && (text.includes('9合1') || text.includes('9合一') || text.includes('九合一') || text.includes('分线器') || text.includes('转换器'))) ||
+    text === 'ugreen' || 
+    text === '绿联'
+  ) {
     return 'ugreen_hub';
   }
   const cleanCat = String(category || '').trim().toLowerCase();
@@ -372,9 +420,9 @@ export function inferCategory({ category = '', keyword = '', title = '' } = {}) 
  * Regex patterns for seller communication analysis.
  * Uses negative lookbehinds/lookaheads to prevent matching questions like '有没有' or '没有问题'.
  */
-export const UNFIT_SELLER_REGEX = /(?:(?<!有)没有(?!问题|毛病|瑕疵|损坏)|没有咯|已出|卖了|不在了|下架|缺货|出掉了|出完了|无货|暂时没货|只有se|仅se|卖家关闭了订单|不单出|已坏|故障)/i;
+export const UNFIT_SELLER_REGEX = /(?:(?<!有)没有(?!问题|毛病|瑕疵|损坏)|没有咯|已出|卖了|卖掉了|不在了|下架|缺货|出掉了|出完了|出给别人了|被人拍了|已被拍|无货|暂时没货|只有se|仅se|卖家关闭了订单|不单出|不卖了|已坏|故障)/i;
 export const GHOST_SELLER_REGEX = /(?:没回复说明客服可能在忙|自动回复|智能客服)/;
-export const RESPONSIVE_SELLER_REGEX = /(?:全新正品|包邮|专拍价|可以发|明天发|当天发|有货|现货|在的|还在|有奶白|加振款|拿火源|标价.*拿火|\b(?:1\d{3}|2\d{3})\b)/;
+export const RESPONSIVE_SELLER_REGEX = /(?:全新正品|包邮|专拍价|可以发|明天发|当天发|有货|现货|在的|还在|可以拍|能发|随时发|保真|正品|原封|未拆|有奶白|加振款|拿火源|标价.*拿火|(?:\b(?:[6-9]\d|1\d{2}|2\d{2}|3\d{2}|[12]\d{3})\b\s*(?:元|块|出|包邮|发顺丰|拿走|直接拍)?))/;
 
 /**
  * Classifies a seller's communication status based on session metadata and messages.
@@ -629,17 +677,22 @@ export function extractMultiImageDefects(description = '', images = []) {
  * Sends a structured event payload to an HTTP Webhook endpoint (Webhook Hub / n8n / custom).
  * Built with timeout protection and non-fatal error trapping to prevent crashing the monitor.
  */
-export async function sendWebhookNotification(webhookUrl, payload) {
+export async function sendWebhookNotification(webhookUrl, payload, options = {}) {
   if (!webhookUrl || typeof webhookUrl !== 'string') return false;
   try {
+    const token = options.token || process.env.WEBHOOK_BEARER_TOKEN || process.env.WEBHOOK_TOKEN || '';
+    const headers = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'OpenCLI-Goofish-Watcher/1.6.0',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
     const res = await fetch(webhookUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'OpenCLI-Goofish-Watcher/1.6.0',
-      },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
