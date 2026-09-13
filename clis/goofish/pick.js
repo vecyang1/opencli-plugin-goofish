@@ -226,8 +226,17 @@ export const command = cli({
 
       // Write valid items to SQLite SSOT
       if (validItems.length > 0) {
-        saveCandidates(validItems, { keyword: sc.keyword, category: sc.category, filterAccessories: false });
+        saveCandidates(validItems, { keyword: sc.keyword, category: sc.category, filterAccessories: true });
       }
+    }
+
+    // Map user sort parameter
+    const rawSort = String(kwargs.sort || 'price_asc').trim();
+    let sortKey = 'price_asc';
+    if (rawSort.includes('降序') || rawSort.toLowerCase().includes('desc')) {
+      sortKey = 'price_desc';
+    } else if (rawSort.includes('新') || rawSort.includes('time') || rawSort.includes('updated')) {
+      sortKey = 'updated';
     }
 
     // Unidirectional Data Flow: Re-read authoritative candidates from SQLite view
@@ -242,7 +251,7 @@ export const command = cli({
       const candidates = queryCandidates({ 
         category: cat, 
         excludeGhosted: true, 
-        sort: 'price_asc', 
+        sort: sortKey, 
         limit 
       });
       for (const best of candidates) {

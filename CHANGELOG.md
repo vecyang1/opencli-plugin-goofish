@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-09-13
+
+### Added & Hardened (Digital Spec Hardening, Defect Extraction, & Watch Push Engine)
+- **3C Digital Specification & UGREEN 15375 Guard (`_contract.js`, `_db.js`)**:
+  - Expanded `DIGITAL_NOISE_REGEX` to filter cases, sleeves, dust plugs, bags, and dongles (`收纳袋`, `保护壳`, `硅胶套`, `防尘塞`, `外壳`, `转接头`, `延长线`).
+  - Added `UGREEN_15375_MISMATCH_REGEX` to automatically reject downgraded models (5合1, 6合1, 7合1, 10合1, 4K30Hz, 百兆网口).
+  - Added category-specific price floor in `saveCandidates` and `purgeJunkCandidates` (rejecting spurious digital accessories under ¥60).
+  - Fixed category check in `purgeJunkCandidates` by removing the empty string entry that previously risked purging uncategorized products under ¥400.
+- **Objective Condition & Defect Notes Inspection Engine (`_contract.js`, `detail.js`)**:
+  - Implemented `extractDefectNotes(title, description)` extracting scratches, bumps, repair history, and missing parts vs. certifying pristine condition (`全新未拆封`, `箱说配件全`).
+  - Integrated `extractDefectNotes` into `detail.js` so live item fetches automatically populate `defect_notes` in both CLI output and SQLite SSOT.
+- **Dynamic Sort & Filter Alignment in Pick Engine (`clis/goofish/pick.js`)**:
+  - Resolved bug where `--sort` was previously ignored; now maps user sort input (`价格降序`, `price_desc`, `updated`) directly into authoritative query.
+  - Enforced `filterAccessories: true` during write-back in `pick.js` to trigger database-level contract and price floor guards.
+- **Toolchain Alignment (`bin/xy-chat.js`)**:
+  - Aligned `knownCats` and category normalization with `inferCategory`, adding `ugreen_hub`, `15375`, `hub`, `dock`.
+  - Added `--sync` option to `xy-chat reviews` for on-demand seller review synchronization.
+- **Monitoring & Watch Push Architecture (`clis/goofish/watch.js`, `tests/watch_and_monitoring.test.js`)**:
+  - Enhanced `watch.js` with HTTP Webhook notification dispatch (`sendWebhookNotification`) with timeout protection.
+  - Added native macOS desktop alert banner integration (`sendDesktopNotification`).
+  - Added anti-bot risk challenge detection (`sec.taobao.com`, `login.m.taobao.com`) with graceful cooldown.
+  - Added full test suite verifying category inference, nylon/steel filtering, reactive live query emissions, and webhook dispatch (46/46 tests passing).
+
 ## [1.6.0] - 2026-09-13
 
 ### Added & Hardened (SSOT Hardening, Adversarial Verification & Write-Back Automation)

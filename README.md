@@ -170,7 +170,7 @@ opencli xianyu export favorites --file-type html --output ./my-favorites.html
 4. **单一本源真理库与单向数据流 (SSOT & Unidirectional Data Flow)**:
    本地持久化原生集成 Node.js 内置 SQLite (`node:sqlite`)。无论通过 `opencli xianyu`、`opencli goofish` 还是 `xy-chat` 调用，所有操作统一按优先级解析至权威真理库（`GOOFISH_DB` > `GOOFISH_DATA_DIR` > `~/data/goofish.db` > `<cwd>/data/goofish.db`），所有实时抓取动作自动单向写回真理库，杜绝数据分裂。
 5. **契约优先与对抗性鲁棒性防护 (Contract-First & Adversarial Protection)**:
-   数据入库遵循严格 Schema 契约校验与防降级更新守卫（`CASE WHEN`），抵御未知占位数据覆盖高置信度记录；内置完备的对抗性边界与数字配件过滤测试套件（38 个测试用例 100% 覆盖通过）。
+   数据入库遵循严格 Schema 契约校验与防降级更新守卫（`CASE WHEN`），抵御未知占位数据覆盖高置信度记录；内置 3C 数码规格防伪匹配（`UGREEN_15375_MISMATCH_REGEX`）、全量成色与瑕疵注记提取引擎（`extractDefectNotes`）、配件价格底线守卫及推送式实时订阅监控（46 个测试用例 100% 覆盖通过）。
 
 
 ---
