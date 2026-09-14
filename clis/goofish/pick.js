@@ -5,7 +5,7 @@ import {
   queryCandidates, 
   syncSellerReviewsFromSessionsAndMessages 
 } from './_db.js';
-import { isAccessoryTitle, inferCategory } from './_contract.js';
+import { isAccessoryTitle, inferCategory, getProductSpec } from './_contract.js';
 
 export const command = cli({
   site: 'goofish',
@@ -17,8 +17,9 @@ export const command = cli({
   browser: true,
   navigateBefore: false,
   args: [
-    { name: 'target', positional: true, required: false, default: 'all', help: '目标品类/搜索关键词: nexg | air | me4 | all | 或任意关键词 (如: "绿联 15375")' },
-    { name: 'category', type: 'str', help: '自定义品类标识 (如: ugreen_hub, tablet, nexg2_nylon)' },
+    { name: 'target', positional: true, required: false, default: 'all', help: '目标品类/搜索关键词: nexg | air | me4 | all | 或任意关键词 (如: "绿联 15375", "索尼 a7m4", "switch oled")' },
+    { name: 'category', type: 'str', help: '自定义品类标识 (如: ugreen_hub, tablet, nexg2_nylon, sony_a7m4)' },
+    { name: 'require', type: 'str', help: '必须包含的正向关键词，逗号分隔 (如: 尼龙,2N 或 4K60,千兆 或 2.5K,16384)' },
     { name: 'min-price', type: 'str', help: '自定义最低价格过滤' },
     { name: 'max-price', type: 'str', help: '自定义最高价格过滤' },
     { name: 'exclude', type: 'str', help: '自定义排除关键词，逗号分隔 (如: 6合1,自提,配件,损坏)' },
@@ -42,69 +43,75 @@ export const command = cli({
     const targetLower = rawTarget.toLowerCase();
     const limit = Math.max(5, Math.min(Number(kwargs.limit) || 20, 50));
     const customExclude = kwargs.exclude ? String(kwargs.exclude).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
+    const customRequire = kwargs.require ? String(kwargs.require).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
 
     // 1. Refresh seller reviews from chat records
     try {
       syncSellerReviewsFromSessionsAndMessages();
     } catch (e) {}
 
-    // 2. Determine target search configs
+    // 2. Determine target search configs (extensible & generic across all product lines)
     const searchConfigs = [];
     const explicitCat = kwargs.category ? String(kwargs.category).trim() : '';
-    const isGuitarPreset = (!explicitCat || explicitCat === 'all' || explicitCat === '全部' || explicitCat.includes('guitar') || explicitCat.includes('nexg') || explicitCat.includes('lava')) &&
-                           (targetLower === 'all' || 
-                            targetLower === '全部' || 
-                            targetLower.includes('nexg') || 
-                            targetLower.includes('air') || 
-                            targetLower.includes('me4') || 
-                            targetLower.includes('me 4') || 
-                            targetLower.includes('lava'));
 
-    if (isGuitarPreset) {
-      if (targetLower === 'all' || targetLower === '全部' || targetLower.includes('nexg')) {
+    if (targetLower === 'all' || targetLower === '全部') {
+      if (explicitCat) {
+        const spec = getProductSpec(explicitCat);
+        searchConfigs.push({
+          category: explicitCat,
+          keyword: spec ? spec.defaultQuery : explicitCat,
+          minPrice: kwargs['min-price'] || (spec?.priceFloor ? String(spec.priceFloor) : ''),
+          maxPrice: kwargs['max-price'] || '',
+          exclude: customExclude,
+          require: customRequire,
+        });
+      } else {
+        // Multi-category defaults across guitars and 3C
         searchConfigs.push({
           category: 'nexg2_nylon',
           keyword: 'nexg 2n',
           minPrice: kwargs['min-price'] || '1000',
           maxPrice: kwargs['max-price'] || '3800',
           exclude: customExclude,
+          require: customRequire,
         });
-        searchConfigs.push({
-          category: 'nexg2_nylon',
-          keyword: 'nexg2 尼龙',
-          minPrice: kwargs['min-price'] || '1000',
-          maxPrice: kwargs['max-price'] || '3800',
-          exclude: customExclude,
-        });
-      }
-      if (targetLower === 'all' || targetLower === '全部' || targetLower.includes('air')) {
         searchConfigs.push({
           category: 'lava_me_air',
           keyword: 'lava me air',
           minPrice: kwargs['min-price'] || '1000',
           maxPrice: kwargs['max-price'] || '3200',
           exclude: customExclude,
+          require: customRequire,
         });
-      }
-      if (targetLower === 'all' || targetLower === '全部' || targetLower.includes('me4') || targetLower.includes('me 4') || targetLower.includes('lava 4')) {
         searchConfigs.push({
           category: 'lava_me_4',
           keyword: 'lava me 4',
           minPrice: kwargs['min-price'] || '1400',
           maxPrice: kwargs['max-price'] || '3800',
           exclude: customExclude,
+          require: customRequire,
+        });
+        searchConfigs.push({
+          category: 'ugreen_hub',
+          keyword: '绿联 15375',
+          minPrice: kwargs['min-price'] || '60',
+          maxPrice: kwargs['max-price'] || '160',
+          exclude: customExclude,
+          require: customRequire,
         });
       }
     } else {
-      // General purpose custom product pick!
-      const cat = explicitCat || inferCategory({ keyword: rawTarget, title: rawTarget });
-      const kw = (rawTarget === 'all' || rawTarget === '全部') ? (cat === 'ugreen_hub' ? '绿联 15375' : cat) : rawTarget;
+      // General purpose product or specific category search
+      const spec = getProductSpec(explicitCat || rawTarget);
+      const cat = explicitCat || (spec ? spec.category : inferCategory({ keyword: rawTarget, title: rawTarget }));
+      const kw = rawTarget;
       searchConfigs.push({
         category: cat,
         keyword: kw,
-        minPrice: kwargs['min-price'] || (cat === 'ugreen_hub' ? '60' : ''),
-        maxPrice: kwargs['max-price'] || (cat === 'ugreen_hub' ? '160' : ''),
+        minPrice: kwargs['min-price'] || (spec?.priceFloor ? String(spec.priceFloor) : ''),
+        maxPrice: kwargs['max-price'] || '',
         exclude: customExclude,
+        require: customRequire,
       });
     }
 
@@ -225,7 +232,7 @@ export const command = cli({
       }, limit);
 
       // Filter out accessories & user-specified exclusions via contract
-      const validItems = (rawCards || []).filter(it => !isAccessoryTitle(it.title, sc.category, sc.exclude));
+      const validItems = (rawCards || []).filter(it => !isAccessoryTitle(it.title, sc.category, sc.exclude, { require: sc.require }));
 
       // Write valid items to SQLite SSOT
       if (validItems.length > 0) {

@@ -82,8 +82,8 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu export` | `[read]` | 将订单或收藏导出为 Markdown、JSON 或 HTML 报表 | `[type orders/favorites] [--output path] [--file-type md/html/json]` |
 | `opencli xianyu candidates` | `[read]` | 候选池管理与离线全文检索 (按品类/价格/卖家状态筛选) | `[query] [--category <cat>] [--keyword <kw>] [--min-price N] [--max-price N] [--exclude-ghosted] [--limit 50]` |
 | `opencli xianyu reviews` | `[read]` | 卖家信誉与沟通记录评估 (活跃报价/已读不回/无货标注) | `[seller] [--status responsive/ghosted/unfit] [--sync] [--limit 50]` |
-| `opencli xianyu pick` | `[read/write]` | 自动化跨品类候选聚合、详情补全、风险卖家过滤与最优解推荐 | `[target nexg2_nylon/lava_me_air/lava_me_4/all] [--min-price N] [--max-price N] [--limit 20]` |
-| `opencli xianyu watch` | `[read/write]` | 实时监听新上架宝贝与降价动态 (推送式实时订阅与离线真理库同步) | `[query] [--category <cat>] [--interval 10] [--min-price N] [--max-price N] [--iterations 1]` |
+| `opencli xianyu pick` | `[read/write]` | 通用多品类候选聚合、正向必选过滤、风险卖家剔除与最优解推荐 | `[target nexg2_nylon/ugreen_hub/sony_a7m4/all] [--require 词1,词2] [--exclude 词1,词2] [--min-price N] [--max-price N] [--limit 20]` |
+| `opencli xianyu watch` | `[read/write]` | 实时/定时监听新上架宝贝与降价动态 (8大硬件原型配件过滤、低价地板拦截与推送式实时真理库同步) | `[query] [--category <cat>] [--require 词1,词2] [--price-floor N] [--min-price N] [--max-price N] [--interval 3600] [--iterations 1]` |
 | `xy-chat <cmd>` | `[all]` | 统一独立可执行命令行表面，与 OpenCLI 共享相同底层契约与 SSOT 数据库 | `xy-chat <doctor/whoami/personal/orders/favorites/search/detail/seller/candidates/reviews/pick/watch/purge/sync/stats>` |
 
 ---
@@ -185,8 +185,8 @@ opencli xianyu export favorites --file-type html --output ./my-favorites.html
    每个命令均包含轻量级会话嗅探机制，当检测到登录态失效时精准抛出 `AuthRequiredError`，引导用户在 Chrome 浏览器中无缝续期。
 4. **单一本源真理库与单向数据流 (SSOT & Unidirectional Data Flow)**:
    本地持久化原生集成 Node.js 内置 SQLite (`node:sqlite`)。无论通过 `opencli xianyu`、`opencli goofish` 还是 `xy-chat` 调用，所有操作统一按优先级解析至权威真理库（`GOOFISH_DB` > `GOOFISH_DATA_DIR` > `~/data/goofish.db` > `<cwd>/data/goofish.db`），所有实时抓取动作自动单向写回真理库，杜绝数据分裂。
-5. **契约优先与对抗性鲁棒性防护 (Contract-First & Adversarial Protection)**:
-   数据入库遵循严格 Schema 契约校验与防降级更新守卫（`CASE WHEN`），抵御未知占位数据覆盖高置信度记录；内置 3C 数码规格防伪匹配（`UGREEN_15375_MISMATCH_REGEX`）、全量成色与瑕疵注记提取引擎（`extractDefectNotes`）、配件价格底线守卫及推送式实时订阅监控（46 个测试用例 100% 覆盖通过）。
+5. **通用硬件原型与契约优先过滤 (Universal Archetypes & Contract-First)**:
+   数据入库遵循严格 Schema 契约校验与防降级更新守卫（`CASE WHEN`）；涵盖 8 大消费电子与数码硬件原型（吉他、扩展坞、相机、掌机、数位屏、耳机、PC硬件、手机平板）的专用配件过滤网；支持动态注册商品规则与正向必选词（`--require`）；内置多图瑕疵提取与价格底线拦截守卫（51 个单元与对抗性测试用例 100% 覆盖通过）。
 
 
 ---

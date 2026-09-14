@@ -249,6 +249,44 @@ export const GUITAR_ACCESSORY_REGEX = /(?:踏板|踩钉|麦克风|话筒|耳麦|
 export const DIGITAL_NOISE_REGEX = /(?:手机壳|保护套|保护壳|硅胶套|硅胶壳|挂绳|收纳包|收纳袋|收纳盒|内胆包|纯包装|展示壳|防尘塞|防尘套|贴膜|展示机|模型机|单机壳|纯外壳|替换壳|单壳|空壳|单独外壳|仅外壳|仅出外壳|只出外壳|单卖外壳|替换外壳|外壳配件|无主板外壳|(?:拓展坞|扩展坞)\s*(?:单?外壳|空壳|机壳)(?!\s*(?:无|没有|有|微|细|轻|磨损|划痕|划伤|磕碰|磕伤|掉漆|完好|正常|成色|全新|9\d新|良好|氧化|保护)))/i;
 
 /**
+ * Archetype accessory regexes for major consumer electronics, photography, and gaming hardware.
+ */
+export const CAMERA_ACCESSORY_REGEX = /(?:假电池|座充|充电器|单充电盒|兔笼|拓展框|手柄套|遮光罩|镜头盖|机身盖|保护盖|UV镜|滤镜|贴纸|硅胶套|转接环|转接筒|背带|腕带|肩带|快装板|云台|三脚架|补光灯|假镜头|模型机)/i;
+export const CONSOLE_ACCESSORY_REGEX = /(?:游戏卡|卡带|卡盒|收纳包|收纳盒|水晶壳|保护壳|硅胶套|摇杆帽|按键贴|按键帽|手柄套|手柄包|腕带|单底座|防尘塞|散热风扇|散热底座|单手柄|双手柄|手柄握把)/i;
+export const PHONE_TABLET_ACCESSORY_REGEX = /(?:手机壳|平板壳|保护套|皮套|硅胶套|钢化膜|水凝膜|背膜|镜头膜|贴膜|笔尖|笔套|电容笔|手写笔|保护膜|桌面支架|手机支架|车载支架|散热背夹|防尘塞)/i;
+export const AUDIO_ACCESSORY_REGEX = /(?:耳机套|耳塞套|耳帽|海绵套|保护套|硅胶套|收纳包|收纳盒|仅充电仓|单充电仓|单出充电盒|单耳|左耳|右耳|单出左耳|单出右耳|耳机线|升级线|平衡线|音频线|防尘塞)/i;
+export const PC_HARDWARE_ACCESSORY_REGEX = /(?:包装盒|空盒|显卡盒|主板盒|散热风扇|冷排|风冷|水冷头|挡板|转接线|模组线|显卡支架|导热垫|导热硅脂|硅脂|铜片|假卡|模型卡|损坏卡|报废卡)/i;
+export const DRAWING_TABLET_ACCESSORY_REGEX = /(?:笔尖|替换笔尖|笔芯|压感笔|单笔|手写笔|笔筒|笔盒|笔座|数位板膜|类纸膜|保护膜|快捷键盘|单键盘|收纳包|支架|转接线|连接线|数据线|电源线|三合一(?:连接)?线)/i;
+
+export const ARCHETYPE_ACCESSORY_PATTERNS = {
+  guitar: GUITAR_ACCESSORY_REGEX,
+  digital_hub: DIGITAL_NOISE_REGEX,
+  camera: CAMERA_ACCESSORY_REGEX,
+  gaming_console: CONSOLE_ACCESSORY_REGEX,
+  phone_tablet: PHONE_TABLET_ACCESSORY_REGEX,
+  audio_headphone: AUDIO_ACCESSORY_REGEX,
+  pc_hardware: PC_HARDWARE_ACCESSORY_REGEX,
+  drawing_tablet: DRAWING_TABLET_ACCESSORY_REGEX,
+};
+
+/**
+ * Infer product archetype from keyword, title, or category slug.
+ */
+export function inferArchetype(text = '') {
+  const str = String(text || '').trim().toLowerCase();
+  if (ARCHETYPE_ACCESSORY_PATTERNS[str]) return str;
+  if (/(?:吉他|guitar|nexg|lava|拿火|恩雅|民谣|古典|开声|电吉他|尤克里里)/i.test(str)) return 'guitar';
+  if (/(?:数位板|数位屏|绘图板|手绘屏|wacom|xppen|高漫|绘王|drawing|tablet)/i.test(str)) return 'drawing_tablet';
+  if (/(?:耳机|耳麦|降噪|airpods|wh-1000|xm5|xm4|bose|森海塞尔|漫步者|充电仓|耳塞|headphone|earphone|earbuds)/i.test(str)) return 'audio_headphone';
+  if (/(?:相机|微单|单反|单电|摄影|镜头|索尼a7|佳能|尼康|富士|理光|松下|哈苏|徕卡|action|gopro|dji|camera)/i.test(str)) return 'camera';
+  if (/(?:switch|ps5|ps4|xbox|steam\s*deck|rog\s*ally|掌机|游戏机|ns|oled|console)/i.test(str)) return 'gaming_console';
+  if (/(?:iphone|ipad|华为|小米|荣耀|vivo|oppo|魅族|红米|一加|平板|手机|phone)/i.test(str)) return 'phone_tablet';
+  if (/(?:显卡|主板|cpu|内存|固态硬盘|rtx|gtx|amd|intel|电源|机箱|gpu)/i.test(str)) return 'pc_hardware';
+  if (/(?:拓展坞|扩展坞|分线器|转接器|集线器|多功能转换器|hub|dock|15375)/i.test(str)) return 'digital_hub';
+  return 'general';
+}
+
+/**
  * Standalone dongle/cable regex when the item is NOT a multi-function docking station.
  */
 export const STANDALONE_DONGLE_CABLE_REGEX = /(?:转接头|转换头|纯线|延长线|纯数据线|单充头)/i;
@@ -277,43 +315,210 @@ export const UGREEN_15375_MISMATCH_REGEX = /(?:(?<!(?:非|不是|并非|绝非|�
 export const ACCESSORY_REGEX = GUITAR_ACCESSORY_REGEX;
 
 /**
- * Check if a title indicates an accessory or non-target product.
- * Supports category-aware filtering, disambiguation, and user-supplied custom exclusions.
+ * Standard product catalog with pre-configured archetypes, specs, and price floors.
  */
-export function isAccessoryTitle(title, category = '', customExclude = []) {
+export const PRODUCT_CATALOG = new Map([
+  ['nexg2_nylon', {
+    category: 'nexg2_nylon',
+    archetype: 'guitar',
+    defaultQuery: 'nexg 2n',
+    aliases: ['nexg', 'nexg2', '2n', 'nylon', '恩雅2n', 'nexg2n'],
+    mustInclude: /(?:(?<!(?:非|不是|并非|绝非|无|没有|不带))\s*(?:尼龙|2N|古典))/i,
+    priceFloor: 700,
+    description: '恩雅 NEXG 2N 尼龙静音智能吉他',
+  }],
+  ['lava_me_air', {
+    category: 'lava_me_air',
+    archetype: 'guitar',
+    defaultQuery: 'lava me air',
+    aliases: ['air', 'me air', 'lava air'],
+    mustExclude: /(?<!(?:非|不是|并非))\bplay\b/i,
+    priceFloor: 600,
+    description: '拿火 LAVA ME AIR 碳纤维智能吉他',
+  }],
+  ['lava_me_4', {
+    category: 'lava_me_4',
+    archetype: 'guitar',
+    defaultQuery: 'lava me 4',
+    aliases: ['me4', 'lava4', 'lava 4'],
+    priceFloor: 800,
+    description: '拿火 LAVA ME 4 四代智能吉他',
+  }],
+  ['ugreen_hub', {
+    category: 'ugreen_hub',
+    archetype: 'digital_hub',
+    defaultQuery: '绿联 15375',
+    aliases: ['15375', 'hub', 'dock', '绿联', '绿联拓展坞', '绿联15375'],
+    mustExclude: UGREEN_15375_MISMATCH_REGEX,
+    priceFloor: 60,
+    description: '绿联 15375 9合1 4K60Hz+千兆网口 Type-C 拓展坞',
+  }],
+  ['xppen_artist16_gen2', {
+    category: 'xppen_artist16_gen2',
+    archetype: 'drawing_tablet',
+    defaultQuery: 'xppen 16 gen2',
+    aliases: ['xppen16_gen2', 'artist16_gen2', 'xppen二代'],
+    mustInclude: /(?:gen\s*2|2代|二代|2\.5k|x3\s*pro|16384|16383)/i,
+    mustExclude: /(?:1代|一代|1080p|1920|8192|旧款)/i,
+    priceFloor: 800,
+    description: 'XPPen Artist Pro 16 Gen 2 2.5K 16384级压感数位屏',
+  }],
+  ['sony_a7m4', {
+    category: 'sony_a7m4',
+    archetype: 'camera',
+    defaultQuery: '索尼 a7m4',
+    aliases: ['a7m4', 'a74', 'ilce-7m4', '索尼a74'],
+    mustInclude: /(?:a7m4|a74|a7\s*iv|ilce-7m4)/i,
+    mustExclude: /(?:a7m3|a73|a7s3|a7r4|a7c|一代|二代|三代)/i,
+    priceFloor: 5000,
+    description: '索尼 A7M4 全画幅微单相机',
+  }],
+  ['switch_oled', {
+    category: 'switch_oled',
+    archetype: 'gaming_console',
+    defaultQuery: 'switch oled',
+    aliases: ['switch_oled', 'ns_oled', '任天堂oled', 'switch oled', '任天堂 switch oled', '任天堂switch'],
+    mustInclude: /(?:oled|日版|港版|国行|白色|续航)/i,
+    mustExclude: /(?:续航版.*非oled|普通版|lite)/i,
+    priceFloor: 800,
+    description: '任天堂 Switch OLED 版掌机',
+  }],
+]);
+
+/**
+ * Register or update product specification dynamically.
+ */
+export function registerProductSpec(spec) {
+  if (!spec || !spec.category) return;
+  PRODUCT_CATALOG.set(spec.category, {
+    ...spec,
+    archetype: spec.archetype || inferArchetype(spec.category),
+    priceFloor: Number(spec.priceFloor) || 0,
+  });
+}
+
+/**
+ * Retrieve product specification from catalog or generate a dynamic heuristic archetype spec.
+ */
+export function getProductSpec(nameOrQuery = '') {
+  const q = String(nameOrQuery || '').trim().toLowerCase();
+  if (!q) return null;
+
+  // 1. Direct or alias match in catalog
+  for (const [cat, spec] of PRODUCT_CATALOG.entries()) {
+    if (cat.toLowerCase() === q || (spec.aliases && spec.aliases.some(a => a.toLowerCase() === q))) {
+      return spec;
+    }
+  }
+
+  // 2. Substring or defaultQuery match in catalog
+  for (const [cat, spec] of PRODUCT_CATALOG.entries()) {
+    if (q.includes(cat.toLowerCase()) || 
+        (spec.defaultQuery && q.includes(spec.defaultQuery.toLowerCase())) ||
+        (spec.aliases && spec.aliases.some(a => q.includes(a.toLowerCase())))) {
+      return spec;
+    }
+  }
+
+  // 3. Dynamic generic archetype fallback
+  const archetype = inferArchetype(q);
+  const archetypeFloors = {
+    guitar: 300,
+    digital_hub: 40,
+    camera: 500,
+    gaming_console: 250,
+    phone_tablet: 200,
+    audio_headphone: 80,
+    pc_hardware: 100,
+    drawing_tablet: 200,
+    general: 0,
+    general_electronics: 0,
+  };
+  return {
+    category: inferCategory({ keyword: q, title: q }),
+    archetype,
+    defaultQuery: nameOrQuery,
+    priceFloor: archetypeFloors[archetype] || 0,
+    isDynamic: true,
+  };
+}
+
+/**
+ * Get minimum sane price floor for a product category or query.
+ */
+export function getPriceFloor(categoryOrQuery = '') {
+  const spec = getProductSpec(categoryOrQuery);
+  return spec ? spec.priceFloor || 0 : 0;
+}
+
+/**
+ * Check if a title indicates an accessory or non-target product.
+ * Supports category-aware filtering, archetypes, positive requirements, and user-supplied custom exclusions.
+ */
+export function isAccessoryTitle(title, category = '', customExclude = [], options = {}) {
   if (!title || typeof title !== 'string') return false;
 
   // 1. Universal junk across all categories
   if (UNIVERSAL_JUNK_REGEX.test(title)) return true;
 
   // 2. User-specified custom exclusions
-  if (Array.isArray(customExclude) && customExclude.length > 0) {
+  const optExclude = options && options.exclude ? (Array.isArray(options.exclude) ? options.exclude : [options.exclude]) : [];
+  const allExcludes = [
+    ...(Array.isArray(customExclude) ? customExclude : (customExclude ? [customExclude] : [])),
+    ...optExclude,
+  ];
+  if (allExcludes.length > 0) {
     const lower = title.toLowerCase();
-    for (const kw of customExclude) {
-      if (kw && lower.includes(String(kw).toLowerCase().trim())) {
+    for (const kw of allExcludes) {
+      if (!kw) continue;
+      if (kw instanceof RegExp) {
+        if (kw.test(title)) return true;
+      } else if (lower.includes(String(kw).toLowerCase().trim())) {
         return true;
       }
     }
   }
 
-  // 3. Category resolution & cross-domain noise isolation
-  const cat = String(category || '').toLowerCase();
-  const isGuitarExplicit = cat.includes('guitar') || cat.includes('nexg') || cat.includes('lava');
-  const isDigitalExplicit = cat.includes('hub') || cat.includes('dock') || cat.includes('digital') || cat.includes('15375') || cat.includes('electronic') || cat.includes('ugreen');
+  // 3. Resolve Product Specification & Archetype
+  const spec = getProductSpec(category || title);
+  const cat = String(category || (spec ? spec.category : '')).toLowerCase();
+  const archetype = (options && options.archetype) || (spec ? spec.archetype : inferArchetype(cat || title));
 
-  // If category is not explicitly known or is 'other', disambiguate based on title keywords
-  const isGuitar = isGuitarExplicit || (!isDigitalExplicit && /(?:吉他|guitar|nexg|lava|拿火|恩雅|民谣|古典|开声)/i.test(title));
-  const isDigital = isDigitalExplicit || (!isGuitarExplicit && /(?:拓展坞|扩展坞|分线器|转接器|hub|dock|15375|绿联|type-c)/i.test(title));
-
-  if (isGuitar) {
-    if (GUITAR_ACCESSORY_REGEX.test(title)) return true;
-    if (cat === 'lava_me_air' && /play/i.test(title) && !/air/i.test(title)) return true;
-    if (cat === 'nexg2_nylon' || (isGuitar && /(?:nexg|2n)/i.test(title))) {
-      if (/(?:非尼龙|钢弦|民谣|电吉他)/i.test(title) && !/(?:(?<!(?:非|不是|并非|绝非|无|没有|不带))\s*(?:尼龙|2N|古典))/i.test(title)) return true;
+  // 4. Positive requirement check (options.require)
+  const allRequires = options && options.require ? (Array.isArray(options.require) ? options.require : [options.require]) : [];
+  if (allRequires.length > 0) {
+    const lower = title.toLowerCase();
+    for (const req of allRequires) {
+      if (!req) continue;
+      if (req instanceof RegExp) {
+        if (!req.test(title)) return true; // Required regex missing -> reject
+      } else {
+        const lowerReq = String(req).toLowerCase().trim();
+        if (!lower.includes(lowerReq)) return true; // Required keyword missing -> reject
+      }
     }
   }
 
-  if (isDigital) {
+  // 5. Negative exclusion check from spec.mustExclude
+  if (spec?.mustExclude) {
+    const neg = spec.mustExclude;
+    if (neg instanceof RegExp) {
+      if (neg.test(title)) return true;
+    } else if (Array.isArray(neg)) {
+      for (const n of neg) {
+        if (n && title.toLowerCase().includes(String(n).toLowerCase().trim())) return true;
+      }
+    }
+  }
+
+  // 6. Archetype-specific accessory patterns
+  if (archetype === 'guitar') {
+    if (GUITAR_ACCESSORY_REGEX.test(title)) return true;
+    if (cat === 'lava_me_air' && /play/i.test(title) && !/air/i.test(title)) return true;
+    if (cat === 'nexg2_nylon' || /(?:nexg|2n)/i.test(title)) {
+      if (/(?:非尼龙|钢弦|民谣|电吉他)/i.test(title) && !/(?:(?<!(?:非|不是|并非|绝非|无|没有|不带))\s*(?:尼龙|2N|古典))/i.test(title)) return true;
+    }
+  } else if (archetype === 'digital_hub') {
     if (DIGITAL_NOISE_REGEX.test(title)) return true;
 
     // Check standalone dongles/cables when title does NOT represent a dock/hub
@@ -323,16 +528,17 @@ export function isAccessoryTitle(title, category = '', customExclude = []) {
     // UGREEN 15375 Specific Mismatch Guards
     const is15375Target = cat === 'ugreen_hub' || cat.includes('15375') || /(?:15375|绿联.*(?:9合1|9合一|九合一|拓展坞|扩展坞))/i.test(title);
     if (is15375Target) {
-      // Port count mismatch (e.g. 5-in-1, 6-in-1, 10-in-1) unless un-negated
       if (PORT_COUNT_MISMATCH_REGEX.test(title)) return true;
-
-      // Refresh rate downgrade (30Hz) unless 60Hz is explicitly supported
       const has60Hz = /(?<!(?:非|不是|不支持|无|并非|绝非))\s*(?:60Hz|60帧)/i.test(title);
       if (REFRESH_RATE_30HZ_REGEX.test(title) && !has60Hz) return true;
-
-      // Ethernet downgrade (100M / 百兆) unless Gigabit is explicitly supported
       const hasGigabit = /(?<!(?:非|不是|无|不带|并非|绝非))\s*(?:千兆|1000M|gigabit)/i.test(title);
       if (ETHERNET_100M_REGEX.test(title) && !hasGigabit) return true;
+    }
+  } else {
+    // Dynamic archetype pattern check
+    const pattern = ARCHETYPE_ACCESSORY_PATTERNS[archetype];
+    if (pattern && pattern.test(title)) {
+      return true;
     }
   }
 
@@ -392,6 +598,9 @@ export function inferCategory({ category = '', keyword = '', title = '' } = {}) 
   if (cat === 'nexg2_nylon' || cat === 'nexg' || cat === 'nexg2' || cat === '2n') return 'nexg2_nylon';
   if (cat === 'lava_me_air' || cat === 'air') return 'lava_me_air';
   if (cat === 'lava_me_4' || cat === 'me4' || cat === 'lava4') return 'lava_me_4';
+  if (cat === 'sony_a7m4' || cat === 'a7m4' || cat === 'a74') return 'sony_a7m4';
+  if (cat === 'switch_oled' || cat === 'ns_oled') return 'switch_oled';
+  if (cat === 'xppen_artist16_gen2' || cat === 'artist16_gen2') return 'xppen_artist16_gen2';
 
   // Digital hub detection
   if (
@@ -410,6 +619,21 @@ export function inferCategory({ category = '', keyword = '', title = '' } = {}) 
   }
   if (/(?:nexg\s*2n|nexg2|nexg)/i.test(all) || (/(?:恩雅|enya)/i.test(all) && /(?:2n|尼龙|古典)/i.test(all))) {
     return 'nexg2_nylon';
+  }
+
+  // Camera detection
+  if (/(?:索尼\s*a7m4|a7m4|ilce-7m4|a7\s*iv)/i.test(all)) {
+    return 'sony_a7m4';
+  }
+
+  // Gaming console detection
+  if (/(?:switch\s*oled|ns\s*oled|任天堂.*oled)/i.test(all)) {
+    return 'switch_oled';
+  }
+
+  // Drawing tablet detection
+  if (/(?:xppen.*16.*(?:gen\s*2|2代|二代)|artist\s*16.*gen\s*2)/i.test(all)) {
+    return 'xppen_artist16_gen2';
   }
 
   if (cat && cat !== 'all' && cat !== '全部') {

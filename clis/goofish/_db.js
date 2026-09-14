@@ -11,7 +11,8 @@ import {
   validateOrder,
   isAccessoryTitle,
   inferCategory,
-  classifySellerCommunication
+  classifySellerCommunication,
+  getPriceFloor
 } from './_contract.js';
 
 /**
@@ -534,10 +535,8 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
         if (valid.price_num <= 0) {
           continue;
         }
-        if (valid.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(valid.category)) {
-          continue;
-        }
-        if (valid.price_num < 60 && valid.category === 'ugreen_hub') {
+        const floor = getPriceFloor(valid.category || category);
+        if (floor > 0 && valid.price_num < floor) {
           continue;
         }
       }
@@ -680,10 +679,10 @@ export function purgeJunkCandidates() {
   db.exec('BEGIN TRANSACTION;');
   try {
     for (const it of all) {
+      const floor = getPriceFloor(it.category);
       const isJunk = isAccessoryTitle(it.title, it.category) || 
         it.price_num <= 0 ||
-        (it.price_num < 400 && ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(it.category)) ||
-        (it.price_num < 60 && it.category === 'ugreen_hub');
+        (floor > 0 && it.price_num < floor);
       if (isJunk) {
         deleteCand.run(it.item_id);
         try { deleteFts.run(it.item_id); } catch (e) {}

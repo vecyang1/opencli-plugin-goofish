@@ -9,7 +9,9 @@ import {
 import { 
   isAccessoryTitle, 
   inferCategory,
-  validateCandidate
+  validateCandidate,
+  getProductSpec,
+  getPriceFloor
 } from './_contract.js';
 
 export {
@@ -28,9 +30,11 @@ export const command = cli({
   browser: true,
   navigateBefore: false,
   args: [
-    { name: 'query', positional: true, required: false, help: '监听关键词 (如 nexg 2n 尼龙 或 绿联 15375)' },
-    { name: 'category', type: 'str', help: '归一化品类 (如 nexg2_nylon / ugreen_hub / lava_me_air)' },
+    { name: 'query', positional: true, required: false, help: '监听关键词 (如 nexg 2n 尼龙 或 绿联 15375 或 索尼 a7m4)' },
+    { name: 'category', type: 'str', help: '归一化品类 (如 nexg2_nylon / ugreen_hub / lava_me_air / sony_a7m4)' },
+    { name: 'require', type: 'str', help: '必须包含的正向关键词，逗号分隔 (如 尼龙,2N 或 4K60,千兆)' },
     { name: 'min-price', type: 'str', help: '最低价格过滤' },
+    { name: 'price-floor', type: 'str', help: '最低有效价格地板 (低于此价格被视作配件/占位帖)' },
     { name: 'max-price', type: 'str', help: '最高价格过滤 (高于此价格不上报)' },
     { name: 'exclude', type: 'str', help: '自定义排除词，以逗号分隔 (如 踏板,琴包,配件,钢弦)' },
     { name: 'interval', type: 'int', default: 3600, help: '常驻监听轮询间隔秒数 (默认 3600 秒/1小时，安全防封，内置高斯随机抖动)' },
@@ -55,19 +59,15 @@ export const command = cli({
     'item_url',
   ],
   func: async (page, kwargs) => {
-    const category = kwargs.category ? String(kwargs.category).trim() : inferCategory({ keyword: kwargs.query || kwargs._?.[0] || '' });
-    const defaultQueryMap = {
-      ugreen_hub: '绿联 15375',
-      nexg2_nylon: 'nexg 2n',
-      lava_me_air: 'lava me air',
-      lava_me_4: 'lava me 4',
-    };
-    const query = String(kwargs.query || kwargs._?.[0] || defaultQueryMap[category] || 'nexg 2n').trim();
-    const isGuitarTarget = ['nexg2_nylon', 'lava_me_air', 'lava_me_4'].includes(category);
-    const minPrice = kwargs['min-price'] || (isGuitarTarget ? '700' : (category === 'ugreen_hub' ? '60' : null));
+    const rawPos = kwargs.query || kwargs._?.[0] || '';
+    const spec = getProductSpec(kwargs.category || rawPos);
+    const category = kwargs.category ? String(kwargs.category).trim() : (spec ? spec.category : inferCategory({ keyword: rawPos }));
+    const query = String(rawPos || (spec ? spec.defaultQuery : '') || 'nexg 2n').trim();
+    const minPrice = kwargs['min-price'] || kwargs['price-floor'] || (spec?.priceFloor ? String(spec.priceFloor) : null);
     const maxPrice = kwargs['max-price'] || null;
     const maxPriceNum = maxPrice ? parseFloat(String(maxPrice).replace(/[^\d.]/g, '')) : null;
-    const customExclude = kwargs.exclude ? String(kwargs.exclude).split(',').map(s => s.trim()).filter(Boolean) : [];
+    const customExclude = kwargs.exclude ? String(kwargs.exclude).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
+    const customRequire = kwargs.require ? String(kwargs.require).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
     const intervalSec = Math.max(60, Number(kwargs.interval) || 3600);
     const isDaemon = Boolean(kwargs.daemon);
     const maxIterations = isDaemon ? 999999 : Math.max(1, Math.min(Number(kwargs.iterations) || 1, 100));
@@ -250,7 +250,7 @@ export const command = cli({
         });
 
         if (Array.isArray(items) && items.length > 0) {
-          const validCandidates = items.filter(it => !isAccessoryTitle(it.title, category, customExclude));
+          const validCandidates = items.filter(it => !isAccessoryTitle(it.title, category, customExclude, { require: customRequire }));
           if (validCandidates.length > 0) {
             // Optional deep inspection on newly arrived candidates
             if (inspectImages) {
