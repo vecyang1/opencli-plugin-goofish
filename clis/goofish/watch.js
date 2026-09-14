@@ -33,7 +33,7 @@ export const command = cli({
     { name: 'min-price', type: 'str', help: '最低价格过滤' },
     { name: 'max-price', type: 'str', help: '最高价格过滤 (高于此价格不上报)' },
     { name: 'exclude', type: 'str', help: '自定义排除词，以逗号分隔 (如 踏板,琴包,配件,钢弦)' },
-    { name: 'interval', type: 'int', default: 15, help: '监听轮询间隔秒数 (默认 15，内置高斯随机抖动)' },
+    { name: 'interval', type: 'int', default: 3600, help: '常驻监听轮询间隔秒数 (默认 3600 秒/1小时，安全防封，内置高斯随机抖动)' },
     { name: 'iterations', type: 'int', default: 1, help: '最大执行轮次 (默认 1 用于 Cadence 定时任务，传入如 10 进行多次轮询)' },
     { name: 'daemon', type: 'bool', default: false, help: '是否作为常驻守护进程持续轮询' },
     { name: 'webhook', type: 'str', help: 'Webhook 接收端 URL (如 http://127.0.0.1:9423/webhook/goofish)' },
@@ -68,7 +68,7 @@ export const command = cli({
     const maxPrice = kwargs['max-price'] || null;
     const maxPriceNum = maxPrice ? parseFloat(String(maxPrice).replace(/[^\d.]/g, '')) : null;
     const customExclude = kwargs.exclude ? String(kwargs.exclude).split(',').map(s => s.trim()).filter(Boolean) : [];
-    const intervalSec = Math.max(5, Number(kwargs.interval) || 15);
+    const intervalSec = Math.max(60, Number(kwargs.interval) || 3600);
     const isDaemon = Boolean(kwargs.daemon);
     const maxIterations = isDaemon ? 999999 : Math.max(1, Math.min(Number(kwargs.iterations) || 1, 100));
     const webhookUrl = kwargs.webhook ? String(kwargs.webhook).trim() : null;

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.4] - 2026-09-14
+
+### Changed & Hardened (Upstream Anti-Ban Protection & Zero-Token Cadence Alignment)
+- **Low-Frequency Upstream Protection Schedule (`cadence-records.md`)**:
+  - Replaced aggressive 15-minute polling with a human-like, daytime-only schedule (4 times daily: 09:30, 13:00, 18:30, 21:30 via `launchd`), completely eliminating risk of triggering Xianyu anti-scraping / bot defenses.
+  - Aligned primary runtime to `launchd` and strictly enforced `Credit Policy: no_ai_credit` (100% local Node.js + Chrome CDP + SQLite execution, **0 AI Tokens consumed**).
+  - Validated with `validate_cadence_card.py` (1 card, 0 errors, 0 warnings).
+- **Default Polling Interval Hardening (`clis/goofish/watch.js`)**:
+  - Increased default daemon polling interval from 15s to 3600s (1 hour) with a strict `Math.max(60, ...)` guard to prevent any accidental rapid requests to Xianyu servers.
+- **Immediate Abort on Risk Challenge**:
+  - Enforced `Stop Condition: sec_captcha_detected` across watcher tasks — immediately aborts on slider verification challenge to protect account integrity.
+
 ## [1.7.3] - 2026-09-14
 
 ### Added & Hardened (E2E Multi-Generation Hardware Inspection & High-Precision Visual Pipeline)

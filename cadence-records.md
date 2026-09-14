@@ -15,12 +15,12 @@
 | Execution Root | `{PROJECT_ROOT}` |
 | Root Alias | `PROJECT_ROOT` |
 | Runtime Project Label | `opencli-plugin-goofish` |
-| Primary Runtime | `webhook-hub` |
+| Primary Runtime | `launchd` |
 | Runtime Systems | `webhook-hub, opencli, launchd` |
-| Schedule Frequency | `every_15_minutes` |
-| Schedule Expression | `*/15 * * * *` |
+| Schedule Frequency | `four_times_daily` |
+| Schedule Expression | `30 9,13,18,21 * * *` |
 | Timezone | `Asia/Bangkok` |
-| Preferred Window | `anytime` |
+| Preferred Window | `daytime_only` |
 | Credit Policy | `no_ai_credit` |
 | Catch Up Policy | `skip_if_stale` |
 | Retry Policy | `retry_3_times` |
@@ -42,14 +42,16 @@
 
 #### Operational Contract
 
-This periodic monitoring cadence continuously runs on a 15-minute schedule to track new listings and price drops for the **ENYA NEXG 2N nylon string smart guitar** ("nexg2n 尼龙的那个版本") on Xianyu.
+This periodic monitoring cadence runs on a safe, low-frequency schedule (4 times daily during daytime activity windows: 09:30, 13:00, 18:30, 21:30) to track new listings and price drops for the **ENYA NEXG 2N nylon string smart guitar** ("nexg2n 尼龙的那个版本") on Xianyu without risk of triggering upstream anti-scraping or bot defenses.
 
 1. Execution Command:
    ```bash
    node bin/xy-chat.js watch "nexg 2n 尼龙" --category nexg2_nylon --max-price 2500 --iterations 1 --diff-only --webhook http://127.0.0.1:9423/webhook/goofish --notify
    ```
 2. Invariants & Safety:
-   - Filters out steel string models (`非尼龙|钢弦|民谣`), guitar accessories (`踏板|琴包|耳机|麦克风`), and junk listings (< ¥400).
-   - Writes authoritative candidates to local SQLite SSOT (`data/goofish.db`).
-   - Dispatches real-time JSON alert to `webhook-hub` (port 9423) and triggers desktop banner notifications on new arrivals or price reductions.
-   - Settle delay and random Gaussian jitter prevent bot risk detection.
+   - **Zero AI Token Cost**: Fully local execution using Chrome CDP DOM extraction, regex filtering, and SQLite differential matching (`Credit Policy: no_ai_credit`).
+   - **Upstream Anti-Ban Safety**: Low-frequency daytime schedule (4 scans/day) mimics human browsing patterns and eliminates aggressive request rates.
+   - **Risk Interception**: If Xianyu presents a slider verification or risk challenge (`sec_captcha_detected`), the runner aborts immediately without brute-force retrying.
+   - **Precision Filtering**: Filters out steel string models (`非尼龙|钢弦|民谣`), guitar accessories (`踏板|琴包|耳机|麦克风`), and junk listings (< ¥400).
+   - **Local SSOT**: Writes authoritative candidates to local SQLite (`data/goofish.db`).
+   - **Real-time Alerting**: Dispatches differential alerts to `webhook-hub` (port 9423) and triggers desktop notifications only when new arrivals or price reductions occur.
