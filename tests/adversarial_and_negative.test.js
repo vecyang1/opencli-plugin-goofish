@@ -185,6 +185,26 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
     assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 4K60Hz', 'ugreen_hub', ['6合1']), false);
     assert.equal(isAccessoryTitle('绿联 15375 6合1 拓展坞 4K30Hz', 'ugreen_hub', ['6合1']), true);
     assert.equal(isAccessoryTitle('绿联 拓展坞 自提不邮寄', 'ugreen_hub', ['自提']), true);
+
+    // Negative paths: Camera, Console, Audio, PC Hardware, Drawing Tablet Archetypes
+    assert.equal(isAccessoryTitle('索尼 A7M4 相机兔笼 拓展框 手柄', 'sony_a7m4'), true);
+    assert.equal(isAccessoryTitle('索尼 A7M4 UV镜 镜头遮光罩', 'sony_a7m4'), true);
+    assert.equal(isAccessoryTitle('索尼 A7M4 单机身 99新 箱说全', 'sony_a7m4'), false);
+
+    assert.equal(isAccessoryTitle('Switch OLED 摇杆帽 硅胶套 水晶壳', 'switch_oled'), true);
+    assert.equal(isAccessoryTitle('Switch 游戏卡带 塞尔达传说 仅卡', 'switch_oled'), true);
+    assert.equal(isAccessoryTitle('任天堂 Switch OLED 白色日版 主机全套 原装盒', 'switch_oled'), false);
+
+    assert.equal(isAccessoryTitle('AirPods Pro 2 硅胶保护套 挂绳', 'audio_headphone'), true);
+    assert.equal(isAccessoryTitle('AirPods Pro 2 单出左耳 单耳出', 'audio_headphone'), true);
+    assert.equal(isAccessoryTitle('索尼 WH-1000XM5 无线头戴降噪耳机 全套在盒', 'audio_headphone'), false);
+
+    assert.equal(isAccessoryTitle('华硕 ROG RTX 4090 显卡包装盒 空盒子', 'pc_hardware'), true);
+    assert.equal(isAccessoryTitle('RTX 4090 显卡风扇 散热器 水冷头 支架', 'pc_hardware'), true);
+    assert.equal(isAccessoryTitle('华硕 ROG RTX 4090 猛禽显卡 24G 箱说全', 'pc_hardware'), false);
+
+    assert.equal(isAccessoryTitle('XP-Pen Artist 16 2nd 替换笔尖 压感笔', 'xppen_artist16_gen2'), true);
+    assert.equal(isAccessoryTitle('XP-Pen Artist Pro 16 Gen 2 数位屏 手绘屏 二代', 'xppen_artist16_gen2'), false);
   });
 
   await t.test('3. Sanity Price Floor Guard on Save Candidates', () => {
@@ -206,6 +226,24 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
     }], { category: 'ugreen_hub', filterAccessories: true });
     assert.equal(hubOkSaved, 1);
 
+    // Normal candidate saved (Camera: Sony A7M4)
+    const camOkSaved = saveCandidates([{
+      item_id: 'CAM_OK_01',
+      title: '索尼 A7M4 全画幅微单单机身 黑色',
+      price: '¥11200',
+      seller: '摄影爱好者',
+    }], { category: 'sony_a7m4', filterAccessories: true });
+    assert.equal(camOkSaved, 1);
+
+    // Normal candidate saved (Console: Switch OLED)
+    const consoleOkSaved = saveCandidates([{
+      item_id: 'CONSOLE_OK_01',
+      title: '任天堂 Switch OLED 日版白色 主机全套',
+      price: '¥1350',
+      seller: '游戏党',
+    }], { category: 'switch_oled', filterAccessories: true });
+    assert.equal(consoleOkSaved, 1);
+
     // Accessory attempt disguised with tiny price (e.g. ¥25 pedal or strings)
     const junkSaved = saveCandidates([{
       item_id: 'GUITAR_JUNK_01',
@@ -223,6 +261,24 @@ test('Adversarial & Negative Edge-Case Test Suite', async (t) => {
       seller: '配件商',
     }], { category: 'ugreen_hub', filterAccessories: true });
     assert.equal(hubJunkSaved, 0, 'Spurious low-price digital accessory must be rejected');
+
+    // Spurious low-price camera accessory disguised as Sony A7M4 (< ¥5000)
+    const camJunkSaved = saveCandidates([{
+      item_id: 'CAM_JUNK_01',
+      title: '索尼 A7M4 机身电池 配件',
+      price: '¥99',
+      seller: '配件专卖',
+    }], { category: 'sony_a7m4', filterAccessories: true });
+    assert.equal(camJunkSaved, 0, 'Spurious sub-floor camera accessory must be rejected');
+
+    // Spurious low-price console accessory disguised as Switch OLED (< ¥800)
+    const consoleJunkSaved = saveCandidates([{
+      item_id: 'CONSOLE_JUNK_01',
+      title: '任天堂 Switch OLED 保护套 水晶壳',
+      price: '¥39',
+      seller: '配件小店',
+    }], { category: 'switch_oled', filterAccessories: true });
+    assert.equal(consoleJunkSaved, 0, 'Spurious sub-floor console accessory must be rejected');
 
     // Zero-price unpriced / display / wanted post rejection (price_num <= 0)
     const zeroJunkSaved = saveCandidates([{

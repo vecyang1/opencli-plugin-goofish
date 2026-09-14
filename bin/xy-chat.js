@@ -13,7 +13,7 @@ import {
   syncSellerReviewsFromSessionsAndMessages,
   getDbStats, resolveDbPath 
 } from '../src/db.js';
-import { isAccessoryTitle, inferCategory } from '../src/contract.js';
+import { isAccessoryTitle, inferCategory, getProductSpec } from '../src/contract.js';
 import { humanDelay } from '../clis/goofish/_shared.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -324,16 +324,20 @@ async function main() {
     case 'candidates': {
       const { positionals, options } = parseCliArgs(subArgs);
       const rawPos = positionals[0] || '';
-      const knownCats = ['all', '全部', 'nexg', 'nexg2', '2n', 'nylon', '尼龙', 'air', 'lava air', 'me4', 'me 4', 'lava4', 'lava 4', 'nexg2_nylon', 'lava_me_air', 'lava_me_4', 'ugreen_hub', 'hub', 'dock', '15375', '绿联', '拓展坞', '扩展坞', 'ugreen'];
       let category = options['--category'] || '';
       let keyword = options['--keyword'] || options['-q'] || '';
 
       if (!category && rawPos) {
-        const inferred = inferCategory({ category: rawPos, keyword: rawPos });
-        if (inferred !== 'other' || knownCats.includes(rawPos.toLowerCase())) {
-          category = (inferred !== 'other') ? inferred : rawPos;
+        const spec = getProductSpec(rawPos);
+        if (spec && !spec.isDynamic) {
+          category = spec.category;
         } else {
-          keyword = keyword ? `${keyword} ${rawPos}` : rawPos;
+          const inferred = inferCategory({ category: rawPos, keyword: rawPos });
+          if (inferred !== 'other') {
+            category = inferred;
+          } else {
+            keyword = keyword ? `${keyword} ${rawPos}` : rawPos;
+          }
         }
       }
 

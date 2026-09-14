@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-09-14
+
+### Added & Generalize (Universal Product Archetypes & Extensible Second-Hand Rule Engine)
+- **Universal Hardware Archetypes Engine (`clis/goofish/_contract.js`)**:
+  - Generalized product handling beyond guitars and single docks to support 8 major consumer hardware archetypes:
+    1. `guitar`: Acoustics, electrics, silent guitars, carbon fiber (strings, capos, gigbags, pedals filtered).
+    2. `digital_hub`: Multi-function docking stations, converters, hubs (cables, silicone sleeves, mismatch port counts filtered).
+    3. `camera`: Mirrorless & DSLR bodies, action cams (cages, dummy batteries, chargers, lens caps, UV filters filtered).
+    4. `gaming_console`: Handheld & home consoles (game cards, crystal cases, silicone covers, thumb grips, standalone docks filtered).
+    5. `phone_tablet`: Smartphones and tablets (protective cases, tempered films, stylus tips, stands filtered).
+    6. `audio_headphone`: Over-ear and in-ear wireless headphones (single earbud, empty charging case, ear tips filtered).
+    7. `pc_hardware`: GPUs, motherboards, CPUs, RAM (empty packaging boxes, cooler fans, thermal paste, brackets filtered).
+    8. `drawing_tablet`: Digital pen displays and graphics tablets (replacement nibs, pens, 3-in-1 cables, films filtered).
+  - Implemented `inferArchetype(text)` for heuristic archetype classification and direct archetype name recognition.
+- **Universal Product Catalog & Dynamic Runtime Registration (`clis/goofish/_contract.js`)**:
+  - Established `PRODUCT_CATALOG` registry mapping product models to archetypes, default search queries, aliases, price floors, and spec constraints.
+  - Implemented `registerProductSpec(spec)` for zero-code, runtime registration of new product categories.
+  - Implemented `getProductSpec(nameOrQuery)` with alias, defaultQuery, and substring matching plus dynamic generic archetype fallback.
+  - Implemented `getPriceFloor(categoryOrQuery)` providing authoritative price sanity thresholds across catalog items and archetypes.
+- **Positive Filtering (`--require`) & Price Floor Guard (`--price-floor`)**:
+  - Added `--require` flag to `clis/goofish/pick.js` and `clis/goofish/watch.js` to enforce mandatory positive keywords (e.g. `--require 尼龙,2N` or `--require 4K60,千兆`) without modifying code.
+  - Added `--price-floor` flag to `clis/goofish/watch.js` allowing custom price floors to reject spurious low-price accessory listings.
+- **SSOT Database Generalization (`clis/goofish/_db.js`)**:
+  - Removed rigid hardcoded guitar category lists (`['nexg2_nylon', 'lava_me_air', 'lava_me_4']`) in `saveCandidates()` and `purgeJunkCandidates()`.
+  - Unified price sanity validation through `getPriceFloor(candidate.category || options.category)`.
+- **CLI Ergonomics & Anti-Fragmentation (`bin/xy-chat.js`, `clis/goofish/pick.js`)**:
+  - Harmonized category inference and search config dispatch across all commands.
+  - Enabled multi-category queries and customizable exclusions via unified interfaces.
+- **Exhaustive Two-Sided Verification (`tests/contract.test.js`, `tests/adversarial_and_negative.test.js`)**:
+  - Added test cases validating all 8 archetypes, dynamic catalog registration, positive `--require` filtering, and price floor guards.
+  - Total test suite expanded to **51 tests, 100% passing green**.
+
 ## [1.7.4] - 2026-09-14
 
 ### Changed & Hardened (Upstream Anti-Ban Protection & Zero-Token Cadence Alignment)
