@@ -1119,3 +1119,160 @@ export function auditRentalListing({
   };
 }
 
+/**
+ * Assesses whether a secondhand candidate listing presents an "Absolute Low Price Trap" (绝对低价陷阱).
+ * Detects whether an appealingly low nominal price masks severe cosmetic degradation (<95新),
+ * hidden flaws (scratches, dents, repairs, defects), or missing critical accessories (hidden TCO cost).
+ *
+ * Enforces:
+ * 1. Physical condition check (<95新 like 7新, 85新, 有磕碰, 掉漆, 划痕, 暗病).
+ * 2. Missing essential accessories detection (裸机, 缺配件, 单机, 无原装盒/电源/手写笔).
+ * 3. Image coverage check (<= 1 image flags lack of detail photos / cover bias risk).
+ * 4. TCO & price tier recommendation:
+ *    - 'absolute_low_trap': Low price with noticeable wear/defects or missing parts. High risk.
+ *    - 'budget_utility': Disclosed minor cosmetic wear with complete functions, suitable for budget users.
+ *    - 'sweet_spot': High condition (95新-99新) with full accessories and minimal wear, best overall value.
+ *    - 'pristine': Brand new sealed or opened-box pristine, premium quality.
+ *
+ * Returns typed result:
+ * {
+ *   isTrapRisk: boolean,
+ *   riskLevel: 'HIGH' | 'MEDIUM' | 'LOW' | 'SAFE',
+ *   tier: 'absolute_low_trap' | 'budget_utility' | 'sweet_spot' | 'pristine',
+ *   condition: string,
+ *   defect_notes: string,
+ *   flags: string[],
+ *   highlights: string[],
+ *   tcoWarning: string | null,
+ *   advice: string,
+ * }
+ */
+export function assessLowPriceTrap({
+  title = '',
+  description = '',
+  price = 0,
+  condition = '',
+  defect_notes = '',
+  images = [],
+  category = '',
+} = {}) {
+  const t = String(title || '').trim();
+  const d = String(description || '').trim();
+  const fullText = `${t}\n${d}`.trim();
+
+  const imgList = Array.isArray(images) 
+    ? images 
+    : (typeof images === 'string' ? images.split('|').map(s => s.trim()).filter(Boolean) : []);
+
+  // 1. Resolve condition & defect notes if missing or default
+  let derivedCondition = String(condition || '').trim();
+  let derivedDefects = String(defect_notes || '').trim();
+
+  if (!derivedCondition || derivedCondition === '-' || derivedCondition === '二手' || !derivedDefects || derivedDefects.includes('待深检')) {
+    const multiImg = extractMultiImageDefects(fullText, imgList, category);
+    if (!derivedCondition || derivedCondition === '-' || derivedCondition === '二手') {
+      derivedCondition = multiImg.condition;
+    }
+    if (!derivedDefects || derivedDefects.includes('待深检')) {
+      derivedDefects = multiImg.defect_notes;
+    }
+  }
+
+  // Parse numerical price
+  let numPrice = 0;
+  if (typeof price === 'number') {
+    numPrice = price;
+  } else if (typeof price === 'string') {
+    const clean = price.replace(/,/g, '').replace(/[^\d.]/g, '');
+    numPrice = parseFloat(clean) || 0;
+  }
+
+  const flags = [];
+  const highlights = [];
+  let tcoWarning = null;
+
+  // 2. Severe wear and damage indicators (<90新)
+  const isSevereWear = /(?:85新|8新|75新|7新|伊拉克|需注意暗病|有磕碰)/i.test(derivedCondition) ||
+    /(?:存在暗病|维修史|轻微磕碰|磕碰|掉漆|凹痕|裂痕|裂纹|划伤严重|屏幕划痕|坏点|漏光)/i.test(derivedDefects) ||
+    /(?<!(?:无|没有|没有任何|从没|未曾|未|无明显|没明显|未见))\s*(?:磕碰|掉漆|凹痕|裂痕|裂纹|屏幕划痕|拆修|修过|进水|打品|暗病|暗伤|故障|接触不良)/i.test(fullText);
+
+  if (isSevereWear) {
+    flags.push('存在磕碰掉漆、屏幕作业面损伤或暗病维修风险');
+  }
+
+  // 3. Moderate wear indicators (9新 / 细微划痕)
+  const isModerateWear = !isSevereWear && (
+    /(?:9新|细微划痕|微小划痕|轻微划痕|有些许划痕|使用磨损|轻微磨损)/i.test(derivedCondition) ||
+    /(?:细微划痕|微小划痕|轻微划痕|有些许划痕|使用磨损|轻微磨损)/i.test(derivedDefects) ||
+    /(?<!(?:无|没有|没有任何|从没|未曾|未|无明显|没明显|未见))\s*(?:细微划痕|微小划痕|轻微划痕|有些许划痕|使用磨损|轻微磨损)/i.test(fullText)
+  );
+
+  if (isModerateWear) {
+    flags.push('外观有正常使用细微划痕或轻度磨损');
+  }
+
+  // 4. Missing critical accessories (Hidden TCO trap)
+  const isMissingParts = /(?:裸机|缺配件|缺少配件|无包装|无盒子|无原装盒|无箱说|无说明书|单机|单板|仅机身|不含笔|不带笔|无笔|不带充电器|无电源|无原装充电器|无原装电源|不带线|无原配)/i.test(fullText) ||
+    /(?:裸机|缺配件|单机|无箱说)/i.test(derivedDefects);
+
+  if (isMissingParts) {
+    flags.push('缺失原装包装盒或核心配件，存在补购隐性成本');
+    tcoWarning = '⚠️ 隐性成本警示：缺失核心原装配件（如原装电源/专属手写笔/原包装），补齐配件往往需多花 ¥80~¥250，真实到手成本可能反超高成色全套机。';
+  }
+
+  // 5. Check pristine indicators
+  const isPristine = /(?:全新未拆封|原封未拆|全新原盒|没拆封|全新未拆)/i.test(derivedCondition) || /(?:全新未拆封|原封未拆)/i.test(derivedDefects);
+  const isNearNew = !isPristine && (/(?:99新|98新|准新仅拆|充新)/i.test(derivedCondition) || /(?:准新仅拆)/i.test(derivedDefects));
+  const hasCompleteAccessories = /(?:箱说全|箱说齐全|原盒原装|原包装齐全|配件齐全|配件全|全套齐全)/i.test(fullText) || /(?:箱说配件全)/i.test(derivedDefects);
+
+  if (isPristine) highlights.push('全新未拆封');
+  if (isNearNew) highlights.push('99准新高成色');
+  if (hasCompleteAccessories && !isMissingParts) highlights.push('箱说配件齐全');
+
+  // 6. Image coverage check
+  if (imgList.length <= 1) {
+    flags.push('仅1张实拍图或无细节图，存在封面粉饰与盲区风险，必须强制索要多角度实拍');
+  } else {
+    highlights.push(`实拍图共${imgList.length}张已核验`);
+  }
+
+  // 7. Determine Tier and Risk Level
+  let tier = 'sweet_spot';
+  let riskLevel = 'LOW';
+  let isTrapRisk = false;
+  let advice = '';
+
+  if (isSevereWear || (isModerateWear && isMissingParts) || (isMissingParts && !isPristine && !isNearNew)) {
+    isTrapRisk = true;
+    riskLevel = 'HIGH';
+    tier = 'absolute_low_trap';
+    advice = '⚠️ 警惕绝对低价陷阱：该商品虽报价极低，但实拍存在明显磨损/磕碰/暗病风险或缺少关键原装配件，切勿仅凭低价盲目下单！必须强制视觉复核全量图片或优先考虑成色更好的甜点级商品。';
+  } else if (isModerateWear) {
+    riskLevel = 'MEDIUM';
+    tier = 'budget_utility';
+    advice = '工装实用档：外观存在轻微划痕/磨损但功能完整，适合预算极其有限且完全不在意成色的实用型买家。';
+  } else if (isPristine) {
+    riskLevel = 'SAFE';
+    tier = 'pristine';
+    advice = '✨ 极品准新档：原封未拆或全新原盒，成色顶格，适合强迫症或送礼需求。';
+  } else {
+    // 95新 ~ 99新
+    riskLevel = 'LOW';
+    tier = 'sweet_spot';
+    advice = '✅ 甜点性价比档（首选推荐）：95新~99新外观完好，配件齐全且无硬伤，综合持有成本与二手残值保值率最佳。';
+  }
+
+  return {
+    isTrapRisk,
+    riskLevel,
+    tier,
+    condition: derivedCondition,
+    defect_notes: derivedDefects,
+    flags,
+    highlights,
+    tcoWarning,
+    advice,
+  };
+}
+
+

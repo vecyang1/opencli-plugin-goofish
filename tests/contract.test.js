@@ -312,6 +312,67 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.ok(slumListing.score <= 40);
     assert.ok(slumListing.flags.some(f => f.includes('缺乏基本家具') || f.includes('环境简陋')));
   });
+
+  await t.test('assessLowPriceTrap contract enforces condition review and flags low price traps', async () => {
+    const { assessLowPriceTrap } = await import('../src/contract.js');
+
+    // Case 1: Severe wear & missing accessories (Classic Absolute Low Price Trap)
+    const trapItem = assessLowPriceTrap({
+      title: 'XPPen Artist 16 Gen 2 数位屏 超低价捡漏出',
+      description: '成色85新，边角有磕碰掉漆，屏幕有细划痕，裸机单机出，不带笔和电源线，发货不退不换。',
+      price: '850',
+      images: ['https://img1.jpg'],
+      category: 'drawing_tablet',
+    });
+    assert.equal(trapItem.isTrapRisk, true);
+    assert.equal(trapItem.riskLevel, 'HIGH');
+    assert.equal(trapItem.tier, 'absolute_low_trap');
+    assert.ok(trapItem.flags.some(f => f.includes('磕碰掉漆') || f.includes('损伤')));
+    assert.ok(trapItem.flags.some(f => f.includes('缺失原装') || f.includes('隐性成本')));
+    assert.ok(trapItem.tcoWarning.includes('隐性成本警示'));
+    assert.ok(trapItem.advice.includes('绝对低价陷阱'));
+
+    // Case 2: Utility budget item with minor scratch but complete box (Budget Utility Tier)
+    const utilityItem = assessLowPriceTrap({
+      title: '绿联 15375 9合1 拓展坞 4K60Hz 千兆',
+      description: '9新，外壳有些许细微划痕，箱说全，原包装都在，功能全部正常。',
+      price: '95',
+      images: ['https://img1.jpg', 'https://img2.jpg'],
+      category: 'ugreen_hub',
+    });
+    assert.equal(utilityItem.isTrapRisk, false);
+    assert.equal(utilityItem.riskLevel, 'MEDIUM');
+    assert.equal(utilityItem.tier, 'budget_utility');
+    assert.ok(utilityItem.flags.some(f => f.includes('细微划痕')));
+    assert.ok(utilityItem.highlights.some(h => h.includes('箱说配件齐全')));
+
+    // Case 3: Flawless high condition (Sweet Spot Tier - Recommended)
+    const sweetSpotItem = assessLowPriceTrap({
+      title: '拿火 LAVA ME AIR 智能吉他 黑色',
+      description: '自用成色很好，无明显划痕，无明显磕碰，从没修过，箱说齐全，配件齐全。',
+      price: '1850',
+      images: ['https://img1.jpg', 'https://img2.jpg', 'https://img3.jpg'],
+      category: 'lava_me_air',
+    });
+    assert.equal(sweetSpotItem.isTrapRisk, false);
+    assert.equal(sweetSpotItem.riskLevel, 'LOW');
+    assert.equal(sweetSpotItem.tier, 'sweet_spot');
+    assert.ok(sweetSpotItem.highlights.some(h => h.includes('箱说配件齐全')));
+    assert.ok(sweetSpotItem.advice.includes('甜点性价比档'));
+
+    // Case 4: Pristine brand new unopened (Pristine Tier)
+    const pristineItem = assessLowPriceTrap({
+      title: '恩雅 NEXG 2N 智能吉他 尼龙款 全新未拆封',
+      description: '公司年会中奖，全新未拆封原封未拆，带原装包装盒与原装吉他包配件全。',
+      price: '2800',
+      images: ['https://img1.jpg', 'https://img2.jpg'],
+      category: 'nexg2_nylon',
+    });
+    assert.equal(pristineItem.isTrapRisk, false);
+    assert.equal(pristineItem.riskLevel, 'SAFE');
+    assert.equal(pristineItem.tier, 'pristine');
+    assert.ok(pristineItem.highlights.some(h => h.includes('全新未拆封')));
+  });
 });
 
 

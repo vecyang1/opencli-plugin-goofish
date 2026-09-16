@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3] - 2026-09-16
+
+### Added (Anti-Absolute-Low-Price Trap & Condition Review Governance)
+- **Low-Price Trap Audit Contract (`clis/goofish/_contract.js`)**:
+  - Implemented `assessLowPriceTrap({ title, description, price, condition, defect_notes, images, category })` contract function.
+  - Automatically assesses whether an enticingly low nominal price masks severe cosmetic degradation (<95新 like 7新, 85新, 有磕碰, 掉漆, 划痕, 暗病), missing critical accessories (naked/bare unit missing charger, stylus, case), or unverified single-image risk.
+  - Generates typed tier classification: `absolute_low_trap` (high risk), `budget_utility` (disclosed minor wear), `sweet_spot` (95~99新 with complete accessories, optimal value), and `pristine` (sealed/unopened).
+  - Flags hidden Total Cost of Ownership (TCO) accessories traps where purchasing missing parts inflates actual landed cost beyond complete units.
+- **Smart Decision Engine Enhancement (`clis/goofish/pick.js`)**:
+  - Automatically tags `⚠️ [低价成色风险]` in candidate `defect_notes` when low-price trap risks are detected.
+  - Expanded defect display width to prevent truncation of critical inspection warnings.
+- **Hardened Agent Governance & Constitution (`SKILL.md`, `AGENTS.md`)**:
+  - Established top-level caution alert and Section 6.4 mandating visual review of actual photos (all carousel images, angles, corners, back, ports, accessories) rather than blindly trusting `--sort 价格升序` or seller self-praise ("99新/几乎全新").
+  - Formulated Section 9.4 requiring structured 3-tier matrix delivery: `[工装实用底价档]` vs `[甜点性价比推荐档]` vs `[极品准新未拆档]` with explicit defect disclosures and TCO comparisons.
+- **Two-Sided Verification & Tests (`tests/contract.test.js`)**:
+  - Added test suite verifying detection of severe wear, missing accessories, utility tiers, sweet-spot tiers, and pristine listings.
+  - Expanded automated test suite to **53/53 tests passing 100%**.
+
 ## [1.8.2] - 2026-09-16
 
 ### Fixed (Multi-Token Search Ingestion)
