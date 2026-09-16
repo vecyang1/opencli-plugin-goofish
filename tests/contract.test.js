@@ -268,5 +268,50 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 4K60Hz 千兆', 'ugreen_hub', [], { require: ['4K60', '千兆'] }), false);
     assert.equal(isAccessoryTitle('绿联 15375 9合1 拓展坞 4K30Hz 千兆', 'ugreen_hub', [], { require: ['4K60'] }), true, 'Missing required term "4K60" must be rejected');
   });
+
+  await t.test('auditRentalListing contract enforces two-sided verification for rental listings', async () => {
+    const { auditRentalListing } = await import('../src/contract.js');
+
+    // Case 1: High aesthetic nomad-ready listing (Should pass and score >= 80)
+    const goodListing = auditRentalListing({
+      title: '阳朔西街漓江畔 漓水东舍 日式原木侘寂风大床房',
+      description: '大落地窗直面喀斯特峰林，配实木书桌与百兆高速宽带，可月租短租，包水电网费，拎包入住。',
+      price: '700',
+      images: ['https://img1.jpg', 'https://img2.jpg', 'https://img3.jpg', 'https://img4.jpg', 'https://img5.jpg'],
+    });
+    assert.equal(goodListing.passed, true);
+    assert.equal(goodListing.tier, 'high_aesthetic');
+    assert.ok(goodListing.score >= 80, `Expected score >= 80, got ${goodListing.score}`);
+    assert.equal(goodListing.monthly_rent, 700);
+    assert.equal(goodListing.is_short_term_friendly, true);
+    assert.ok(goodListing.highlights.some(h => h.includes('设计美感')));
+    assert.ok(goodListing.highlights.some(h => h.includes('采光与景观')));
+    assert.ok(goodListing.highlights.some(h => h.includes('游民工作生活设施')));
+
+    // Case 2: Fraudulent / Deceptive listing ("room not in picture", "1 year minimum")
+    const fraudListing = auditRentalListing({
+      title: '阳朔西街附近民宿月租500元',
+      description: '订房请先咨询，另有月租房，一年起租，月租房非照片上的房间，不短租。',
+      price: '500',
+      images: ['https://img1.jpg'],
+    });
+    assert.equal(fraudListing.passed, false);
+    assert.equal(fraudListing.tier, 'fraud_or_longterm');
+    assert.equal(fraudListing.score, 0);
+    assert.ok(fraudListing.flags.some(f => f.includes('拒绝长租强绑') || f.includes('虚假套路')));
+
+    // Case 3: Inferior, unfurnished, bare mattress listing
+    const slumListing = auditRentalListing({
+      title: '阳朔城西路单间出租',
+      description: '毛坯无家具，自备床垫与家电，红塑料脸盆，老旧招待所风格。',
+      price: '400',
+      images: ['https://img1.jpg'],
+    });
+    assert.equal(slumListing.passed, false);
+    assert.equal(slumListing.tier, 'inferior');
+    assert.ok(slumListing.score <= 40);
+    assert.ok(slumListing.flags.some(f => f.includes('缺乏基本家具') || f.includes('环境简陋')));
+  });
 });
+
 

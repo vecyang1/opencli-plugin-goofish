@@ -973,3 +973,149 @@ export function sendDesktopNotification(title, message) {
   }
 }
 
+/**
+ * Rental housing fraud & long-term mandatory lock-in regex pattern.
+ * Intercepts "not the room in the picture" deception and mandatory >= 6 months / 1 year restrictions.
+ */
+export const RENTAL_FRAUD_AND_LONGTERM_REGEX = /(?:月租房非照片|非照片上的房间|非实拍照片|实际房间不同|看房不是这间|另有月租房.*非照片|照片仅供参考.*实际不同|(?<!(?:不|可|免|无|非|未|支持))\s*(?:半年起租|半年起|一年起租|一年起|年租起|仅(?:支持)?年付|不短租|不接受短租|不月租|不接受月租))/i;
+
+/**
+ * Inferior rental room / missing furniture regex pattern.
+ * Catches unfurnished/rough-cast rooms, missing beds/mattresses/AC/water heaters, and tacky slum attributes.
+ */
+export const RENTAL_INFERIOR_AND_UNFURNISHED_REGEX = /(?:毛坯|自备家具|自备床|自备床垫|无家具|无床|无热水器|无空调|不带家具|不提供家具|红塑料|塑料盆|红脸盆|毛坯铝合金|裸床垫|老旧招待所)/i;
+
+/**
+ * High aesthetic & digital nomad lifestyle indicators for rental properties.
+ */
+export const RENTAL_AESTHETIC_HIGHLIGHTS_REGEX = /(?:原木|侘寂|极简|日式|奶油风|复古|设计感|独栋|野奢|艺术|断桥铝|高织棉麻)/i;
+export const RENTAL_VIEW_LIGHT_REGEX = /(?:落地窗|大落地窗|观景阳台|超大阳台|全景落地|大飘窗|山景|江景|漓江|遇龙河|峰林|采光好|采光通透|视野开阔)/i;
+export const RENTAL_NOMAD_WORK_REGEX = /(?:书桌|电脑桌|工作台|写字台|实木大桌|高速宽带|光纤|百兆宽带|千兆宽带|wifi|独立卫浴|包水电|包水电气|包网费|电梯|拎包入住)/i;
+export const RENTAL_SHORT_TERM_FRIENDLY_REGEX = /(?:月租|短租|按月付|押一付一|灵活租期|周租)/i;
+
+/**
+ * Audits a rental housing listing on Goofish for digital nomads and travelers.
+ * Enforces:
+ * 1. Zero tolerance for deceptive listings ("room not in picture") and mandatory long-term (>半年/一年起租).
+ * 2. Mandatory furnished & move-in ready (no bare mattress, no missing furniture, no rough construction).
+ * 3. Aesthetic grading: evaluates natural wood/wabi-sabi/minimalist vibes, floor-to-ceiling windows, mountain/river view, dedicated work desk.
+ * 
+ * Returns typed result: { passed, tier, score, monthly_rent, is_short_term_friendly, highlights, flags, reason }
+ */
+export function auditRentalListing({
+  title = '',
+  description = '',
+  price = 0,
+  images = [],
+} = {}) {
+  const t = String(title || '').trim();
+  const d = String(description || '').trim();
+  const fullText = `${t}\n${d}`.trim();
+
+  const imgList = Array.isArray(images) 
+    ? images 
+    : (typeof images === 'string' ? images.split('|').map(s => s.trim()).filter(Boolean) : []);
+
+  // Parse numerical monthly price
+  let monthlyRent = 0;
+  if (typeof price === 'number') {
+    monthlyRent = price;
+  } else if (typeof price === 'string') {
+    const clean = price.replace(/,/g, '').replace(/[^\d.]/g, '');
+    monthlyRent = parseFloat(clean) || 0;
+  }
+
+  const flags = [];
+  const highlights = [];
+
+  // 1. Check for fraud or forced long-term commitment
+  if (RENTAL_FRAUD_AND_LONGTERM_REGEX.test(fullText)) {
+    const m = fullText.match(RENTAL_FRAUD_AND_LONGTERM_REGEX);
+    flags.push(`拒绝长租强绑/虚假套路: ${m ? m[0] : '非月租/非实拍'}`);
+  }
+
+  // 2. Check for unfurnished / inferior condition
+  if (RENTAL_INFERIOR_AND_UNFURNISHED_REGEX.test(fullText)) {
+    const m = fullText.match(RENTAL_INFERIOR_AND_UNFURNISHED_REGEX);
+    flags.push(`缺乏基本家具或环境简陋: ${m ? m[0] : '毛坯/简陋'}`);
+  }
+
+  // 3. Extract positive highlights
+  const isShortTermFriendly = RENTAL_SHORT_TERM_FRIENDLY_REGEX.test(fullText) || (monthlyRent > 0 && monthlyRent <= 2500);
+  if (isShortTermFriendly) {
+    highlights.push('支持月租/短租');
+  }
+
+  if (RENTAL_AESTHETIC_HIGHLIGHTS_REGEX.test(fullText)) {
+    const m = fullText.match(RENTAL_AESTHETIC_HIGHLIGHTS_REGEX);
+    highlights.push(`设计美感: ${m[0]}`);
+  }
+
+  if (RENTAL_VIEW_LIGHT_REGEX.test(fullText)) {
+    const m = fullText.match(RENTAL_VIEW_LIGHT_REGEX);
+    highlights.push(`采光与景观: ${m[0]}`);
+  }
+
+  if (RENTAL_NOMAD_WORK_REGEX.test(fullText)) {
+    const matches = fullText.match(new RegExp(RENTAL_NOMAD_WORK_REGEX.source, 'gi'));
+    if (matches) {
+      highlights.push(`游民工作生活设施: ${[...new Set(matches)].slice(0, 3).join('/')}`);
+    }
+  }
+
+  if (imgList.length >= 3) {
+    highlights.push(`实拍多图(${imgList.length}张)`);
+  }
+
+  // 4. Decision & Tier classification
+  if (flags.some(f => f.includes('拒绝长租强绑') || f.includes('虚假套路'))) {
+    return {
+      passed: false,
+      tier: 'fraud_or_longterm',
+      score: 0,
+      monthly_rent: monthlyRent,
+      is_short_term_friendly: false,
+      highlights,
+      flags,
+      reason: `淘汰: ${flags.join('；')}`,
+    };
+  }
+
+  if (flags.some(f => f.includes('缺乏基本家具') || f.includes('环境简陋'))) {
+    return {
+      passed: false,
+      tier: 'inferior',
+      score: Math.max(10, 40 - flags.length * 10),
+      monthly_rent: monthlyRent,
+      is_short_term_friendly: isShortTermFriendly,
+      highlights,
+      flags,
+      reason: `淘汰: ${flags.join('；')}`,
+    };
+  }
+
+  // Calculate score (Base 60)
+  let score = 60;
+  if (RENTAL_AESTHETIC_HIGHLIGHTS_REGEX.test(fullText)) score += 15;
+  if (RENTAL_VIEW_LIGHT_REGEX.test(fullText)) score += 15;
+  if (/(?:书桌|电脑桌|工作台|实木大桌)/i.test(fullText)) score += 10;
+  if (/(?:包水电|包水电气|包网费)/i.test(fullText)) score += 5;
+  if (imgList.length >= 5) score += 5;
+
+  score = Math.min(100, score);
+
+  const isHighAesthetic = score >= 80;
+  const tier = isHighAesthetic ? 'high_aesthetic' : 'acceptable';
+
+  return {
+    passed: true,
+    tier,
+    score,
+    monthly_rent: monthlyRent,
+    is_short_term_friendly: isShortTermFriendly,
+    highlights,
+    flags,
+    reason: isHighAesthetic ? `严选推荐: 高美感且具备游民创作空间 (${score}分)` : `普通达标房源 (${score}分)`,
+  };
+}
+
