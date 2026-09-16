@@ -37,9 +37,18 @@ export const command = cli({
     await checkAuth(page);
 
     // Wait for conversation items to render
-    for (let retry = 0; retry < 5; retry++) {
-      const hasItems = await page.evaluate(() => document.querySelectorAll('div[class*="conversation-item--"]').length > 0);
-      if (hasItems) break;
+    // Wait for conversation items AND contact names (skeleton disappeared) to render
+    for (let retry = 0; retry < 8; retry++) {
+      const isReady = await page.evaluate(() => {
+        const items = document.querySelectorAll('div[class*="conversation-item--"]');
+        if (items.length === 0) return false;
+        const first = items[0];
+        const nameEl = first.querySelector('div[style*="font-size: 14px"]');
+        const hasName = nameEl && nameEl.innerText && nameEl.innerText.trim().length > 0;
+        const hasSkeleton = Boolean(first.querySelector('.ant-skeleton:not([style*="display: none"])'));
+        return (hasName || (first.innerText || '').split('\n').length >= 3) && !hasSkeleton;
+      });
+      if (isReady) break;
       await page.wait(1.5);
     }
 
@@ -82,16 +91,55 @@ export const command = cli({
             }
           }
 
-          // Contact name is typically the first line unless empty or skeleton
-          let name = lines[0] || '未知联系人';
-          if (name === timeStr || name === tradeStatus) {
-            name = lines[1] || '未知联系人';
+          // 1. Precise DOM element targeting based on Goofish Web IM layout
+          const nameEl = it.querySelector('div[style*="font-weight: 500"][style*="font-size: 14px"] > div, div[style*="font-weight: 500"][style*="font-size: 14px"], div[style*="font-size: 14px"], div[class*="title--"], span[class*="title--"]');
+          let domName = nameEl ? (nameEl.innerText || '').trim() : '';
+          if (domName && domName.includes('\n')) {
+            domName = domName.split('\n')[0].trim();
           }
 
-          const msgCand = lines.find(l => l !== name && l !== tradeStatus && l !== timeStr && l !== unreadCount && !l.includes('评价') && !l.startsWith('¥'));
-          if (msgCand) lastMsg = msgCand;
+          const msgEl = it.querySelector('div[style*="font-size: 12px"], div[class*="message--"]');
+          let domMsg = msgEl ? (msgEl.innerText || '').trim() : '';
 
-          const hasItemImg = Boolean(it.querySelector('img[src*="alicdn"], img[src*="tbcdn"]'));
+          const timeEl = it.querySelector('div[style*="font-size: 10px"], div[class*="time--"]');
+          let domTime = timeEl ? (timeEl.innerText || '').trim() : '';
+          if (domTime) timeStr = domTime;
+
+          // 2. Resilient fallback to cleaned text lines
+          const cleanLines = lines.filter(l => 
+            l !== unreadCount && 
+            !/^\d{1,4}$/.test(l) && 
+            l !== timeStr && 
+            l !== tradeStatus && 
+            !l.startsWith('¥') && 
+            !l.startsWith('￥')
+          );
+
+          let name = domName;
+          if (!name || /^\d{1,4}$/.test(name) || name === timeStr || name === tradeStatus) {
+            name = cleanLines[0] || '未知联系人';
+          }
+          if (name === timeStr || name === tradeStatus || /^\d{1,4}$/.test(name)) {
+            name = cleanLines.find(l => !/^\d{1,4}$/.test(l) && l !== timeStr && l !== tradeStatus) || '未知联系人';
+          }
+
+          if (domMsg && domMsg !== name && domMsg !== tradeStatus) {
+            lastMsg = domMsg;
+          } else {
+            const msgCand = cleanLines.find(l => 
+              l !== name && 
+              l !== timeStr && 
+              l !== tradeStatus && 
+              !['交易成功', '交易关闭', '退款成功', '有新交易评价', '等待见面交易'].includes(l)
+            );
+            if (msgCand) lastMsg = msgCand;
+          }
+
+          const hasItemImg = Boolean(
+            it.querySelector('img[src*="xy_item"]') || 
+            it.querySelector('div[style*="50px"] img') ||
+            (it.querySelectorAll('img').length >= 2)
+          );
 
           return {
             name,

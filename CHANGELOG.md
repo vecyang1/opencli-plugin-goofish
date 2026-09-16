@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-09-16
+
+### Added (Digital Nomad Rental Housing Contract & Aesthetic Grading)
+- **Rental Housing Audit Contract (`clis/goofish/_contract.js`)**:
+  - Implemented `auditRentalListing({ title, description, price, images })` contract function for digital nomad and long-stay housing evaluation.
+  - Enforces strict rejection of deceptive listings (`非照片上的房间`, `非实拍照片`) and mandatory long-term commitments (`半年起租`, `一年起租`, `年租起`, `仅支持年付`).
+  - Enforces rejection of unfurnished rooms (`毛坯`, `自备家具`, `自备床`, `无空调`, `无热水器`) and tacky slum conditions (`裸床垫`, `红塑料脸盆`, `老旧招待所`).
+  - Enforces aesthetic tier grading: evaluates natural wood/wabi-sabi/minimalist style (`原木`, `侘寂`, `极简`), floor-to-ceiling panoramic windows (`落地窗`, `观景阳台`, `喀斯特峰林`), dedicated workspaces (`书桌`, `工作台`, `高速宽带`), and utilities inclusion.
+  - Two-sided verification added to `tests/contract.test.js` (52/52 tests passing).
+
+### Fixed (IM Inbox Parsing & Asynchronous Skeleton Race Condition)
+- **Eliminated Skeleton Race Condition & Misattribution (`clis/goofish/inbox.js`)**:
+  - Added robust skeleton detection waiting loop (`!hasSkeleton && (hasName || lines.length >= 3)`) ensuring DOM elements finish rendering before parsing.
+  - Upgraded contact name extraction using precise inline CSS font-size selectors (`div[style*="font-size: 14px"]`), message selectors (`div[style*="font-size: 12px"]`), and timestamp selectors (`div[style*="font-size: 10px"]`).
+  - Fixed misattribution where unread badge counts (`1`, `6`) or trade statuses were incorrectly captured as contact nicknames.
+
 ## [1.8.0] - 2026-09-14
 
 ### Added & Generalize (Universal Product Archetypes & Extensible Second-Hand Rule Engine)
