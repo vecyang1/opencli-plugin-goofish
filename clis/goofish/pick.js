@@ -5,7 +5,7 @@ import {
   queryCandidates, 
   syncSellerReviewsFromSessionsAndMessages 
 } from './_db.js';
-import { isAccessoryTitle, inferCategory, getProductSpec } from './_contract.js';
+import { isAccessoryTitle, inferCategory, getProductSpec, assessLowPriceTrap } from './_contract.js';
 
 export const command = cli({
   site: 'goofish',
@@ -264,12 +264,30 @@ export const command = cli({
       for (const best of candidates) {
         if (seenItemIds.has(best.item_id)) continue;
         seenItemIds.add(best.item_id);
+
+        const trapAudit = assessLowPriceTrap({
+          title: best.title,
+          price: best.price,
+          condition: best.condition,
+          defect_notes: best.defect_notes,
+          images: best.images,
+          category: sc.category,
+        });
+
+        let defectDisplay = best.defect_notes || '封面完好待深检';
+        if (trapAudit.isTrapRisk && !defectDisplay.includes('低价成色风险') && !defectDisplay.includes('低价陷阱')) {
+          defectDisplay = `⚠️ [低价成色风险] ${defectDisplay}`;
+        }
+        if (defectDisplay.length > 50) {
+          defectDisplay = defectDisplay.slice(0, 50) + '...';
+        }
+
         results.push({
           category: sc.category,
           best_item_id: best.item_id,
           lowest_price: best.price,
           condition: best.condition || '-',
-          defect_notes: best.defect_notes ? (best.defect_notes.length > 30 ? best.defect_notes.slice(0, 30) + '...' : best.defect_notes) : '封面完好',
+          defect_notes: defectDisplay,
           seller: best.seller,
           seller_status: best.seller_status === 'responsive' 
             ? '✅ 活跃报价' 
