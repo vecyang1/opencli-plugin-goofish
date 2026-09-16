@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.2] - 2026-09-16
+
+### Fixed (Multi-Token Search Ingestion)
+- **Robust Positional Query Resolution (`clis/goofish/search.js`)**:
+  - Automatically joins `kwargs._` array tokens when multiple search keywords are supplied without single-argument quotes (e.g. `opencli xianyu search 阳朔 门票`), preventing Commander.js / kwargs parser from silently dropping subsequent terms.
+
 ## [1.8.1] - 2026-09-16
 
 ### Added (Digital Nomad Rental Housing Contract & Aesthetic Grading)

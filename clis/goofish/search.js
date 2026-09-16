@@ -40,7 +40,10 @@ export const command = cli({
     'item_url',
   ],
   func: async (page, kwargs) => {
-    const query = String(kwargs.query || kwargs._?.[0] || '').trim();
+    const rawQuery = (Array.isArray(kwargs._) && kwargs._.length > 0)
+      ? kwargs._.join(' ')
+      : (kwargs.query || '');
+    const query = String(rawQuery).trim();
     if (!query) {
       throw new ArgumentError('请指定要搜索的闲鱼关键词');
     }
