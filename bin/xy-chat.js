@@ -263,6 +263,56 @@ async function main() {
       break;
     }
 
+    case 'sku':
+    case 'skus': {
+      const { positionals, options } = parseCliArgs(subArgs);
+      const itemId = positionals[0] || options['--id'] || '';
+      if (!itemId) {
+        console.error('用法: xy-chat sku <商品ID>');
+        process.exit(1);
+      }
+      console.log(`🔍 正在深度解析商品 [${itemId}] 的多规格与不同选项 (SKU 列表)...`);
+      const detRes = runOpenCli('detail', [itemId, '-f', 'json']);
+      let parsed = [];
+      try {
+        parsed = JSON.parse(detRes.stdout);
+      } catch (e) {}
+
+      if (!parsed || parsed.length === 0) {
+        console.error('❌ 获取商品详情失败或商品已下架');
+        process.exit(1);
+      }
+
+      const item = parsed[0];
+      console.log(`\n📦 商品标题: ${item.title}`);
+      console.log(`💰 标价/区间: ${item.price}`);
+      console.log(`👤 卖家: ${item.seller} (${item.location})`);
+
+      let skus = [];
+      if (item.skus_json) {
+        try {
+          skus = JSON.parse(item.skus_json);
+        } catch (e) {}
+      }
+
+      if (skus.length > 0) {
+        console.log(`\n🎯 命中 ${skus.length} 个独立规格选项 (SKU 列表):`);
+        printTable(skus.map((s, idx) => ({
+          '#': idx + 1,
+          '规格/选项名称': s.name,
+          '真实价格': `¥${s.price}`,
+          '库存': s.quantity ?? '-',
+          'SKU ID': s.sku_id || s.skuId || '-',
+        })));
+      } else if (item.specs && item.specs !== '-') {
+        console.log(`\n📋 规格信息: ${item.specs}`);
+      } else {
+        console.log('\n（该商品未设置多规格选项，为单一一口价商品）');
+      }
+      process.exit(0);
+      break;
+    }
+
     case 'seller': {
       const res = spawnSync('opencli', ['xianyu', 'seller', ...subArgs], { stdio: 'inherit' });
       process.exit(res.status ?? 0);
@@ -357,10 +407,11 @@ async function main() {
       printTable(results.map((c, idx) => ({
         '#': idx + 1,
         '商品ID': c.item_id,
-        '标题': c.title.slice(0, 26),
+        '标题': c.title.slice(0, 24),
         '价格': c.price,
         '成色': c.condition,
-        '多图质检注记': c.defect_notes ? (c.defect_notes.length > 25 ? c.defect_notes.slice(0, 25) + '...' : c.defect_notes) : '封面完好待深检',
+        '规格/选项(SKU)': c.specs ? (c.specs.length > 25 ? c.specs.slice(0, 25) + '...' : c.specs) : '-',
+        '多图质检注记': c.defect_notes ? (c.defect_notes.length > 22 ? c.defect_notes.slice(0, 22) + '...' : c.defect_notes) : '封面完好待深检',
         '卖家': c.seller,
         '卖家状态': c.seller_status === 'responsive' ? '✅ 活跃报价' : (c.seller_status === 'ghosted' ? '⚠️ 已读不回' : (c.seller_status === 'unfit' ? '❌ 明确无货' : '❓ 待沟通')),
         '所在地': c.location,
@@ -487,6 +538,7 @@ async function main() {
   xy-chat chat <联系人> <消息>       发送私信 (--dry-run 空跑安全测试)
   xy-chat search <关键词>            全网多维度二手搜索
   xy-chat detail <商品ID>            查看商品详情与卖家信用档案
+  xy-chat sku <商品ID>               深度解析商品多规格/选项 (SKU 列表、各选项价格与库存)
   xy-chat seller <卖家ID/商品链接>   深度分析卖家在售SKU与砍价策略
   xy-chat candidates [category]      查询已沉淀的候选商品库 (SSOT, 支持吉他与 3C 拓展坞)
   xy-chat reviews [卖家]             查询卖家聊天评估档案 (排除已读不回/无货卖家)

@@ -79,7 +79,7 @@ export function initSchema(db) {
     }
   } catch (e) {}
 
-  // Migrate existing candidates table if images or defect_notes columns are missing
+  // Migrate existing candidates table if images, defect_notes, specs, min_price, max_price, skus_json columns are missing
   try {
     const cCols = db.prepare("PRAGMA table_info('candidates');").all();
     if (cCols.length > 0) {
@@ -88,6 +88,18 @@ export function initSchema(db) {
       }
       if (!cCols.some(c => c.name === 'defect_notes')) {
         db.exec("ALTER TABLE candidates ADD COLUMN defect_notes TEXT DEFAULT '';");
+      }
+      if (!cCols.some(c => c.name === 'specs')) {
+        db.exec("ALTER TABLE candidates ADD COLUMN specs TEXT DEFAULT '';");
+      }
+      if (!cCols.some(c => c.name === 'min_price')) {
+        db.exec("ALTER TABLE candidates ADD COLUMN min_price REAL DEFAULT 0;");
+      }
+      if (!cCols.some(c => c.name === 'max_price')) {
+        db.exec("ALTER TABLE candidates ADD COLUMN max_price REAL DEFAULT 0;");
+      }
+      if (!cCols.some(c => c.name === 'skus_json')) {
+        db.exec("ALTER TABLE candidates ADD COLUMN skus_json TEXT DEFAULT '';");
       }
     }
   } catch (e) {}
@@ -479,9 +491,9 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
       item_id, keyword, category, title, price, price_num, original_price,
       price_drop, publish_time, location, seller, seller_user_id,
       seller_tag, condition, guarantee, item_url, image_url,
-      images, defect_notes,
+      images, defect_notes, specs, min_price, max_price, skus_json,
       seller_status, seller_note, status, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(item_id) DO UPDATE SET
       keyword = COALESCE(NULLIF(excluded.keyword, ''), candidates.keyword),
       category = CASE WHEN excluded.category != 'other' AND excluded.category != '' THEN excluded.category ELSE candidates.category END,
@@ -501,6 +513,10 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
       image_url = COALESCE(NULLIF(excluded.image_url, ''), candidates.image_url),
       images = COALESCE(NULLIF(excluded.images, ''), candidates.images),
       defect_notes = COALESCE(NULLIF(excluded.defect_notes, ''), candidates.defect_notes),
+      specs = COALESCE(NULLIF(excluded.specs, ''), candidates.specs),
+      min_price = CASE WHEN excluded.min_price > 0 THEN excluded.min_price ELSE candidates.min_price END,
+      max_price = CASE WHEN excluded.max_price > 0 THEN excluded.max_price ELSE candidates.max_price END,
+      skus_json = COALESCE(NULLIF(excluded.skus_json, ''), candidates.skus_json),
       status = excluded.status,
       updated_at = excluded.updated_at;
   `);
@@ -561,6 +577,10 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
         valid.image_url,
         valid.images,
         valid.defect_notes,
+        valid.specs,
+        valid.min_price,
+        valid.max_price,
+        valid.skus_json,
         valid.seller_status,
         valid.seller_note,
         valid.status,

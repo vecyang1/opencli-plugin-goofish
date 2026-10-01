@@ -118,6 +118,10 @@ export const SCHEMA_CONTRACT = {
         image_url: { type: 'TEXT', default: '', description: '商品主图链接' },
         images: { type: 'TEXT', default: '', description: '全部实拍图片链接列表 (以 | 分隔)' },
         defect_notes: { type: 'TEXT', default: '', description: '全量多图成色客观质检注记 (如 背面划痕/磕碰说明)' },
+        specs: { type: 'TEXT', default: '', description: '商品多规格/选项 (SKU 列表格式化文本)' },
+        min_price: { type: 'REAL', default: 0, description: '多规格最低价 (元)' },
+        max_price: { type: 'REAL', default: 0, description: '多规格最高价 (元)' },
+        skus_json: { type: 'TEXT', default: '', description: '多规格结构化 JSON 数据' },
         seller_status: { type: 'TEXT', default: 'unknown', description: '保留兼容字段，真理投影见 candidates_view' },
         seller_note: { type: 'TEXT', default: '', description: '保留兼容字段，真理投影见 candidates_view' },
         status: { type: 'TEXT', default: 'active', description: '候选状态: active | sold | hidden' },
@@ -149,6 +153,10 @@ export const SCHEMA_CONTRACT = {
         c.image_url,
         COALESCE(c.images, c.image_url, '') AS images,
         COALESCE(c.defect_notes, '') AS defect_notes,
+        COALESCE(c.specs, '') AS specs,
+        COALESCE(c.min_price, 0) AS min_price,
+        COALESCE(c.max_price, 0) AS max_price,
+        COALESCE(c.skus_json, '') AS skus_json,
         COALESCE(r.status, c.seller_status, 'unknown') AS seller_status,
         COALESCE(r.reason, c.seller_note, '') AS seller_note,
         c.status,
@@ -790,10 +798,80 @@ export function validateCandidate(data) {
     image_url: String(data.image_url || '').trim(),
     images: String(data.images || data.image_url || '').trim(),
     defect_notes: String(data.defect_notes || '').trim(),
+    specs: String(data.specs || '').trim(),
+    min_price: typeof data.min_price === 'number' ? data.min_price : (parseFloat(String(data.min_price || '0').replace(/[^\d.]/g, '')) || 0),
+    max_price: typeof data.max_price === 'number' ? data.max_price : (parseFloat(String(data.max_price || '0').replace(/[^\d.]/g, '')) || 0),
+    skus_json: typeof data.skus_json === 'string' ? data.skus_json : (data.skus_json ? JSON.stringify(data.skus_json) : ''),
     seller_status: String(data.seller_status || 'unknown').trim(),
     seller_note: String(data.seller_note || '').trim(),
     status: String(data.status || 'active').trim(),
     updated_at: data.updated_at || new Date().toISOString(),
+  };
+}
+
+/**
+ * Authoritatively parses item SKUs and options from Goofish MTOP response.
+ * Extracts individual variants, stock, price, and price range.
+ */
+export function parseItemSkus(mtopData) {
+  if (!mtopData || typeof mtopData !== 'object') {
+    return { skus: [], specs: '-', minPrice: 0, maxPrice: 0, skusJson: '[]', isMultiSku: false };
+  }
+
+  const itemDO = mtopData.itemDO || {};
+  const rawSkuList = itemDO.skuList || itemDO.idleItemSkuList || [];
+  const skus = [];
+
+  if (Array.isArray(rawSkuList) && rawSkuList.length > 0) {
+    for (const s of rawSkuList) {
+      const propText = s.propertyList?.[0]?.actualValueText || 
+                       s.propertyList?.[0]?.valueText || 
+                       (s.features?.idlePvPairs ? s.features.idlePvPairs.split('^')?.[1]?.replace(/^\d+#/, '') : '') || 
+                       '默认规格';
+      
+      const priceVal = typeof s.priceInCent === 'number' && s.priceInCent > 0
+        ? (s.priceInCent / 100)
+        : (typeof s.price === 'number' ? (s.price > 1000 ? s.price / 100 : s.price) : parseFloat(s.price || 0));
+
+      const qty = typeof s.quantity === 'number' 
+        ? s.quantity 
+        : (s.features?.idleOriginalQuantity ? parseInt(s.features.idleOriginalQuantity, 10) : 0);
+
+      skus.push({
+        name: propText.trim(),
+        price: priceVal,
+        quantity: qty,
+        sku_id: String(s.skuId || ''),
+      });
+    }
+  }
+
+  const rawMin = parseFloat(itemDO.minPrice || 0);
+  const rawMax = parseFloat(itemDO.maxPrice || 0);
+  
+  let minPrice = rawMin;
+  let maxPrice = rawMax;
+
+  if (skus.length > 0) {
+    const prices = skus.map(s => s.price).filter(p => p > 0);
+    if (prices.length > 0) {
+      if (!minPrice) minPrice = Math.min(...prices);
+      if (!maxPrice) maxPrice = Math.max(...prices);
+    }
+  }
+
+  const isMultiSku = skus.length > 1;
+  const specs = skus.length > 0
+    ? skus.map(s => `${s.name} ¥${s.price}${s.quantity > 0 ? ` (余${s.quantity})` : ''}`).join(' | ')
+    : '-';
+
+  return {
+    skus,
+    specs,
+    minPrice,
+    maxPrice,
+    skusJson: JSON.stringify(skus),
+    isMultiSku,
   };
 }
 

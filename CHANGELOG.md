@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.5] - 2026-10-01
+
+### Added (Seller Listing Editor & Programmatic Feed Optimization)
+- **Seller Listing Editor Command (`clis/goofish/edit.js`)**:
+  - Implemented `opencli xianyu edit <itemId>` (`opencli goofish edit <itemId>`) supporting title, description, price, original price, condition, diagnostic inspection, and live submission.
+  - Automatically bridges Ant Design React Fiber form state (`props.form.setFieldsValue`) and DOM contenteditable nodes (`document.execCommand('insertText')`) to ensure framework state and rendered DOM stay in sync.
+- **Media Schema Normalization & Video Blocker Resolution (`clis/goofish/edit.js`)**:
+  - Resolved Alibaba MTOP error `FAIL_BIZ_VIDEO_NO_ID_OR_OSSOBJECT::视频信息缺失` when editing listings originally posted with mobile short videos: automatically normalizes media item types (`imageInfoDOList[].type: 10000 -> 0`) so high-resolution photo covers submit cleanly without requiring re-encoding of missing video assets.
+- **Diagnostic Network Interception (`clis/goofish/edit.js`)**:
+  - Added non-invasive XMLHttpRequest / Fetch listener hook during submission to capture exact MTOP business responses (`ret[0]`) and display typed error explanations (e.g. market activity locks).
+
+### Fixed (Published Listings ID Resolution)
+- **ID & URL Extraction in Published Feed (`clis/goofish/published.js`)**:
+  - Fixed bug where `item_id` and `item_url` were omitted from `opencli xianyu published` output due to missing detail link extraction; now reliably extracts real numeric item IDs from item card anchors.
+
+### Tested & Verified
+- Verified 58/58 tests passing (`npm test`).
+- Verified live production mutation on Insta360 Flow Pro listing (`1089657928967`), successfully updating title and professional conversion description on Xianyu.
+
+## [1.8.4] - 2026-09-29
+
+### Added (Authoritative Multi-SKU & Variant Option Resolution)
+- **Authoritative MTOP SKU Resolution Engine (`clis/goofish/_contract.js`)**:
+  - Implemented `parseItemSkus(mtopData)` function to extract all product SKU variants, specifications, individual prices (in yuan/cents), stock quantities, and SKU IDs directly from Goofish MTOP server payload (`mtop.taobao.idle.pc.detail`).
+  - Added multi-SKU price range calculation (`minPrice`, `maxPrice`) and automatic range labeling (`¥min - ¥max (多规格)`).
+- **SQLite SSOT Schema Migration & Persistence (`clis/goofish/_contract.js`, `clis/goofish/_db.js`)**:
+  - Added `specs`, `min_price`, `max_price`, and `skus_json` columns to `SCHEMA_CONTRACT.tables.candidates` and `candidates_view`.
+  - Added non-destructive database migrations in `initSchema` with zero downtime.
+  - Enhanced `saveCandidates` to persist complete multi-SKU variant breakdown into SQLite SSOT.
+- **Dedicated Observability & Diagnostic Command (`bin/xy-chat.js`)**:
+  - Added `xy-chat sku <itemId>` command to print a structured diagnostic table displaying each variant's name, real price, available stock, and SKU ID.
+  - Added `规格/选项(SKU)` column to `xy-chat candidates` output for immediate visibility.
+
+### Fixed (Concatenated String Pricing & Masked Accessory Pricing Defect)
+- **Resolved Number Concatenation Bug (`clis/goofish/detail.js`)**:
+  - Fixed issue where adjacent price spans rendered in Goofish DOM caused values like `158` and `278` to concatenate into `158278`.
+- **Eliminated Fake Low-Price Placeholder Traps**:
+  - When a seller lists an expensive item (e.g. Anker 140W "全新" at ¥278) with a cheap accessory or long-standby prototype (e.g. "待机时间长样机" at ¥158) under the same listing, the tool now highlights the range (`¥158 - ¥278 (多规格)`) and lists the actual prices for each option rather than misrepresenting the entire product as ¥158.
+
+### Tested & Verified
+- Added `tests/sku_options.test.js` covering MTOP parsing, single-price edge cases, candidate validation, and SQLite SSOT persistence.
+- Verified 58/58 tests passing (`npm test`).
+- Verified real-world runtime receipt on Anker 140W listing (`1075633915367`).
+
 ## [1.8.3] - 2026-09-16
 
 ### Added (Anti-Absolute-Low-Price Trap & Condition Review Governance)

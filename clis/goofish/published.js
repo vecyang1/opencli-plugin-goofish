@@ -17,10 +17,12 @@ export const command = cli({
   ],
   columns: [
     'index',
+    'item_id',
     'title',
     'price',
     'original_price',
     'status',
+    'item_url',
     'seller',
   ],
   func: async (page, kwargs) => {
@@ -37,6 +39,70 @@ export const command = cli({
     }
 
     const rawItems = await page.evaluate(() => {
+      // Strategy 1: DOM link / card extraction (item?id=...)
+      const allLinks = Array.from(document.querySelectorAll('a[href*="id="], a[href*="item"], div[data-item-id]'));
+      const itemLinks = allLinks.filter(el => {
+        const href = el.href || el.getAttribute('data-href') || '';
+        return /item\?id=\d+/.test(href) || /[?&]id=\d+/.test(href) || el.getAttribute('data-item-id');
+      });
+
+      if (itemLinks.length > 0) {
+        const seenIds = new Set();
+        const extracted = [];
+        for (const el of itemLinks) {
+          const href = el.href || el.getAttribute('data-href') || '';
+          let itemId = el.getAttribute('data-item-id') || '';
+          if (!itemId) {
+            const m = href.match(/[?&]id=(\d+)/);
+            if (m) itemId = m[1];
+          }
+          if (!itemId || seenIds.has(itemId)) continue;
+          seenIds.add(itemId);
+
+          const text = el.innerText || '';
+          const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
+
+          let price = '¥0';
+          let origPrice = '-';
+          for (let i = 0; i < lines.length; i++) {
+            if ((lines[i] === '¥' || lines[i] === '￥') && lines[i + 1]) {
+              price = '¥' + lines[i + 1];
+              if (lines[i + 2] && lines[i + 2].startsWith('.')) {
+                price += lines[i + 2];
+              }
+              if (lines[i + 3] && lines[i + 3].startsWith('¥')) {
+                origPrice = lines[i + 3];
+              }
+              break;
+            }
+          }
+          if (price === '¥0') {
+            const pMatch = text.match(/[¥￥]\s*([\d.]+)/);
+            if (pMatch) price = '¥' + pMatch[1];
+          }
+
+          let title = lines.find(l => l.length > 3 && !l.startsWith('¥') && !l.startsWith('￥') && !['在售', '已卖出', '下架', '编辑'].includes(l)) || lines[0] || '闲鱼宝贝';
+          let status = '在售';
+          if (text.includes('已卖出')) status = '已卖出';
+          else if (text.includes('已下架')) status = '已下架';
+
+          extracted.push({
+            item_id: itemId,
+            item_url: `https://www.goofish.com/item?id=${itemId}`,
+            title: title.slice(0, 100),
+            price,
+            original_price: origPrice,
+            status,
+            seller: '-',
+          });
+        }
+
+        if (extracted.length > 0) {
+          return extracted;
+        }
+      }
+
+      // Strategy 2: Fallback to innerText lines
       const text = document.body ? document.body.innerText : '';
       const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
 
@@ -92,6 +158,8 @@ export const command = cli({
 
         if (title && title.length > 1 && !['¥', '￥', '编辑资料', '宝贝'].includes(title)) {
           items.push({
+            item_id: '-',
+            item_url: '-',
             title: title.slice(0, 100),
             price,
             original_price: origPrice,
@@ -106,15 +174,17 @@ export const command = cli({
 
     let filtered = rawItems || [];
     if (query) {
-      filtered = filtered.filter(it => it.title.toLowerCase().includes(query) || it.seller.toLowerCase().includes(query));
+      filtered = filtered.filter(it => it.title.toLowerCase().includes(query) || it.seller.toLowerCase().includes(query) || (it.item_id && it.item_id.includes(query)));
     }
 
     return filtered.slice(0, limit).map((it, idx) => ({
       index: idx + 1,
+      item_id: it.item_id || '-',
       title: it.title,
       price: it.price,
       original_price: it.original_price,
       status: it.status,
+      item_url: it.item_url || '-',
       seller: it.seller,
     }));
   },

@@ -2,13 +2,13 @@ import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError, CommandExecutionError } from '@jackwener/opencli/errors';
 import { safeGoto } from './_shared.js';
 import { saveCandidates } from './_db.js';
-import { extractDefectNotes, extractMultiImageDefects, inferCategory } from './_contract.js';
+import { extractDefectNotes, extractMultiImageDefects, inferCategory, parseItemSkus } from './_contract.js';
 
 export const command = cli({
   site: 'goofish',
   name: 'detail',
   access: 'read',
-  description: '获取闲鱼商品详情 (标题、售价、成色、卖家信誉档案、想要/浏览数、规格及描述)',
+  description: '获取闲鱼商品详情 (标题、售价、多规格选项SKU、成色、卖家信誉档案、想要/浏览数及描述)',
   domain: 'www.goofish.com',
   strategy: Strategy.COOKIE,
   browser: true,
@@ -28,6 +28,7 @@ export const command = cli({
     'want_count',
     'browse_count',
     'specs',
+    'skus_json',
     'images',
     'defect_notes',
     'description',
@@ -47,7 +48,27 @@ export const command = cli({
     await safeGoto(page, 'https://www.goofish.com/item?id=' + itemId);
     await page.wait(2.5);
 
-    const data = await page.evaluate(() => {
+    const evalResult = await page.evaluate(async (itemId) => {
+      let mtopData = null;
+      if (window.lib?.mtop?.request) {
+        try {
+          const res = await window.lib.mtop.request({
+            api: 'mtop.taobao.idle.pc.detail',
+            data: { itemId: String(itemId) },
+            type: 'POST',
+            v: '1.0',
+            dataType: 'json',
+            needLogin: false,
+            needLoginPC: false,
+            sessionOption: 'AutoLoginOnly',
+            ecode: 0,
+          });
+          mtopData = res?.data || {};
+        } catch (e) {
+          mtopData = { error: String(e) };
+        }
+      }
+
       const text = document.body ? document.body.innerText : '';
       if (text.includes('网络不见了') || text.includes('快停止散发魅力')) {
         return { ok: false, error: 'item_offline_or_not_found', message: '商品已下架或不存在' };
@@ -112,14 +133,26 @@ export const command = cli({
         }
       }
 
-      let price = '¥0';
-      const priceEl = document.querySelector('span[class*="price--"], div[class*="price--"]');
-      if (priceEl && priceEl.innerText && /[\d.]+/.test(priceEl.innerText)) {
-        price = '¥' + priceEl.innerText.replace(/[^\d.]/g, '');
-      } else {
-        const priceMatch = text.match(/直接买\s*[￥¥]\s*([\d.]+)/) || text.match(/[¥￥]\s*([\d.]+)/);
-        if (priceMatch) price = '¥' + priceMatch[1];
+      let domSpecs = '-';
+      const allLines = text.split('\n').map(s => s.trim()).filter(Boolean);
+      const optionRegex = /([^¥￥\n]{1,15})[¥￥]\s*([\d.]+)/;
+      const foundOptions = [];
+      for (const line of allLines) {
+        let m = line.match(optionRegex);
+        if (m && !line.includes('直接买') && !line.includes('想要') && !line.includes('浏览')) {
+          foundOptions.push(`${m[1].trim()} ¥${m[2]}`);
+        }
       }
+      if (foundOptions.length > 0) {
+        domSpecs = Array.from(new Set(foundOptions)).join(' | ');
+      } else {
+        const specMatch = text.match(/(分类：[^\n]+)/);
+        if (specMatch) domSpecs = specMatch[1];
+      }
+
+      let domPrice = '¥0';
+      const priceMatch = text.match(/直接买\s*[￥¥]\s*([\d.]+)/) || text.match(/[¥￥]\s*([\d.]+)/);
+      if (priceMatch) domPrice = '¥' + priceMatch[1];
 
       let wantCount = '-';
       let browseCount = '-';
@@ -127,10 +160,6 @@ export const command = cli({
       if (wantMatch) wantCount = wantMatch[1];
       const browseMatch = text.match(/(\d+浏览)/);
       if (browseMatch) browseCount = browseMatch[1];
-
-      let specs = '-';
-      const specMatch = text.match(/(分类：[^\n]+)/);
-      if (specMatch) specs = specMatch[1];
 
       let descStart = lines.findIndex(l => l.includes('浏览') || l.includes('想要'));
       let descEnd = lines.findIndex(l => l === '聊一聊' || l === '立即购买' || l.includes('为你推荐'));
@@ -142,44 +171,84 @@ export const command = cli({
 
       return {
         ok: true,
-        title: title || '闲鱼商品',
-        price,
-        seller: seller || '闲鱼卖家',
-        seller_user_id: sellerUserId || '-',
-        location,
-        seller_stats: sellerStatsArr.join(' · ') || '正常卖家',
-        want_count: wantCount,
-        browse_count: browseCount,
-        specs,
-        images: images.slice(0, 6).join(' | ') || '-',
-        description: description.slice(0, 300) || '-',
+        mtopData,
+        domData: {
+          title: title || '闲鱼商品',
+          price: domPrice,
+          seller: seller || '闲鱼卖家',
+          seller_user_id: sellerUserId || '-',
+          location,
+          seller_stats: sellerStatsArr.join(' · ') || '正常卖家',
+          want_count: wantCount,
+          browse_count: browseCount,
+          specs: domSpecs,
+          images: images.slice(0, 8).join(' | ') || '-',
+          description: description.slice(0, 500) || '-',
+        },
       };
-    });
+    }, itemId);
 
-    if (!data || data.ok === false) {
-      throw new CommandExecutionError('查询商品详情失败: ' + (data ? data.message : '商品可能已失效或下架'));
+    if (!evalResult || evalResult.ok === false) {
+      throw new CommandExecutionError('查询商品详情失败: ' + (evalResult ? evalResult.message : '商品可能已失效或下架'));
     }
 
-    const category = inferCategory({ keyword: data.title, title: data.title });
-    const imgList = (data.images && data.images !== '-') ? data.images.split(' | ').map(s => s.trim()).filter(Boolean) : [];
-    const multiInspection = extractMultiImageDefects(data.description || data.title, imgList, category);
-    const defectNotes = extractDefectNotes(data.title, data.description);
+    const mtopData = evalResult.mtopData || {};
+    const itemDO = mtopData.itemDO || {};
+    const sellerDO = mtopData.sellerDO || {};
+    const domData = evalResult.domData || {};
+
+    const skuInfo = parseItemSkus(mtopData);
+
+    const title = String(itemDO.title || domData.title || '闲鱼商品').trim();
+    const seller = String(sellerDO.nick || sellerDO.uniqueName || domData.seller || '闲鱼卖家').trim();
+    const sellerUserId = String(sellerDO.sellerId || domData.seller_user_id || '-').trim();
+    const location = String(sellerDO.publishCity || sellerDO.city || domData.location || '-').trim();
+    const wantCount = itemDO.wantCnt ? `${itemDO.wantCnt}人想要` : domData.want_count;
+    const browseCount = itemDO.browseCnt ? `${itemDO.browseCnt}浏览` : domData.browse_count;
+    const description = String(itemDO.desc || domData.description || '-').trim();
+
+    let displayPrice = '';
+    let priceNum = 0;
+    if (skuInfo.isMultiSku && skuInfo.minPrice && skuInfo.maxPrice && skuInfo.minPrice !== skuInfo.maxPrice) {
+      displayPrice = `¥${skuInfo.minPrice} - ¥${skuInfo.maxPrice} (多规格)`;
+      priceNum = skuInfo.minPrice;
+    } else if (skuInfo.minPrice) {
+      displayPrice = `¥${skuInfo.minPrice}`;
+      priceNum = skuInfo.minPrice;
+    } else if (itemDO.soldPrice || itemDO.defaultPrice) {
+      displayPrice = `¥${itemDO.soldPrice || itemDO.defaultPrice}`;
+      priceNum = parseFloat(itemDO.soldPrice || itemDO.defaultPrice) || 0;
+    } else {
+      displayPrice = domData.price;
+      priceNum = parseFloat(String(domData.price).replace(/[^\d.]/g, '')) || 0;
+    }
+
+    const finalSpecs = skuInfo.specs !== '-' ? skuInfo.specs : domData.specs;
+    const category = inferCategory({ keyword: title, title });
+    const imgList = (domData.images && domData.images !== '-') ? domData.images.split(' | ').map(s => s.trim()).filter(Boolean) : [];
+    const multiInspection = extractMultiImageDefects(description || title, imgList, category);
+    const defectNotes = extractDefectNotes(title, description);
     const finalNotes = defectNotes !== '封面完好待深检' ? defectNotes : multiInspection.defect_notes;
     const finalCondition = multiInspection.condition;
 
     // Unidirectional write-back into SQLite SSOT only when valid product data is present
-    if (data && data.title && data.title !== '闲鱼商品' && data.price && data.price !== '¥0') {
+    if (title && title !== '闲鱼商品' && displayPrice && displayPrice !== '¥0') {
       try {
         saveCandidates([{
           item_id: itemId,
           category,
-          title: data.title,
-          price: data.price,
-          seller: data.seller,
-          seller_user_id: data.seller_user_id,
-          location: data.location,
-          seller_tag: data.seller_stats,
+          title,
+          price: displayPrice,
+          price_num: priceNum,
+          seller,
+          seller_user_id: sellerUserId,
+          location,
+          seller_tag: domData.seller_stats,
           condition: finalCondition,
+          specs: finalSpecs,
+          min_price: skuInfo.minPrice,
+          max_price: skuInfo.maxPrice,
+          skus_json: skuInfo.skusJson,
           item_url: `https://www.goofish.com/item?id=${itemId}`,
           image_url: imgList[0] || '',
           images: imgList.join('|'),
@@ -190,19 +259,20 @@ export const command = cli({
 
     return [{
       item_id: itemId,
-      title: data.title,
-      price: data.price,
+      title,
+      price: displayPrice,
       condition: finalCondition,
-      seller: data.seller,
-      seller_user_id: data.seller_user_id,
-      location: data.location,
-      seller_stats: data.seller_stats,
-      want_count: data.want_count,
-      browse_count: data.browse_count,
-      specs: data.specs,
-      images: data.images,
+      seller,
+      seller_user_id: sellerUserId,
+      location,
+      seller_stats: domData.seller_stats,
+      want_count: wantCount,
+      browse_count: browseCount,
+      specs: finalSpecs,
+      skus_json: skuInfo.skusJson,
+      images: domData.images,
       defect_notes: finalNotes,
-      description: data.description,
+      description: description.slice(0, 300),
     }];
   },
 });
