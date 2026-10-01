@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.6] - 2026-10-01
+
+### Added (Full Seller Management Suite & Line-Break Preservation Engine)
+- **Full Seller Command Suite (`offline.js`, `relist.js`, `delete.js`, `sold.js`)**:
+  - `opencli xianyu offline <itemId> [--submit]`: Safe listing delisting (转为暂不售卖状态).
+  - `opencli xianyu relist <itemId> [--submit]`: Re-list off-shelf items (重新上架).
+  - `opencli xianyu delete <itemId> [--submit]`: Permanent deletion of off-shelf listings (防误触保护，仅下架状态可删).
+  - `opencli xianyu sold [--limit 30] [--query <key>]`: Query sold orders and historical transaction prices (我卖出的).
+- **Line Break & Rich-Text Preservation Engine (`edit.js`)**:
+  - Added `--description_file <file_path>` parameter to load multiline description text directly from UTF-8 files, completely bypassing shell escape and newline flattening.
+  - Implemented Xianyu contenteditable editor line splitting algorithm (`lines.map(line => line.length === 0 ? '<br>' : escapeHtml(line)).join('<br>')`), preserving visual spacing between section headers `【...】` and individual bullet points `•`.
+  - Added `--screenshot <path>` flag across all execution modes (`--diagnose`, dry run, and `--submit`) to allow visual audit of live editor and item details.
+- **Anti-Bot Baxia Modal & CDP Interaction (`_shared.js`, `detail.js`)**:
+  - Enhanced `dismissBaxiaDialog` with iframe detection and native Chrome DevTools Protocol (`tryNativeDrag` / `tryNativeClick`) to traverse cross-origin security boundaries and automatically slide verification sliders or click `✕` dismiss buttons.
+- **Seller Copywriting Defense Rules**:
+  - Enforced zero overpromising ("机身无任何磕碰划痕" / "99新" prohibited; strictly objective condition statements).
+  - Enforced zero accessory hallucination (bare unit explicit disclosure: "所见即所得，无原包装盒及未出镜配件").
+  - Verbatim authentic pledge: `"直接拍, 链接在产品在, 看到了当天或次日我会发"`.
+- **Comprehensive Automated Test Suite (`tests/seller_suite.test.js`)**:
+  - Added 6 new automated tests verifying seller CLI contracts, parameters, guards, and multiline newline-to-`<br>` HTML conversions. Total test count increased from 58 to 64.
+
+### Tested & Verified
+- Verified 64/64 tests passing (`npm test`).
+- Verified live visual screenshot evidence in `tests/fixtures/xianyu_edit_verified.png` with clean, distinct paragraph lines and bullet spacing.
+- Synchronized all 30 adapter files across `goofish` and `xianyu` sites in `~/.opencli/clis/`.
+
 ## [1.8.5] - 2026-10-01
 
 ### Added (Seller Listing Editor & Programmatic Feed Optimization)

@@ -95,6 +95,109 @@ export async function enforceRateLimit(url, options = {}) {
 }
 
 /**
+ * Dismiss anti-bot Baxia verification dialog if a close button exists, or simulate slider drag.
+ */
+export async function dismissBaxiaDialog(page) {
+  try {
+    if (typeof page.evaluate === 'function') {
+      await page.evaluate(() => {
+        const allDocs = [document];
+        document.querySelectorAll('iframe').forEach(f => {
+          try {
+            if (f.contentDocument) allDocs.push(f.contentDocument);
+          } catch (e) {}
+        });
+
+        for (const doc of allDocs) {
+          // 1. Check for dedicated close button
+          const closeEl = doc.querySelector('.baxia-dialog-close, .sufei-dialog-close, [class*="close"], [aria-label*="close" i]');
+          if (closeEl && typeof closeEl.click === 'function') {
+            const rect = closeEl.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              closeEl.click();
+              return;
+            }
+          }
+
+          // 2. Also look for elements with close glyph
+          const glyphs = Array.from(doc.querySelectorAll('button, div, span, a, svg')).filter(el => {
+            const txt = (el.innerText || '').trim();
+            const cls = typeof el.className === 'string' ? el.className : '';
+            return (txt === '×' || txt === '✕' || txt === 'X' || cls.includes('close')) && el.children.length <= 1;
+          });
+          for (const btn of glyphs) {
+            const rect = btn.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              btn.click();
+              return;
+            }
+          }
+
+          // 3. Slider handle drag simulation
+          const sliderHandle = doc.querySelector('#nc_1_n1z, .btn_slide, span[class*="btn_slide"], span.nc_iconfont');
+          if (sliderHandle) {
+            const rect = sliderHandle.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              const startX = rect.left + rect.width / 2;
+              const startY = rect.top + rect.height / 2;
+              const dispatch = (type, x, y) => {
+                const evt = new MouseEvent(type, {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window,
+                  clientX: x,
+                  clientY: y,
+                });
+                sliderHandle.dispatchEvent(evt);
+              };
+              dispatch('mousedown', startX, startY);
+              for (let i = 1; i <= 10; i++) {
+                dispatch('mousemove', startX + (i * 32), startY + (Math.random() * 2 - 1));
+              }
+              dispatch('mouseup', startX + 330, startY);
+            }
+          }
+        }
+      });
+    }
+
+    // 4. Native CDP cross-origin iframe fallback
+    if (typeof page.evaluate === 'function') {
+      const iframeInfo = await page.evaluate(() => {
+        const iframes = Array.from(document.querySelectorAll('iframe'));
+        for (const iframe of iframes) {
+          const rect = iframe.getBoundingClientRect();
+          if (rect.width > 200 && rect.height > 200) {
+            return {
+              hasIframe: true,
+              left: rect.left,
+              top: rect.top,
+              width: rect.width,
+              height: rect.height,
+            };
+          }
+        }
+        return { hasIframe: false };
+      });
+
+      if (iframeInfo?.hasIframe) {
+        if (typeof page.tryNativeDrag === 'function') {
+          const sliderStartX = Math.round(iframeInfo.left + iframeInfo.width * 0.28);
+          const sliderStartY = Math.round(iframeInfo.top + iframeInfo.height * 0.61);
+          const sliderEndX = Math.round(iframeInfo.left + iframeInfo.width * 0.78);
+          await page.tryNativeDrag({ x: sliderStartX, y: sliderStartY }, { x: sliderEndX, y: sliderStartY });
+        }
+        if (typeof page.tryNativeClick === 'function') {
+          const closeX = Math.round(iframeInfo.left + iframeInfo.width * 0.88);
+          const closeY = Math.round(iframeInfo.top + iframeInfo.height * 0.14);
+          await page.tryNativeClick(closeX, closeY);
+        }
+      }
+    }
+  } catch (e) {}
+}
+
+/**
  * Resilient page navigation with automatic retry and location.href evaluation fallback.
  * Solves the frequent 'Navigation rejected.' CDP issue on heavy web pages.
  * Automatically throttles and introduces human behavior jitter to prevent anti-bot bans.
@@ -109,6 +212,7 @@ export async function safeGoto(page, url, options = {}) {
   try {
     await page.goto(url, { settleMs });
     await page.wait(waitSec);
+    await dismissBaxiaDialog(page);
     return;
   } catch (error) {
     if (!isRetriableNavigationError(error)) {
@@ -121,6 +225,7 @@ export async function safeGoto(page, url, options = {}) {
             }
           }, url);
           await page.wait(waitSec + 1);
+          await dismissBaxiaDialog(page);
           return;
         }
       } catch (evalError) {
@@ -128,6 +233,7 @@ export async function safeGoto(page, url, options = {}) {
         await page.wait(1);
         await page.goto(url, { waitUntil: 'none' });
         await page.wait(waitSec);
+        await dismissBaxiaDialog(page);
         return;
       }
       throw error;
@@ -136,6 +242,7 @@ export async function safeGoto(page, url, options = {}) {
     await page.wait(1.5);
     await page.goto(url, { settleMs });
     await page.wait(waitSec);
+    await dismissBaxiaDialog(page);
   }
 }
 

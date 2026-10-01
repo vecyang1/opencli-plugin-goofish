@@ -69,7 +69,11 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu orders` | `[read]` | 获取已买到的宝贝历史订单 (十余年翻页) | `[query] [--limit 50] [--status 全部] [--all]` |
 | `opencli xianyu favorites` | `[read]` | 查看收藏夹宝贝与降价监控 | `[query] [--tab 全部/降价宝贝/有效宝贝] [--limit 30]` |
 | `opencli xianyu published` | `[read]` | 获取个人发布在售与已卖出闲置列表 | `[query] [--limit 30] [--all]` |
-| `opencli xianyu edit` | `[write]` | 编辑与优化已发布宝贝 (标题/描述/标价/原价/成色，支持预览与保存) | `<item_id> [--title 标题] [--description 描述] [--price 售价] [--original_price 原价] [--diagnose] [--submit]` |
+| `opencli xianyu edit` | `[write]` | 编辑与优化已发布宝贝 (标题/描述/标价/原价/成色，支持 --description_file 文件排版与 --screenshot 快照) | `<item_id> [--title 标题] [--description 描述] [--description_file 文件] [--price 售价] [--original_price 原价] [--diagnose] [--submit] [--screenshot 路径]` |
+| `opencli xianyu offline` | `[write]` | 下架闲鱼在售宝贝 (转为暂不售卖状态) | `<item_id> [--submit]` |
+| `opencli xianyu relist` | `[write]` | 重新上架已下架的闲置宝贝 | `<item_id> [--submit]` |
+| `opencli xianyu delete` | `[write]` | 永久删除已下架宝贝 (防误触保护，仅下架状态可删) | `<item_id> [--submit]` |
+| `opencli xianyu sold` | `[read]` | 获取闲鱼卖家已卖出的宝贝记录 (历史成交订单与价格) | `[query] [--limit 30] [--all]` |
 | `opencli xianyu search` | `[read]` | 全网高级搜索二手商品 (地区/排序/价格/标签/降价/排除词) | `<query> [--region 珠三角/广东] [--sort 综合/新发布/新降价/价格] [--min-price] [--max-price] [--exclude 关键词] [--tags] [--page-num 1]` |
 | `opencli xianyu suggest` | `[read]` | 获取闲鱼全网热搜词与搜索关键词联想补全 | `[query] [--limit 20]` |
 | `opencli xianyu detail` | `[read]` | 获取指定商品详情与卖家信誉档案 | `<item_id>` |

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError } from '@jackwener/opencli/errors';
 import { safeGoto, checkAuth } from './_shared.js';
@@ -6,7 +7,7 @@ export const command = cli({
   site: 'goofish',
   name: 'edit',
   access: 'write',
-  description: '编辑与优化闲鱼已发布宝贝 (标题、描述、售价、原价及成色)',
+  description: '编辑与优化闲鱼已发布宝贝 (标题、描述、售价、原价及成色，支持文本文件换行与详情页截图存证)',
   domain: 'www.goofish.com',
   strategy: Strategy.COOKIE,
   browser: true,
@@ -15,9 +16,11 @@ export const command = cli({
     { name: 'id', positional: true, required: true, help: '闲鱼商品 ID (如: 1089657928967)' },
     { name: 'title', type: 'str', required: false, help: '优化后的新标题' },
     { name: 'description', type: 'str', required: false, help: '优化后的新宝贝描述' },
+    { name: 'description_file', type: 'str', required: false, help: '从指定文本文件读取长文案 (避免命令行转义导致换行丢失)' },
     { name: 'price', type: 'str', required: false, help: '调整后的新售价 (元)' },
     { name: 'original_price', type: 'str', required: false, help: '原价 (选填)' },
     { name: 'condition', type: 'str', required: false, help: '成色 (全新/几乎全新/轻微使用/明显使用/老旧)' },
+    { name: 'screenshot', type: 'str', required: false, help: '提交成功后详情页截图保存路径 (如: /tmp/item.png)' },
     { name: 'diagnose', type: 'bool', default: false, help: '仅诊断当前商品编辑页面可用性与入口，不执行修改' },
     { name: 'submit', type: 'bool', default: false, help: '确认提交修改并保存' },
   ],
@@ -42,7 +45,28 @@ export const command = cli({
     }
 
     const title = kwargs.title ? String(kwargs.title).trim() : '';
-    const description = kwargs.description ? String(kwargs.description).trim() : '';
+    let description = kwargs.description ? String(kwargs.description).trim() : '';
+    if (kwargs.description_file) {
+      const filePath = String(kwargs.description_file).trim();
+      if (fs.existsSync(filePath)) {
+        description = fs.readFileSync(filePath, 'utf8').trim();
+      } else {
+        throw new ArgumentError(`指定的文案文件不存在: ${filePath}`);
+      }
+    } else if (description) {
+      // Unescape literal \n if passed via shell
+      description = description.replace(/\\n/g, '\n');
+    }
+
+    // Defensive formatting: ensure bullet points and section headers have proper line breaks if passed via single-line command line
+    if (!kwargs.description_file && description) {
+      if (!description.includes('\n')) {
+        description = description.replace(/([•·\-\*])/g, '\n$1');
+        description = description.replace(/(【[^】]+】)/g, '\n\n$1\n');
+      }
+      description = description.replace(/\n{3,}/g, '\n\n').trim();
+    }
+
     const price = kwargs.price ? String(kwargs.price).trim() : '';
     const originalPrice = kwargs.original_price ? String(kwargs.original_price).trim() : '';
     const isDiagnose = Boolean(kwargs.diagnose);
@@ -134,13 +158,49 @@ export const command = cli({
           }
         }
 
+        const allEditors = Array.from(document.querySelectorAll('*')).filter(el => {
+          return el.getAttribute('contenteditable') === 'true' || 
+                 el.tagName === 'TEXTAREA' || 
+                 (el.className && typeof el.className === 'string' && el.className.includes('editor'));
+        }).map(el => ({
+          tag: el.tagName,
+          class: el.className,
+          contenteditable: el.getAttribute('contenteditable'),
+          text: (el.innerText || el.value || '').slice(0, 100)
+        }));
+
+        const editorEl = document.querySelector('div[class*="editor--"][contenteditable="true"], div[contenteditable="true"]');
+        let editorFiberInfo = null;
+        if (editorEl) {
+          const fiberKey = Object.keys(editorEl).find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
+          let curr = fiberKey ? editorEl[fiberKey] : null;
+          let propKeys = [];
+          let handlers = [];
+          while (curr && handlers.length < 5) {
+            const p = curr.memoizedProps;
+            if (p) {
+              for (const k of Object.keys(p)) {
+                if (typeof p[k] === 'function' && !handlers.includes(k)) handlers.push(k);
+              }
+            }
+            curr = curr.return;
+          }
+          editorFiberInfo = {
+            innerHTML: editorEl.innerHTML,
+            handlers,
+          };
+        }
+
         return {
           ok: true,
           oldPrice,
           newPrice: oldPrice,
           editorLength: oldEditorText.length,
           submitState: 'diagnose_only',
-          message: JSON.stringify(formFields, null, 2),
+          message: JSON.stringify({
+            editorFiberInfo,
+            formFields,
+          }, null, 2),
         };
       }
 
@@ -186,14 +246,29 @@ export const command = cli({
         } catch (e) {}
       }
 
-      // 1. Update Editor Content using document.execCommand to trigger framework listeners
+      // 1. Update Editor Content with clean <br> line breaks
       if (combinedEditorText && editorEl) {
         editorEl.focus();
-        document.execCommand('selectAll', false, null);
-        const execSuccess = document.execCommand('insertText', false, combinedEditorText);
-        if (!execSuccess || (editorEl.innerText || '').trim().length < combinedEditorText.length / 2) {
-          editorEl.innerText = combinedEditorText;
+        const safeLines = combinedEditorText.split('\n').map(line => {
+          return line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        });
+        editorEl.innerHTML = safeLines.join('<br>');
+
+        // Trigger React handlers via Fiber
+        const fiberKey = Object.keys(editorEl).find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
+        if (fiberKey) {
+          let curr = editorEl[fiberKey];
+          while (curr) {
+            if (typeof curr.memoizedProps?.onChange === 'function') {
+              try { curr.memoizedProps.onChange(combinedEditorText); } catch (e) {}
+            }
+            if (typeof curr.memoizedProps?.onInput === 'function') {
+              try { curr.memoizedProps.onInput({ target: editorEl, currentTarget: editorEl }); } catch (e) {}
+            }
+            curr = curr.return;
+          }
         }
+
         editorEl.dispatchEvent(new Event('input', { bubbles: true }));
         editorEl.dispatchEvent(new Event('change', { bubbles: true }));
       }
@@ -305,9 +380,27 @@ export const command = cli({
       if (postSubmitState.isSuccessUrl || !postSubmitState.hasError) {
         finalStatus = 'success';
         finalMessage = `发布成功！页面状态: ${postSubmitState.currentUrl}`;
+
+        if (kwargs.screenshot) {
+          try {
+            await safeGoto(page, `https://www.goofish.com/item?id=${itemId}`);
+            await page.wait(3.0);
+            await page.screenshot({ path: kwargs.screenshot });
+            finalMessage += ` | 截图已保存至: ${kwargs.screenshot}`;
+          } catch (err) {
+            finalMessage += ` | 截图保存失败: ${err.message}`;
+          }
+        }
       } else {
         finalStatus = 'failed';
         finalMessage = `提交后提示: ${postSubmitState.errorMessage || postSubmitState.bodySnippet}`;
+      }
+    } else if (kwargs.screenshot) {
+      try {
+        await page.screenshot({ path: kwargs.screenshot });
+        finalMessage += ` | 编辑器截图已保存至: ${kwargs.screenshot}`;
+      } catch (err) {
+        finalMessage += ` | 截图保存失败: ${err.message}`;
       }
     }
 

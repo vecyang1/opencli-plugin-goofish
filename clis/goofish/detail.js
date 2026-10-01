@@ -1,6 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError, CommandExecutionError } from '@jackwener/opencli/errors';
-import { safeGoto } from './_shared.js';
+import { safeGoto, dismissBaxiaDialog } from './_shared.js';
 import { saveCandidates } from './_db.js';
 import { extractDefectNotes, extractMultiImageDefects, inferCategory, parseItemSkus } from './_contract.js';
 
@@ -15,6 +15,7 @@ export const command = cli({
   navigateBefore: false,
   args: [
     { name: 'id', positional: true, required: true, help: '闲鱼商品 ID (如: 1059195860101)' },
+    { name: 'screenshot', type: 'str', required: false, help: '详情页实测截图保存路径 (如: /tmp/detail.png)' },
   ],
   columns: [
     'item_id',
@@ -46,7 +47,15 @@ export const command = cli({
     }
 
     await safeGoto(page, 'https://www.goofish.com/item?id=' + itemId);
-    await page.wait(2.5);
+    await page.wait(3.0);
+    await dismissBaxiaDialog(page);
+    await page.wait(1.5);
+
+    if (kwargs.screenshot) {
+      try {
+        await page.screenshot({ path: kwargs.screenshot });
+      } catch (e) {}
+    }
 
     const evalResult = await page.evaluate(async (itemId) => {
       let mtopData = null;
