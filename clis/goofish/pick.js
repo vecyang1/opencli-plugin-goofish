@@ -39,6 +39,7 @@ export const command = cli({
     'item_url',
   ],
   func: async (page, kwargs) => {
+    
     const rawTarget = String(kwargs.target || kwargs._?.[0] || 'all').trim();
     const targetLower = rawTarget.toLowerCase();
     const limit = Math.max(5, Math.min(Number(kwargs.limit) || 20, 50));
@@ -115,6 +116,7 @@ export const command = cli({
       });
     }
 
+    
     for (const sc of searchConfigs) {
       const searchUrl = 'https://www.goofish.com/search?q=' + encodeURIComponent(sc.keyword);
       await safeGoto(page, searchUrl);
@@ -232,7 +234,7 @@ export const command = cli({
       }, limit);
 
       // Filter out accessories & user-specified exclusions via contract
-      const validItems = (rawCards || []).filter(it => !isAccessoryTitle(it.title, sc.category, sc.exclude, { require: sc.require }));
+      const validItems = (rawCards || []).filter(it => !isAccessoryTitle(it.title, sc.category, sc.exclude, {}));
 
       // Write valid items to SQLite SSOT
       if (validItems.length > 0) {
@@ -253,21 +255,99 @@ export const command = cli({
     const results = [];
     const seenItemIds = new Set();
     for (const sc of searchConfigs) {
+      // Query with a wider limit so we can drop traps and out-of-range variant prices
       const candidates = queryCandidates({ 
         category: sc.category, 
-        minPrice: sc.minPrice || kwargs['min-price'] || null,
-        maxPrice: sc.maxPrice || kwargs['max-price'] || null,
+        // We do NOT strictly filter min/max price at DB level because the teaser price might be low but variant price is high
+        // We will filter dynamically below.
         excludeGhosted: true, 
         sort: sortKey, 
-        limit 
+        limit: limit * 3 
       });
-      for (const best of candidates) {
+      
+      let pickedCount = 0;
+
+      for (let i = 0; i < candidates.length; i++) {
+        if (pickedCount >= limit) break;
+        const best = candidates[i];
         if (seenItemIds.has(best.item_id)) continue;
+
+        let activePriceNum = best.price_num;
+        let activePriceStr = best.price;
+        let activeSkuName = '';
+
+        // If skus_json is missing or empty, and we are in browser, we can fetch detail dynamically to avoid teaser trap!
+        if ((!best.skus_json || best.skus_json === '[]' || best.skus_json === 'null') && page) {
+          try {
+            const mtopData = await page.evaluate(async (itemId) => {
+              if (window.lib?.mtop?.request) {
+                try {
+                  const res = await window.lib.mtop.request({
+                    api: 'mtop.taobao.idle.pc.detail',
+                    data: { itemId: String(itemId) },
+                    type: 'POST', v: '1.0', dataType: 'json',
+                    needLogin: false, needLoginPC: false, sessionOption: 'AutoLoginOnly', ecode: 0,
+                  });
+                  return res?.data || null;
+                } catch(e) { return null; }
+              }
+              return null;
+            }, best.item_id);
+            
+            if (mtopData) {
+               // We should extract skus using the shared contract!
+               // Wait, parseItemSkus is exported from _contract.js, we can call it here!
+               const { parseItemSkus } = await import('./_contract.js');
+               const parsed = parseItemSkus(mtopData);
+               if (parsed.skus && parsed.skus.length > 0) {
+                 best.skus_json = JSON.stringify(parsed.skus);
+                 // We should also write this back to SSOT database so we don't fetch it again!
+                 // Wait, we can call saveCandidates here!
+                 // saveCandidates([{ item_id: best.item_id, skus_json: best.skus_json }]);
+               }
+            }
+          } catch(e) {}
+        }
+
+        // Apply variant requirement logic
+        let hasMatchedRequire = !sc.require || sc.require.length === 0;
+
+        if (best.skus_json && best.skus_json !== '[]' && best.skus_json !== 'null') {
+          try {
+            const skus = JSON.parse(best.skus_json);
+            if (sc.require && sc.require.length > 0) {
+              const matchedSku = skus.find(s => sc.require.some(req => s.name.toLowerCase().includes(req.toLowerCase())));
+              if (matchedSku) {
+                activePriceNum = matchedSku.price;
+                activeSkuName = matchedSku.name;
+                activePriceStr = `¥${activePriceNum} (SKU: ${activeSkuName})`;
+                hasMatchedRequire = true;
+              }
+            }
+          } catch(e) {}
+        }
+        
+        // If SKUs didn't match the require (or no SKUs exist), check the title
+        if (!hasMatchedRequire && sc.require && sc.require.length > 0) {
+           const lowerTitle = best.title.toLowerCase();
+           // Require ALL requirements to be in the title if we fallback to title
+           hasMatchedRequire = sc.require.every(req => lowerTitle.includes(req.toLowerCase()));
+        }
+
+        if (!hasMatchedRequire) continue;
+
+        // Re-evaluate min/max bounds with the ACTUAL variant price!
+        const maxP = sc.maxPrice || kwargs['max-price'];
+        const minP = sc.minPrice || kwargs['min-price'];
+        if (maxP && activePriceNum > maxP) continue;
+        if (minP && activePriceNum < minP) continue;
+
         seenItemIds.add(best.item_id);
+        pickedCount++;
 
         const trapAudit = assessLowPriceTrap({
           title: best.title,
-          price: best.price,
+          price: activePriceNum, // Use the active price!
           condition: best.condition,
           defect_notes: best.defect_notes,
           images: best.images,

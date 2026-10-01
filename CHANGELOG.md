@@ -31,6 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verified live visual screenshot evidence in `tests/fixtures/xianyu_edit_verified.png` with clean, distinct paragraph lines and bullet spacing.
 - Synchronized all 30 adapter files across `goofish` and `xianyu` sites in `~/.opencli/clis/`.
 
+## [1.8.7] - 2026-10-02
+
+### Added
+- **Variant-Level Anti-Trap System (SKU Price Resolver)**:
+  - Addressed the "Multi-SKU Teaser Price Trap" where search results display a misleadingly low base price (e.g., ¥25) for high-value items (e.g., ¥55 variant).
+  - Enhanced `pick.js` to dynamically invoke MTOP (`mtop.taobao.idle.pc.detail`) to fetch and parse accurate `skus_json` variant tables for top candidates directly in the pipeline before filtering and evaluating.
+  - Upgraded `isAccessoryTitle` logic to decouple strict Title matching from SKU variant matching: if the target `require` (e.g., "UKA03") is found within the SKU names, the item passes the filter, and its authoritative variant price is injected downstream.
+  - Ensured `queryCandidates` queries fetch a wider net of results to account for false-positive low teaser prices that exceed `maxPrice` once real variant prices are resolved.
+
 ## [1.8.5] - 2026-10-01
 
 ### Added (Seller Listing Editor & Programmatic Feed Optimization)
