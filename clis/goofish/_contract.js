@@ -1353,4 +1353,60 @@ export function assessLowPriceTrap({
   };
 }
 
+/**
+ * 闲鱼卖家文案合规与排版防扯皮审计契约 (Audit Seller Copywriting & Formatting)
+ * 
+ * 依据 Choosing the Rung 原则硬化:
+ * 1. 绝对化零瑕疵承诺（严禁承诺“无任何划痕/磕碰”，极易被买家借由微米级痕迹在小法庭申请争议退款退货）
+ * 2. 虚假高成色承诺（严禁二手物品主观使用“99新/充新”，强制要求客观描述使用痕迹与功能完好）
+ * 3. 虚构配件列表（实拍图未出镜的配件严禁声称“全套配件齐全”，强制要求“所见即所得，无未出镜配件”）
+ * 4. pre-line 换行与段落契约（闲鱼 Web 端采用 white-space: pre-line，普通空格会被折叠，必须保留真实的 \n 和 \n\n）
+ */
+export function auditSellerCopy(text) {
+  if (!text || typeof text !== 'string') {
+    return {
+      pass: true,
+      flags: [],
+      warnings: [],
+      suggestedFix: text || '',
+    };
+  }
+
+  const flags = [];
+  const warnings = [];
+
+  // 1. 绝对化零瑕疵承诺 (Rung 3 判定: 失败静默 + 代价重复 + 谓词可判定)
+  const zeroFlawPattern = /(?:无任何|毫无|完全无|绝无|没有任何|绝对无)\s*(?:磕碰|划痕|磨损|使用痕迹|瑕疵)/i;
+  if (zeroFlawPattern.test(text)) {
+    flags.push('绝对化零瑕疵承诺（严禁承诺“无任何划痕/磕碰”，极易在闲鱼小法庭被挑刺退货）');
+  }
+
+  // 2. 虚假主观高成色承诺
+  const falseNewPattern = /(?:99\s*新|充新|全新仅拆|几乎全新未用|完美成色)/i;
+  if (falseNewPattern.test(text)) {
+    flags.push('主观过度承诺成色（严禁使用“99新/充新”，二手物品应客观描述“正常使用痕迹，功能完好无暗病”）');
+  }
+
+  // 3. 虚构配件列表承诺
+  const fullAccessoryPattern = /(?:全套配件齐全|全套配件原装|箱说全配件齐|配件全套)/i;
+  if (fullAccessoryPattern.test(text)) {
+    warnings.push('配件全套承诺需严格核实实拍图出镜；若仅出镜单机，必须声明“所见即所得，无原包装及未出镜配件”');
+  }
+
+  // 4. pre-line 换行与排版健康度检查
+  if (!text.includes('\n') && text.length > 50) {
+    warnings.push('文案缺少换行符 \\n，闲鱼详情页 pre-line 渲染下普通空格会被折叠，导致所有内容挤成单行');
+  }
+
+  if (/【[^】]+】/.test(text) && !/(?:\n\n|^)【[^】]+】/.test(text)) {
+    warnings.push('段落标题【...】前缺少 \\n\\n 空行分割，在 pre-line 渲染下缺乏段落呼吸感');
+  }
+
+  return {
+    pass: flags.length === 0,
+    flags,
+    warnings,
+  };
+}
+
 

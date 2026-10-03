@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError } from '@jackwener/opencli/errors';
 import { safeGoto, checkAuth } from './_shared.js';
+import { auditSellerCopy } from './_contract.js';
 
 export const command = cli({
   site: 'goofish',
@@ -81,6 +82,8 @@ export const command = cli({
     } else if (description) {
       combinedEditorText = description;
     }
+
+    const copyAudit = auditSellerCopy(description || combinedEditorText);
 
     const targetUrl = `https://www.goofish.com/publish?itemId=${itemId}`;
     await safeGoto(page, targetUrl);
@@ -305,7 +308,11 @@ export const command = cli({
 
       // 5. Submit if requested
       let submitState = 'dry_run_ready';
-      let message = `[预览] 描述: ${readbackText.slice(0, 30)}... (${readbackText.length}字), 价格: ¥${readbackPrice}`;
+      let message = isDiagnose
+        ? `[诊断完成] 页面就绪，当前价格: ¥${oldPrice || readbackPrice}`
+        : (shouldSubmit
+            ? `已触发提交... 价格: ¥${readbackPrice}`
+            : `[本地预览未保存，需加 --submit 正式提交] 描述: ${readbackText.slice(0, 30)}... (${readbackText.length}字), 价格: ¥${readbackPrice}`);
 
       if (shouldSubmit) {
         const publishBtn = document.querySelector('button[class*="publish-button--"]')
@@ -334,7 +341,12 @@ export const command = cli({
     }, { combinedEditorText, newPrice: price, newOrigPrice: originalPrice, shouldSubmit, isDiagnose });
 
     let finalMessage = editResult.message;
-    let finalStatus = 'preview';
+    if (!copyAudit.pass) {
+      finalMessage += ` | ⚠️ 文案合规拦截: ${copyAudit.flags.join('; ')}`;
+    } else if (copyAudit.warnings.length > 0) {
+      finalMessage += ` | ℹ️ 文案优化建议: ${copyAudit.warnings.join('; ')}`;
+    }
+    let finalStatus = isDiagnose ? 'diagnosed' : (shouldSubmit ? 'submitting' : 'preview');
 
     if (shouldSubmit && editResult.submitState === 'click_dispatched') {
       await page.wait(3.5);

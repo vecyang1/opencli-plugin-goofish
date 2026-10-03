@@ -373,6 +373,31 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(pristineItem.tier, 'pristine');
     assert.ok(pristineItem.highlights.some(h => h.includes('全新未拆封')));
   });
+
+  await t.test('auditSellerCopy contract enforces anti-overpromising and pre-line line breaks', async () => {
+    const { auditSellerCopy } = await import('../src/contract.js');
+
+    // Case 1: Overpromising absolute zero flaw
+    const badCopy1 = auditSellerCopy('自用出，机身无任何磕碰划痕，买到赚到。');
+    assert.equal(badCopy1.pass, false);
+    assert.ok(badCopy1.flags.some(f => f.includes('绝对化零瑕疵承诺')));
+
+    // Case 2: Subjective false "99 new"
+    const badCopy2 = auditSellerCopy('99新仅拆封，几乎全新未用，直接拍。');
+    assert.equal(badCopy2.pass, false);
+    assert.ok(badCopy2.flags.some(f => f.includes('主观过度承诺成色')));
+
+    // Case 3: Missing newlines on long description
+    const noNewlineCopy = auditSellerCopy('【实物与配件说明】仅出镜主机【成色客观说明】正常使用痕迹电机完好无修【发货与交易】直接拍当天发货顺丰包邮');
+    assert.ok(noNewlineCopy.warnings.some(w => w.includes('缺少换行符')));
+
+    // Case 4: Compliant description with proper pre-line newlines and honest condition
+    const goodCopy = auditSellerCopy(
+      '【实物与配件说明】\\n• 所见即所得：仅包含实拍图中所见的主机单机，无未出镜配件。\\n\\n【成色客观说明】\\n• 个人闲置，有正常存放与使用痕迹，具体外观成色以实拍图为准。\\n• 电机运转正常，按键顺滑，功能完好。\\n\\n【发货与交易】\\n• 直接拍，链接在产品在，看到了当天或次日发货。'
+    );
+    assert.equal(goodCopy.pass, true);
+    assert.equal(goodCopy.flags.length, 0);
+  });
 });
 
 
