@@ -50,7 +50,7 @@ opencli plugin install ./opencli-plugin-goofish
 
 ### 3. 浏览器环境推荐 (轻量专用 Profile)
 为避免第三方扩展（如 1Password、网页爬虫、AI 助手侧边栏）向页面注入 iframe 导致 Chrome CDP 调试被跨域安全策略拦截（`attach failed: Cannot access a chrome-extension:// URL`），推荐使用专门的纯净 Profile：
-- **主用 Profile**: Chrome **Profile 38** (`~/Library/Application Support/Google/Chrome/Profile 38`，别名 `profile38`，contextId: `wg7phej7`)。
+- **主用 Profile**: 推荐专用的独立 Profile（例如 Chrome **Profile 38**，别名 `profile38`）。
 - **启动与登录**: 若该 Profile 未开启，执行：
   ```bash
   open -na "Google Chrome" --args --profile-directory="Profile 38" https://www.goofish.com
@@ -165,7 +165,7 @@ xy-chat watch "nexg 2n 尼龙" \
   --webhook-token "$WEBHOOK_BEARER_TOKEN" \
   --notify
 
-# 配合 Cadence 定时任务卡片 (CAD-20260913-goofish-nexg2n-watch)
+# 配合 Cadence 定时任务卡片验证
 python3 scripts/validate_cadence_card.py cadence-records.md
 ```
 

@@ -5,7 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.8.6] - 2026-10-01
+## [1.8.8] - 2026-10-02
+
+### Added
+- **Seller Copywriting Compliance Contract (`auditSellerCopy`)**:
+  - Implemented Rung 3 static guard in `clis/goofish/_contract.js` to eliminate silent failures and high-cost dispute risks in Xianyu listings:
+    1. **Absolute Zero-Flaw Ban**: Automatically flags absolute phrases ("无任何划痕", "毫无磕碰", "绝无瑕疵") that expose sellers to malicious returns and buyer dispute claims on microscopic marks.
+    2. **Subjective Overpromising Ban**: Blocks informal overstatements ("99新", "充新成色"), enforcing objective descriptions of authentic wear and flawless motor/key functionality.
+    3. **Accessory Hallucination Guard**: Warns against unqualified "全套配件齐全" when photos only show bare units ("所见即所得，无未出镜配件").
+    4. **`white-space: pre-line` Health Check**: Verifies raw newline `\n` preservation and double newline `\n\n` section spacing to prevent text collapse on the buyer detail page.
+- **Execution Mode Status Disambiguation (`edit.js`)**:
+  - Disambiguated dry-run/preview vs `--submit`: When run without `--submit`, status explicitly returns `preview` with `[本地预览未保存，需加 --submit 正式提交]`, completely eliminating the illusion of server changes without submission.
+  - Automatically appends copy audit compliance warnings and flags to the CLI response.
+
+### Tested & Verified
+- Added automated unit test suite in `tests/contract.test.js` validating all 4 audit dimensions.
+- 65/65 tests green (`npm test`).
+- Re-installed and synced all 30 adapters via `npm run install-adapters` to `~/.opencli/clis/goofish/` and `~/.opencli/clis/xianyu/`.
+- Visually verified live rendered buyer page on item `1089657928967` with all sections and bullets cleanly broken onto separate lines.
+
+## [1.8.7] - 2026-10-02
 
 ### Added (Full Seller Management Suite & Line-Break Preservation Engine)
 - **Full Seller Command Suite (`offline.js`, `relist.js`, `delete.js`, `sold.js`)**:
@@ -28,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tested & Verified
 - Verified 64/64 tests passing (`npm test`).
-- Verified live visual screenshot evidence in `tests/fixtures/xianyu_edit_verified.png` with clean, distinct paragraph lines and bullet spacing.
+- Verified live visual screenshot evidence with clean, distinct paragraph lines and bullet spacing.
 - Synchronized all 30 adapter files across `goofish` and `xianyu` sites in `~/.opencli/clis/`.
 
 ## [1.8.7] - 2026-10-02
@@ -181,7 +200,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Established CDN thumbnail stripper (`url.replace(/_[0-9]+x[0-9]+.*$/, '')`) to retrieve original lossless camera images (HEIC/JPEG) directly from Alibaba CDN.
   - Leveraged macOS native `sips -s format jpeg` for instant local format conversion without external heavy imaging dependencies.
 - **Canonical Skill Alignment (`goofish-ops`)**:
-  - Hardened Section 8 in `skills/goofish-ops/SKILL.md` following the Choosing the Rung framework: Rung 1 (prose trade-offs) for negotiation and bundling decisions vs. Rung 2 (decidable code predicates) for dead-link rejection, image cleanup, and physical hardware invariant checks.
+  - Hardened Section 8 in `goofish-ops` following the Choosing the Rung framework: Rung 1 (prose trade-offs) for negotiation and bundling decisions vs. Rung 2 (decidable code predicates) for dead-link rejection, image cleanup, and physical hardware invariant checks.
 
 ## [1.7.2] - 2026-09-13
 
@@ -358,7 +377,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `tests/contract.test.js`, `tests/ssot_unidirectional.test.js`, and `tests/live_query.test.js`.
   - 22/22 tests passing green across contract, database CRUD, install drift, live queries, smoke guards, and SSOT views.
 - **Cross-Agent Discoverability**:
-  - Updated `goofish-ops` canonical skill (`skills/goofish-ops/SKILL.md`) and Project Vault capabilities registry (`00 - System/registries/project-capabilities.md`).
+  - Updated `goofish-ops` canonical skill and project capabilities registry.
 
 ## [1.3.0] - 2026-09-11
 
@@ -390,7 +409,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Global Standalone CLI (`bin/xy-chat.js` / `xy-chat`)**: Unified entrypoint supporting `doctor`, `whoami`, `personal`, `account`, `orders`, `favorites`, `inbox`, `messages`, `chat`, `search`, `sync`, `stats`, and `export`.
 - **Single Source of Truth (SSOT) SQLite Storage (`src/db.js`)**: Built-in persistence via Node.js native `node:sqlite` (`DatabaseSync`), storing orders, favorites, sessions, and messages with FTS5 millisecond full-text retrieval.
 - **Shared Resilience Module (`clis/goofish/_shared.js`)**: Introduced `safeGoto` with automatic retry and `location.href` fallback to permanently eliminate transient `Navigation rejected.` CDP errors.
-- **Global Skill Registration**: Created `goofish-ops` in global skills directory (`skills/goofish-ops/SKILL.md`) for immediate multi-agent discoverability.
+- **Global Skill Registration**: Created `goofish-ops` in global skills directory for immediate multi-agent discoverability.
 
 ### Fixed
 - **Ghost Logic Elimination**: Completely eradicated hardcoded nicknames (`Vector_Y`), hardcoded cities, and job titles across all 18 adapters. Now dynamically extracts exact live profile data (location: 日本, published items: 36, followers: 16, following: 11, reviews: 213).
