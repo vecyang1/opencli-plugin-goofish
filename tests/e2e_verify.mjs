@@ -7,7 +7,7 @@
  * - Visual verification across desktop and mobile viewports
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -199,10 +199,43 @@ try {
 `;
 
 console.log("Running Adversarial E2E Verification via ego-browser nodejs...");
+let serverProc = null;
+try {
+  const probe = await fetch('http://127.0.0.1:3838', { signal: AbortSignal.timeout(500) });
+  if (probe.ok) {
+    console.log("E2E Verification: Port 3838 already active, reusing running instance");
+  }
+} catch (e) {
+  console.log("E2E Verification: Spawning separate Dashboard Server process on port 3838...");
+  serverProc = spawn(process.execPath, [
+    '-e',
+    'import("./src/server.js").then(m => m.startDashboardServer({ port: 3838 }))'
+  ], {
+    cwd: path.resolve(__dirname, '..'),
+    stdio: 'inherit'
+  });
+
+  let healthy = false;
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 200));
+    try {
+      const res = await fetch('http://127.0.0.1:3838', { signal: AbortSignal.timeout(500) });
+      if (res.ok) {
+        healthy = true;
+        break;
+      }
+    } catch (err) {}
+  }
+  if (!healthy) throw new Error("Dashboard server failed to start within 6 seconds");
+  console.log("E2E Verification: Dashboard Server is ready on http://127.0.0.1:3838");
+}
+
 try {
   execSync(`ego-browser nodejs <<'EOF'\n${scriptContent}\nEOF`, { stdio: 'inherit' });
+  if (serverProc) serverProc.kill('SIGTERM');
   process.exit(0);
 } catch (err) {
   console.error("E2E Verification Failed:", err.message);
+  if (serverProc) serverProc.kill('SIGTERM');
   process.exit(1);
 }

@@ -1,6 +1,25 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { exec } from 'node:child_process';
-import { startDashboardServer } from '../../src/server.js';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+async function getStartDashboardServer() {
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidatePaths = [
+    path.resolve(currentDir, '../../src/server.js'),
+    path.resolve(currentDir, '../src/server.js'),
+    path.resolve(currentDir, './server.js'),
+    path.resolve(process.env.HOME || '', 'Documents/A-coding/opencli-plugin-goofish/src/server.js'),
+  ];
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      const mod = await import(pathToFileURL(p).href);
+      return mod.startDashboardServer;
+    }
+  }
+  throw new Error(`Cannot locate server.js from ${currentDir}`);
+}
 
 export const command = cli({
   site: 'goofish',
@@ -24,6 +43,7 @@ export const command = cli({
     const port = Number(kwargs.port) || 3838;
     const shouldOpen = kwargs.open !== false;
 
+    const startDashboardServer = await getStartDashboardServer();
     const { url } = await startDashboardServer({ port });
 
     if (shouldOpen) {
