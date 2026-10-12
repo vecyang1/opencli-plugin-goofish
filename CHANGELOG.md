@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Connects local SQLite SSOT with Notion database `https://notion.so/3f7e1b43239381f7bc8ee3131a3534be` under Dash collection (`12be1b43-2393-8064-a99f-eb2a407187fe`).
   - Caches database ID in `system_config` table to eliminate duplicate creation.
   - Pushes task metrics, statuses, and links; pulls operator edits (target price, pause/resume) back into SQLite SSOT.
+- **Scheduled Cadence & Antigravity Automations Sidecar (`cadence-records.md`, `cadence-commands.md`, `~/.config/goofish/sidecar.json`)**:
+  - Registered and activated `CAD-20260913-goofish-nexg2n-watch` in Knowledge Base vault (`00 - System/registries/cadence-commands.md`) and local repo `cadence-records.md`.
+  - Provisioned and auto-tuned Antigravity 2.0 Automations sidecar `goofish-nexg2n-watch` with autopoietic self-healing directives, daytime 4-times daily window (`30 9,13,18,21 * * *`), and project binding `goofish-nexg2n-watch`.
+  - Unified scheduled execution pipeline chaining task-bound scanning with Notion dual-sync: `./bin/xy-chat.js watch --task-id task_1791773688487_v4pnsy --iterations 1 --diff-only --webhook http://127.0.0.1:9423/webhook/goofish --notify && ./bin/xy-chat.js notion-sync`.
+  - Passed live E2E dry-run (`cadence_ctl test-sidecar goofish-nexg2n-watch --execute`) in 7.46s (exit code 0).
+  - Validated machine-wide fleet with `cadence_ctl doctor` (115 cards, 0 errors, 0 warnings).
 
 ### Tested & Verified
 - **Automated Tests**: 81/81 automated tests green (`npm test`), including `tests/price_tracking.test.js`, `tests/dashboard_server.test.js`, and `tests/install_contract.test.js`.

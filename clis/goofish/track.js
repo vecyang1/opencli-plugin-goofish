@@ -113,9 +113,11 @@ export const command = cli({
     }
 
     // 5. Query / List monitoring tasks
+    const isListCmd = rawPos.toLowerCase() === 'list' || rawPos.toLowerCase() === 'ls';
+    const filterKeyword = isListCmd ? null : (rawPos ? String(rawPos).trim() : null);
     const tasks = queryMonitoringTasks({
       status: kwargs.status ? String(kwargs.status).trim() : null,
-      keyword: rawPos ? String(rawPos).trim() : null,
+      keyword: filterKeyword,
       category: kwargs.category ? String(kwargs.category).trim() : null,
     });
 

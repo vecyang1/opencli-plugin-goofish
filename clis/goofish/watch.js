@@ -5,7 +5,8 @@ import {
   saveCandidates, 
   queryCandidates, 
   subscribeLiveQuery,
-  recordPriceHistory
+  recordPriceHistory,
+  getMonitoringTask
 } from './_db.js';
 import { 
   isAccessoryTitle, 
@@ -61,19 +62,21 @@ export const command = cli({
     'item_url',
   ],
   func: async (page, kwargs) => {
-    const rawPos = kwargs.query || kwargs._?.[0] || '';
-    const spec = getProductSpec(kwargs.category || rawPos);
-    const category = kwargs.category ? String(kwargs.category).trim() : (spec ? spec.category : inferCategory({ keyword: rawPos }));
+    const taskId = kwargs['task-id'] ? String(kwargs['task-id']).trim() : '';
+    const boundTask = taskId ? getMonitoringTask(taskId) : null;
+    const rawPos = kwargs.query || kwargs._?.[0] || (boundTask ? boundTask.keyword : '');
+    const spec = getProductSpec(kwargs.category || rawPos || (boundTask ? boundTask.category : ''));
+    const category = kwargs.category ? String(kwargs.category).trim() : (boundTask?.category || (spec ? spec.category : inferCategory({ keyword: rawPos })));
     const query = String(rawPos || (spec ? spec.defaultQuery : '') || 'nexg 2n').trim();
-    const minPrice = kwargs['min-price'] || kwargs['price-floor'] || (spec?.priceFloor ? String(spec.priceFloor) : null);
-    const maxPrice = kwargs['max-price'] || null;
+    const minPrice = kwargs['min-price'] || kwargs['price-floor'] || (boundTask?.price_floor ? String(boundTask.price_floor) : (spec?.priceFloor ? String(spec.priceFloor) : null));
+    const maxPrice = kwargs['max-price'] || (boundTask?.target_price ? String(boundTask.target_price) : null);
     const maxPriceNum = maxPrice ? parseFloat(String(maxPrice).replace(/[^\d.]/g, '')) : null;
-    const customExclude = kwargs.exclude ? String(kwargs.exclude).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
-    const customRequire = kwargs.require ? String(kwargs.require).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
-    const intervalSec = Math.max(60, Number(kwargs.interval) || 3600);
+    const customExclude = (kwargs.exclude ? String(kwargs.exclude).split(/[,，]/) : (boundTask?.exclude_keywords ? boundTask.exclude_keywords.split(/[,，]/) : [])).map(s => s.trim()).filter(Boolean);
+    const customRequire = (kwargs.require ? String(kwargs.require).split(/[,，]/) : (boundTask?.require_keywords ? boundTask.require_keywords.split(/[,，]/) : [])).map(s => s.trim()).filter(Boolean);
+    const intervalSec = Math.max(60, Number(kwargs.interval) || (boundTask?.interval_sec || 3600));
     const isDaemon = Boolean(kwargs.daemon);
     const maxIterations = isDaemon ? 999999 : Math.max(1, Math.min(Number(kwargs.iterations) || 1, 100));
-    const webhookUrl = kwargs.webhook ? String(kwargs.webhook).trim() : null;
+    const webhookUrl = kwargs.webhook ? String(kwargs.webhook).trim() : (boundTask?.webhook_url || null);
     const webhookToken = kwargs['webhook-token'] ? String(kwargs['webhook-token']).trim() : null;
     const enableNotify = Boolean(kwargs.notify);
     const diffOnly = Boolean(kwargs['diff-only']);
