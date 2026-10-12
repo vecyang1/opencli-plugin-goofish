@@ -15,6 +15,8 @@ import {
 } from '../src/db.js';
 import { isAccessoryTitle, inferCategory, getProductSpec } from '../src/contract.js';
 import { humanDelay } from '../clis/goofish/_shared.js';
+import { startDashboardServer } from '../src/server.js';
+import { syncWithNotion } from '../src/notion-sync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,6 +67,12 @@ function parseCliArgs(args) {
     '--iterations',
     '--webhook',
     '--webhook-token',
+    '--port', '-p',
+    '--db',
+    '--parent',
+    '--target-price',
+    '--price-floor',
+    '--require',
   ]);
   const positionals = [];
   const options = {};
@@ -521,6 +529,52 @@ async function main() {
       break;
     }
 
+    case 'track': {
+      const res = spawnSync('opencli', ['xianyu', 'track', ...subArgs], { stdio: 'inherit' });
+      process.exit(res.status ?? 0);
+      break;
+    }
+
+    case 'history': {
+      const res = spawnSync('opencli', ['xianyu', 'history', ...subArgs], { stdio: 'inherit' });
+      process.exit(res.status ?? 0);
+      break;
+    }
+
+    case 'ui':
+    case 'serve':
+    case 'dashboard': {
+      const { options } = parseCliArgs(subArgs);
+      const port = Number(options['--port'] || options['-p'] || '3838');
+      const noOpen = options['--no-open'] || false;
+      const { url } = await startDashboardServer({ port });
+      if (!noOpen) {
+        const openCmd = process.platform === 'darwin' ? `open "${url}"` : `xdg-open "${url}"`;
+        execSync(openCmd, { stdio: 'ignore' });
+      }
+      console.log('按 Ctrl+C 停止 Web 服务\n');
+      // Keep process running
+      await new Promise(() => {});
+      break;
+    }
+
+    case 'notion-sync':
+    case 'notion': {
+      const { options } = parseCliArgs(subArgs);
+      const dbId = options['--db'] || null;
+      const parentPageId = options['--parent'] || null;
+      console.log('🔄 正在执行闲鱼低价监控与 Notion 数据库双向对账同步...');
+      const res = await syncWithNotion({ databaseId: dbId, parentPageId });
+      console.log('✅ Notion 同步完成！');
+      console.log(`📋 数据库链接: ${res.notion_url}`);
+      console.log(`⬇️ 从 Notion 拉回修改: ${res.pulled_from_notion} 条`);
+      console.log(`⬆️ 新推送到 Notion: ${res.pushed_new_to_notion} 个任务`);
+      console.log(`🔄 更新 Notion 任务指标: ${res.updated_in_notion} 个任务`);
+      console.log(`⏱️ 耗时: ${res.duration_ms}ms (${res.synced_at})`);
+      process.exit(0);
+      break;
+    }
+
     case 'help':
     default: {
       console.log(`
@@ -545,6 +599,10 @@ async function main() {
   xy-chat sync-chats                 全量同步私信记录并分析卖家沟通状态 (支持吉他与数码卖家)
   xy-chat pick [target] [options]    全自动搜索、比价、风控过滤并输出最优推荐 (支持吉他预设或任意关键词如 "绿联 15375")
   xy-chat watch [query] [options]    周期性/实时监听新上架宝贝与降价动态 (支持 --webhook, --notify, --diff-only, --category, --max-price, --exclude, --iterations)
+  xy-chat track [query] [options]    低价监控任务队列管理 (添加/查询/暂停/恢复/删除, 支持 --target-price, --price-floor)
+  xy-chat history [query] [options]  历史价格走势、底价分析、中位数与捡漏突刺查询 (支持 --spikes-only, --target-price)
+  xy-chat ui [--port 3838]           启动人机协同 Web 管理中控台 (含规则诊断器与实时看板)
+  xy-chat notion-sync                触发与 Notion 数据库双向对账同步
   xy-chat purge                      清理本地 SQLite SSOT 中的配件、噪音及异常低价无效记录
   xy-chat sync                       全量同步线上资产至本地 SQLite SSOT
   xy-chat stats                      查看本地离线库统计数据

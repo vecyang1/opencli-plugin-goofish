@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-10-12
+
+### Added
+- **Price Monitoring Queue & Low-Price Snipe Engine (`clis/goofish/_contract.js`, `clis/goofish/_db.js`, `clis/goofish/watch.js`, `clis/goofish/track.js`, `clis/goofish/history.js`)**:
+  - SQLite SSOT table `monitoring_tasks` with strict contract validation (`validateMonitoringTask`), priority, status (`active`, `paused`), alert threshold (`target_price`), price floor anti-accessory filter (`price_floor`), regex include/exclude rules, and auto-updated low-price candidate counters.
+  - Time-series table `price_history` with contract validation (`validatePriceHistoryRecord`) recording every observed SKU price, spotting timestamp, seller ID, and deviation from target.
+  - Statistical floor analyzer (`computePriceHistoryStats`, `getPriceHistorySummary`) calculating historical floor, market median, price distribution percentiles, and below-market bargain spikes (e.g. 恩雅 NEXG 2N typically ~¥1900 with transient appearances below ¥1600).
+  - CLI adapters `opencli xianyu track` and `opencli xianyu history` for complete queue and pricing distribution inspection.
+- **Human-Editable Operations Web Dashboard (`src/server.js`, `web/index.html`, `web/styles.css`, `web/app.js`, `clis/goofish/ui.js`)**:
+  - Built according to `/designing-human-editable-ops-apps` and `/design-md` styling principles with Dark Luxury / Editorial aesthetics.
+  - 5 operational workspaces:
+    1. **🎯 监控任务队列 (Task Queue)**: Live table with pause/resume, one-click scan, delete, and task creation modal with real DB persistence.
+    2. **🚨 捡漏发现雷达 (Bargain Feed)**: Real-time list of items below target price with seller metrics and direct links.
+    3. **📈 历史底价走势 (Price History)**: Distribution cards, floor/median stats, and recent price listings.
+    4. **🔍 规则对账诊断器 (Rule Inspector "能读·能试·能调")**: Interactive tester explaining why an item or link is accepted or rejected across 4 filter gates (Positive Keywords, Negative Keywords, Price Floor, Target Price).
+    5. **🔄 Notion 双向同步 (Notion Bridge)**: Manual/scheduled sync triggering and status view.
+  - Zero-Facade Invariant: 0 simulated network calls, 0 dead clicks, 0 mock arrays; 100% real SQLite round-trip surviving page refresh.
+  - Real-time Server-Sent Events (SSE) via `dbEmitter` pushing instant updates to UI.
+- **Notion Database Bidirectional Reconciliation Bridge (`src/notion-sync.js`, `scripts/notion-sync.js`)**:
+  - Connects local SQLite SSOT with Notion database `https://notion.so/3f7e1b43239381f7bc8ee3131a3534be` under Dash collection (`12be1b43-2393-8064-a99f-eb2a407187fe`).
+  - Caches database ID in `system_config` table to eliminate duplicate creation.
+  - Pushes task metrics, statuses, and links; pulls operator edits (target price, pause/resume) back into SQLite SSOT.
+
+### Tested & Verified
+- **Automated Tests**: 81/81 automated tests green (`npm test`), including `tests/price_tracking.test.js`, `tests/dashboard_server.test.js`, and `tests/install_contract.test.js`.
+- **E2E Real Browser Verification (`/ego-browser`)**: Executed `tests/e2e_verify.mjs` with `ego-browser nodejs`. Verified Desktop (1280x800) and Mobile (390x844) responsiveness, 0 console errors, tab navigation, task creation, state toggling, positive and negative diagnostic pipeline execution, and page reload persistence.
+- **Adapter Registration**: All 33 CLI adapters installed and synchronized across `~/.opencli/clis/goofish` and `~/.opencli/clis/xianyu`.
+
+## [2026-10-04] - 2026-10-04
+
+### Features
+- Add seller copy audit contract and pre-line formatting verification (v1.8.8) (`8d17eff`)
+
+### Documentation
+- Add .env.example configuration template (`12826ed`)
+
 ## [1.8.8] - 2026-10-02
 
 ### Added

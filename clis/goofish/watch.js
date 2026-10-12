@@ -4,7 +4,8 @@ import { safeGoto, humanDelay } from './_shared.js';
 import { 
   saveCandidates, 
   queryCandidates, 
-  subscribeLiveQuery 
+  subscribeLiveQuery,
+  recordPriceHistory
 } from './_db.js';
 import { 
   isAccessoryTitle, 
@@ -45,6 +46,7 @@ export const command = cli({
     { name: 'notify', type: 'bool', default: false, help: '触发 macOS 桌面横幅系统通知' },
     { name: 'diff-only', type: 'bool', default: false, help: '仅在产生新上架或降价事件时输出结果 (稳态静默)' },
     { name: 'inspect-images', type: 'bool', default: false, help: '对新上架候选执行多图深度客观瑕疵质检' },
+    { name: 'task-id', type: 'str', help: '关联的监控任务 ID' },
   ],
   columns: [
     'timestamp',
@@ -265,6 +267,12 @@ export const command = cli({
             // Unidirectional write: save to SQLite DB
             // This triggers dbEmitter -> live query push update
             saveCandidates(validCandidates, { keyword: query, category, filterAccessories: true });
+            recordPriceHistory(validCandidates, { 
+              task_id: kwargs['task-id'] || '', 
+              keyword: query, 
+              category, 
+              target_price: maxPriceNum 
+            });
           }
         }
 

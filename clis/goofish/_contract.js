@@ -128,6 +128,77 @@ export const SCHEMA_CONTRACT = {
         updated_at: { type: 'TEXT', notNull: true, description: '记录同步时间 (ISO)' },
       },
     },
+
+    monitoring_tasks: {
+      tableName: 'monitoring_tasks',
+      primaryKey: ['task_id'],
+      columns: {
+        task_id: { type: 'TEXT', notNull: true, description: '监控任务唯一标识' },
+        keyword: { type: 'TEXT', notNull: true, description: '搜索关键词' },
+        category: { type: 'TEXT', default: '', description: '归一化品类' },
+        target_price: { type: 'REAL', notNull: true, default: 0, description: '目标捡漏价/报警阈值 (元)' },
+        price_floor: { type: 'REAL', default: 0, description: '最低有效价格地板' },
+        max_price: { type: 'REAL', default: 0, description: '最高价格上限' },
+        require_keywords: { type: 'TEXT', default: '', description: '必须包含的正向词 (逗号分隔)' },
+        exclude_keywords: { type: 'TEXT', default: '', description: '自定义排除词 (逗号分隔)' },
+        historical_low_price: { type: 'REAL', default: 0, description: '历史上曾出现的最低价 (元)' },
+        historical_low_item_id: { type: 'TEXT', default: '', description: '历史最低价商品ID' },
+        historical_low_url: { type: 'TEXT', default: '', description: '历史最低价商品直链' },
+        current_low_price: { type: 'REAL', default: 0, description: '当前在售最低价格 (元)' },
+        total_spotted_count: { type: 'INTEGER', default: 0, description: '累计扫描发现的有效商品数量' },
+        below_target_count: { type: 'INTEGER', default: 0, description: '累计出现低于目标价的捡漏数量' },
+        status: { 
+          type: 'TEXT', 
+          notNull: true, 
+          default: 'active', 
+          description: '任务状态: active(监控中) | paused(已暂停) | alerting(发现低价报警)' 
+        },
+        interval_sec: { type: 'INTEGER', default: 1800, description: '监控轮询间隔秒数' },
+        notify_channels: { type: 'TEXT', default: 'desktop,webhook', description: '通知渠道 (desktop,webhook,notion)' },
+        webhook_url: { type: 'TEXT', default: '', description: '自定义 Webhook 回调地址' },
+        last_checked_at: { type: 'TEXT', default: '', description: '最近一次检查时间 (ISO)' },
+        last_alert_at: { type: 'TEXT', default: '', description: '最近一次触发报警时间 (ISO)' },
+        notes: { type: 'TEXT', default: '', description: '操作员备注/核对注记' },
+        created_at: { type: 'TEXT', notNull: true, description: '创建时间 (ISO)' },
+        updated_at: { type: 'TEXT', notNull: true, description: '更新时间 (ISO)' },
+      },
+    },
+
+    price_history: {
+      tableName: 'price_history',
+      primaryKey: ['id'],
+      autoIncrement: true,
+      columns: {
+        id: { type: 'INTEGER', notNull: true, description: '自增主键' },
+        item_id: { type: 'TEXT', notNull: true, description: '商品唯一ID' },
+        task_id: { type: 'TEXT', default: '', description: '关联的监控任务ID' },
+        keyword: { type: 'TEXT', notNull: true, description: '搜索关键词' },
+        category: { type: 'TEXT', default: '', description: '归一化品类' },
+        title: { type: 'TEXT', notNull: true, description: '商品标题' },
+        price: { type: 'TEXT', notNull: true, description: '价格字符串 (如 ¥1650)' },
+        price_num: { type: 'REAL', notNull: true, default: 0, description: '数值型价格 (元)' },
+        original_price: { type: 'TEXT', default: '-', description: '划线原价' },
+        seller: { type: 'TEXT', default: '', description: '卖家昵称' },
+        seller_user_id: { type: 'TEXT', default: '', description: '卖家用户ID' },
+        condition: { type: 'TEXT', default: '95新', description: '商品成色' },
+        defect_notes: { type: 'TEXT', default: '', description: '多图质检瑕疵注记' },
+        item_url: { type: 'TEXT', notNull: true, description: '商品直链' },
+        image_url: { type: 'TEXT', default: '', description: '商品主图' },
+        status: { type: 'TEXT', default: 'active', description: '商品状态: active | sold | delisted' },
+        is_below_target: { type: 'INTEGER', default: 0, description: '是否低于监控目标价 (1是 0否)' },
+        spotted_at: { type: 'TEXT', notNull: true, description: '发现时间 (ISO)' },
+      },
+    },
+
+    system_config: {
+      tableName: 'system_config',
+      primaryKey: ['key'],
+      columns: {
+        key: { type: 'TEXT', notNull: true, description: '配置键名' },
+        value: { type: 'TEXT', notNull: true, description: '配置内容 (JSON 或字符串)' },
+        updated_at: { type: 'TEXT', notNull: true, description: '更新时间 (ISO)' },
+      },
+    },
   },
 
   views: {
@@ -166,6 +237,22 @@ export const SCHEMA_CONTRACT = {
         c.seller = r.seller OR 
         (c.seller_user_id != '' AND c.seller_user_id != '-' AND r.seller_user_id != '' AND c.seller_user_id = r.seller_user_id)
       );
+    `,
+
+    price_history_summary: `
+      CREATE VIEW IF NOT EXISTS price_history_summary AS
+      SELECT 
+        keyword,
+        category,
+        MIN(price_num) AS historical_lowest_price,
+        MAX(price_num) AS historical_highest_price,
+        ROUND(AVG(price_num), 2) AS average_price,
+        COUNT(*) AS total_sightings,
+        COUNT(DISTINCT item_id) AS unique_items_count,
+        SUM(CASE WHEN is_below_target = 1 THEN 1 ELSE 0 END) AS below_target_count,
+        MAX(spotted_at) AS last_spotted_at
+      FROM price_history
+      GROUP BY keyword, category;
     `,
   },
 
@@ -1406,6 +1493,178 @@ export function auditSellerCopy(text) {
     pass: flags.length === 0,
     flags,
     warnings,
+  };
+}
+
+/**
+ * Validates and normalizes a monitoring task contract.
+ */
+export function validateMonitoringTask(task = {}) {
+  if (!task || typeof task !== 'object') {
+    throw new TypeError('监控任务数据必须是非空对象');
+  }
+
+  const keyword = String(task.keyword || '').trim();
+  if (!keyword) {
+    throw new TypeError('监控任务必须指定搜索关键词 (keyword)');
+  }
+
+  const taskId = String(task.task_id || `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`).trim();
+  const spec = getProductSpec(task.category || keyword);
+  const category = String(task.category || (spec ? spec.category : inferCategory({ keyword }))).trim();
+  
+  const targetPrice = typeof task.target_price === 'number' 
+    ? task.target_price 
+    : (parseFloat(String(task.target_price || '0').replace(/[^\d.]/g, '')) || 0);
+
+  const priceFloor = typeof task.price_floor === 'number'
+    ? task.price_floor
+    : (parseFloat(String(task.price_floor || '0').replace(/[^\d.]/g, '')) || (spec ? spec.priceFloor : 0) || 0);
+
+  const maxPrice = typeof task.max_price === 'number'
+    ? task.max_price
+    : (parseFloat(String(task.max_price || '0').replace(/[^\d.]/g, '')) || 0);
+
+  const status = ['active', 'paused', 'alerting'].includes(task.status) ? task.status : 'active';
+  const intervalSec = Math.max(60, Number(task.interval_sec) || 1800);
+
+  return {
+    task_id: taskId,
+    keyword,
+    category,
+    target_price: targetPrice,
+    price_floor: priceFloor,
+    max_price: maxPrice,
+    require_keywords: String(task.require_keywords || '').trim(),
+    exclude_keywords: String(task.exclude_keywords || '').trim(),
+    historical_low_price: typeof task.historical_low_price === 'number' ? task.historical_low_price : (parseFloat(task.historical_low_price) || 0),
+    historical_low_item_id: String(task.historical_low_item_id || '').trim(),
+    historical_low_url: String(task.historical_low_url || '').trim(),
+    current_low_price: typeof task.current_low_price === 'number' ? task.current_low_price : (parseFloat(task.current_low_price) || 0),
+    total_spotted_count: Math.max(0, parseInt(task.total_spotted_count, 10) || 0),
+    below_target_count: Math.max(0, parseInt(task.below_target_count, 10) || 0),
+    status,
+    interval_sec: intervalSec,
+    notify_channels: String(task.notify_channels || 'desktop,webhook').trim(),
+    webhook_url: String(task.webhook_url || '').trim(),
+    last_checked_at: String(task.last_checked_at || '').trim(),
+    last_alert_at: String(task.last_alert_at || '').trim(),
+    notes: String(task.notes || '').trim(),
+    created_at: task.created_at || new Date().toISOString(),
+    updated_at: task.updated_at || new Date().toISOString(),
+  };
+}
+
+/**
+ * Validates and normalizes a price history record contract.
+ */
+export function validatePriceHistoryRecord(data = {}) {
+  if (!data || typeof data !== 'object') {
+    throw new TypeError('价格记录数据必须是非空对象');
+  }
+
+  const itemId = String(data.item_id || '').trim();
+  if (!itemId) {
+    throw new TypeError('价格记录必须包含有效商品ID (item_id)');
+  }
+
+  const rawPrice = String(data.price || '').trim();
+  const priceNum = typeof data.price_num === 'number' && !isNaN(data.price_num)
+    ? data.price_num
+    : parseFloat(rawPrice.replace(/[^\d.]/g, '')) || 0;
+
+  const formattedPrice = rawPrice.startsWith('¥') || rawPrice.startsWith('￥')
+    ? rawPrice
+    : `¥${priceNum}`;
+
+  return {
+    item_id: itemId,
+    task_id: String(data.task_id || '').trim(),
+    keyword: String(data.keyword || '').trim(),
+    category: String(data.category || '').trim(),
+    title: String(data.title || '').trim(),
+    price: formattedPrice,
+    price_num: priceNum,
+    original_price: String(data.original_price || '-').trim(),
+    seller: String(data.seller || '-').trim(),
+    seller_user_id: String(data.seller_user_id || '-').trim(),
+    condition: String(data.condition || '95新').trim(),
+    defect_notes: String(data.defect_notes || '').trim(),
+    item_url: String(data.item_url || `https://www.goofish.com/item?id=${itemId}`).trim(),
+    image_url: String(data.image_url || '').trim(),
+    status: ['active', 'sold', 'delisted'].includes(data.status) ? data.status : 'active',
+    is_below_target: data.is_below_target ? 1 : 0,
+    spotted_at: data.spotted_at || new Date().toISOString(),
+  };
+}
+
+/**
+ * Computes price history statistics, price floor, median, and below-target anomalies.
+ */
+export function computePriceHistoryStats(records = [], targetPrice = 0) {
+  if (!Array.isArray(records) || records.length === 0) {
+    return {
+      count: 0,
+      lowestPrice: 0,
+      highestPrice: 0,
+      averagePrice: 0,
+      medianPrice: 0,
+      belowTargetCount: 0,
+      lowestItem: null,
+      recentSpikes: [],
+      priceDistribution: { tier1_bargain: 0, tier2_sweet_spot: 0, tier3_premium: 0 },
+    };
+  }
+
+  const prices = records.map(r => r.price_num).filter(p => p > 0).sort((a, b) => a - b);
+  if (prices.length === 0) {
+    return {
+      count: records.length,
+      lowestPrice: 0,
+      highestPrice: 0,
+      averagePrice: 0,
+      medianPrice: 0,
+      belowTargetCount: 0,
+      lowestItem: null,
+      recentSpikes: [],
+      priceDistribution: { tier1_bargain: 0, tier2_sweet_spot: 0, tier3_premium: 0 },
+    };
+  }
+
+  const lowestPrice = prices[0];
+  const highestPrice = prices[prices.length - 1];
+  const sum = prices.reduce((a, b) => a + b, 0);
+  const averagePrice = +(sum / prices.length).toFixed(2);
+  const mid = Math.floor(prices.length / 2);
+  const medianPrice = prices.length % 2 === 0 ? +((prices[mid - 1] + prices[mid]) / 2).toFixed(2) : prices[mid];
+
+  const lowestItem = records.find(r => r.price_num === lowestPrice) || null;
+  const targetNum = Number(targetPrice) || 0;
+  const belowTarget = targetNum > 0 ? records.filter(r => r.price_num > 0 && r.price_num <= targetNum) : [];
+
+  const range = highestPrice - lowestPrice;
+  const step = range > 0 ? range / 3 : 1;
+  let t1 = 0, t2 = 0, t3 = 0;
+  for (const p of prices) {
+    if (p < lowestPrice + step) t1++;
+    else if (p < lowestPrice + 2 * step) t2++;
+    else t3++;
+  }
+
+  return {
+    count: records.length,
+    lowestPrice,
+    highestPrice,
+    averagePrice,
+    medianPrice,
+    belowTargetCount: belowTarget.length,
+    lowestItem,
+    recentSpikes: belowTarget.slice(-5),
+    priceDistribution: {
+      tier1_bargain: t1,
+      tier2_sweet_spot: t2,
+      tier3_premium: t3,
+    },
   };
 }
 

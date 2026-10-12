@@ -9,6 +9,9 @@ import {
   validateCandidate, 
   validateSellerReview, 
   validateOrder,
+  validateMonitoringTask,
+  validatePriceHistoryRecord,
+  computePriceHistoryStats,
   isAccessoryTitle,
   inferCategory,
   classifySellerCommunication,
@@ -833,6 +836,345 @@ export function getDbStats() {
     messages_stored: msgCount,
     candidates_stored: candidateCount,
     seller_reviews_stored: reviewCount,
+    tasks_stored: db.prepare('SELECT COUNT(*) as count FROM monitoring_tasks').get()?.count || 0,
+    price_history_stored: db.prepare('SELECT COUNT(*) as count FROM price_history').get()?.count || 0,
     total_spent: '¥' + (spentRow.total || 0).toFixed(2),
   };
 }
+
+/**
+ * Saves or updates a monitoring task in SQLite SSOT.
+ * Emits 'table:monitoring_tasks' on dbEmitter.
+ */
+export function saveMonitoringTask(taskData = {}) {
+  const db = getDb();
+  const task = validateMonitoringTask(taskData);
+
+  const stmt = db.prepare(`
+    INSERT INTO monitoring_tasks (
+      task_id, keyword, category, target_price, price_floor, max_price,
+      require_keywords, exclude_keywords, historical_low_price, historical_low_item_id,
+      historical_low_url, current_low_price, total_spotted_count, below_target_count,
+      status, interval_sec, notify_channels, webhook_url, last_checked_at,
+      last_alert_at, notes, created_at, updated_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?,
+      ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?
+    )
+    ON CONFLICT(task_id) DO UPDATE SET
+      keyword = excluded.keyword,
+      category = excluded.category,
+      target_price = excluded.target_price,
+      price_floor = excluded.price_floor,
+      max_price = excluded.max_price,
+      require_keywords = excluded.require_keywords,
+      exclude_keywords = excluded.exclude_keywords,
+      historical_low_price = CASE 
+        WHEN excluded.historical_low_price > 0 AND (monitoring_tasks.historical_low_price = 0 OR excluded.historical_low_price < monitoring_tasks.historical_low_price)
+        THEN excluded.historical_low_price 
+        ELSE monitoring_tasks.historical_low_price 
+      END,
+      historical_low_item_id = CASE
+        WHEN excluded.historical_low_price > 0 AND (monitoring_tasks.historical_low_price = 0 OR excluded.historical_low_price < monitoring_tasks.historical_low_price)
+        THEN excluded.historical_low_item_id
+        ELSE monitoring_tasks.historical_low_item_id
+      END,
+      historical_low_url = CASE
+        WHEN excluded.historical_low_price > 0 AND (monitoring_tasks.historical_low_price = 0 OR excluded.historical_low_price < monitoring_tasks.historical_low_price)
+        THEN excluded.historical_low_url
+        ELSE monitoring_tasks.historical_low_url
+      END,
+      current_low_price = CASE WHEN excluded.current_low_price > 0 THEN excluded.current_low_price ELSE monitoring_tasks.current_low_price END,
+      total_spotted_count = MAX(monitoring_tasks.total_spotted_count, excluded.total_spotted_count),
+      below_target_count = MAX(monitoring_tasks.below_target_count, excluded.below_target_count),
+      status = excluded.status,
+      interval_sec = excluded.interval_sec,
+      notify_channels = excluded.notify_channels,
+      webhook_url = excluded.webhook_url,
+      last_checked_at = CASE WHEN excluded.last_checked_at != '' THEN excluded.last_checked_at ELSE monitoring_tasks.last_checked_at END,
+      last_alert_at = CASE WHEN excluded.last_alert_at != '' THEN excluded.last_alert_at ELSE monitoring_tasks.last_alert_at END,
+      notes = excluded.notes,
+      updated_at = excluded.updated_at
+  `);
+
+  stmt.run(
+    task.task_id, task.keyword, task.category, task.target_price, task.price_floor, task.max_price,
+    task.require_keywords, task.exclude_keywords, task.historical_low_price, task.historical_low_item_id,
+    task.historical_low_url, task.current_low_price, task.total_spotted_count, task.below_target_count,
+    task.status, task.interval_sec, task.notify_channels, task.webhook_url, task.last_checked_at,
+    task.last_alert_at, task.notes, task.created_at, task.updated_at
+  );
+
+  dbEmitter.emit('table:monitoring_tasks', { action: 'save', task_id: task.task_id });
+  dbEmitter.emit('change', { table: 'monitoring_tasks', action: 'save', task_id: task.task_id });
+  return task;
+}
+
+/**
+ * Queries monitoring tasks with optional filters.
+ */
+export function queryMonitoringTasks({ status, keyword, category, limit = 100 } = {}) {
+  const db = getDb();
+  let sql = 'SELECT * FROM monitoring_tasks WHERE 1=1';
+  const params = [];
+
+  if (status) {
+    sql += ' AND status = ?';
+    params.push(status);
+  }
+  if (keyword) {
+    sql += ' AND (keyword LIKE ? OR require_keywords LIKE ?)';
+    params.push(`%${keyword}%`, `%${keyword}%`);
+  }
+  if (category) {
+    sql += ' AND category = ?';
+    params.push(category);
+  }
+
+  sql += ' ORDER BY updated_at DESC LIMIT ?';
+  params.push(Number(limit) || 100);
+
+  return db.prepare(sql).all(...params);
+}
+
+/**
+ * Retrieves a single monitoring task by ID.
+ */
+export function getMonitoringTask(taskId) {
+  if (!taskId) return null;
+  const db = getDb();
+  return db.prepare('SELECT * FROM monitoring_tasks WHERE task_id = ?').get(String(taskId)) || null;
+}
+
+/**
+ * Updates specific fields of a monitoring task.
+ */
+export function updateMonitoringTask(taskId, updates = {}) {
+  if (!taskId) return null;
+  const db = getDb();
+  const existing = getMonitoringTask(taskId);
+  if (!existing) return null;
+
+  const allowedFields = [
+    'keyword', 'category', 'target_price', 'price_floor', 'max_price',
+    'require_keywords', 'exclude_keywords', 'historical_low_price',
+    'historical_low_item_id', 'historical_low_url', 'current_low_price',
+    'total_spotted_count', 'below_target_count', 'status', 'interval_sec',
+    'notify_channels', 'webhook_url', 'last_checked_at', 'last_alert_at', 'notes'
+  ];
+
+  const setClauses = [];
+  const params = [];
+
+  for (const field of allowedFields) {
+    if (updates[field] !== undefined) {
+      setClauses.push(`${field} = ?`);
+      params.push(updates[field]);
+    }
+  }
+
+  if (setClauses.length === 0) return existing;
+
+  const nowIso = new Date().toISOString();
+  setClauses.push('updated_at = ?');
+  params.push(nowIso);
+  params.push(String(taskId));
+
+  db.prepare(`UPDATE monitoring_tasks SET ${setClauses.join(', ')} WHERE task_id = ?`).run(...params);
+  dbEmitter.emit('table:monitoring_tasks', { action: 'update', task_id: taskId, updates });
+  dbEmitter.emit('change', { table: 'monitoring_tasks', action: 'update', task_id: taskId });
+  return getMonitoringTask(taskId);
+}
+
+/**
+ * Deletes a monitoring task by ID.
+ */
+export function deleteMonitoringTask(taskId) {
+  if (!taskId) return false;
+  const db = getDb();
+  const res = db.prepare('DELETE FROM monitoring_tasks WHERE task_id = ?').run(String(taskId));
+  if (res.changes > 0) {
+    dbEmitter.emit('table:monitoring_tasks', { action: 'delete', task_id: taskId });
+    dbEmitter.emit('change', { table: 'monitoring_tasks', action: 'delete', task_id: taskId });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Records price snapshots for candidate items into price_history and updates matching tasks.
+ */
+export function recordPriceHistory(items = [], metadata = {}) {
+  if (!Array.isArray(items) || items.length === 0) return 0;
+  const db = getDb();
+
+  const insertStmt = db.prepare(`
+    INSERT INTO price_history (
+      item_id, task_id, keyword, category, title, price, price_num,
+      original_price, seller, seller_user_id, condition, defect_notes,
+      item_url, image_url, status, is_below_target, spotted_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?
+    )
+  `);
+
+  const taskId = metadata.task_id || '';
+  const task = taskId ? getMonitoringTask(taskId) : null;
+  const targetPrice = task ? task.target_price : (Number(metadata.target_price) || 0);
+
+  let inserted = 0;
+  let currentLow = Infinity;
+  let belowTargetCount = 0;
+  let lowestItem = null;
+
+  for (const raw of items) {
+    try {
+      const priceNum = typeof raw.price_num === 'number' && !isNaN(raw.price_num)
+        ? raw.price_num
+        : parseFloat(String(raw.price || '0').replace(/[^\d.]/g, '')) || 0;
+
+      if (priceNum <= 0) continue;
+
+      const isBelow = targetPrice > 0 && priceNum <= targetPrice;
+      if (isBelow) belowTargetCount++;
+
+      if (priceNum < currentLow) {
+        currentLow = priceNum;
+        lowestItem = raw;
+      }
+
+      const rec = validatePriceHistoryRecord({
+        ...raw,
+        task_id: taskId,
+        keyword: metadata.keyword || raw.keyword || '',
+        category: metadata.category || raw.category || '',
+        is_below_target: isBelow ? 1 : 0,
+        spotted_at: metadata.spotted_at || new Date().toISOString(),
+      });
+
+      insertStmt.run(
+        rec.item_id, rec.task_id, rec.keyword, rec.category, rec.title, rec.price,
+        rec.price_num, rec.original_price, rec.seller, rec.seller_user_id,
+        rec.condition, rec.defect_notes, rec.item_url, rec.image_url,
+        rec.status, rec.is_below_target, rec.spotted_at
+      );
+      inserted++;
+    } catch (e) {}
+  }
+
+  // Update task metrics if task exists
+  if (task && inserted > 0) {
+    const histLow = task.historical_low_price > 0 && task.historical_low_price < currentLow
+      ? task.historical_low_price
+      : (currentLow !== Infinity ? currentLow : task.historical_low_price);
+
+    const histLowItemId = (currentLow !== Infinity && (task.historical_low_price === 0 || currentLow <= task.historical_low_price) && lowestItem)
+      ? lowestItem.item_id
+      : task.historical_low_item_id;
+
+    const histLowUrl = (currentLow !== Infinity && (task.historical_low_price === 0 || currentLow <= task.historical_low_price) && lowestItem)
+      ? lowestItem.item_url
+      : task.historical_low_url;
+
+    const newStatus = (belowTargetCount > 0 && task.status !== 'paused') ? 'alerting' : task.status;
+    const nowIso = new Date().toISOString();
+
+    updateMonitoringTask(task.task_id, {
+      current_low_price: currentLow !== Infinity ? currentLow : task.current_low_price,
+      historical_low_price: histLow,
+      historical_low_item_id: histLowItemId,
+      historical_low_url: histLowUrl,
+      total_spotted_count: task.total_spotted_count + inserted,
+      below_target_count: task.below_target_count + belowTargetCount,
+      status: newStatus,
+      last_checked_at: nowIso,
+      last_alert_at: belowTargetCount > 0 ? nowIso : task.last_alert_at,
+    });
+  }
+
+  if (inserted > 0) {
+    dbEmitter.emit('table:price_history', { action: 'record', count: inserted, task_id: taskId });
+    dbEmitter.emit('change', { table: 'price_history', action: 'record', count: inserted });
+  }
+
+  return inserted;
+}
+
+/**
+ * Queries price history records with optional filters.
+ */
+export function queryPriceHistory({ keyword, category, task_id, is_below_target, limit = 100 } = {}) {
+  const db = getDb();
+  let sql = 'SELECT * FROM price_history WHERE 1=1';
+  const params = [];
+
+  if (task_id) {
+    sql += ' AND task_id = ?';
+    params.push(task_id);
+  }
+  if (keyword) {
+    sql += ' AND (keyword LIKE ? OR title LIKE ?)';
+    params.push(`%${keyword}%`, `%${keyword}%`);
+  }
+  if (category) {
+    sql += ' AND category = ?';
+    params.push(category);
+  }
+  if (is_below_target !== undefined && is_below_target !== null) {
+    sql += ' AND is_below_target = ?';
+    params.push(is_below_target ? 1 : 0);
+  }
+
+  sql += ' ORDER BY spotted_at DESC, id DESC LIMIT ?';
+  params.push(Number(limit) || 100);
+
+  return db.prepare(sql).all(...params);
+}
+
+/**
+ * Aggregates price history statistics for a keyword or category.
+ */
+export function getPriceHistorySummary({ keyword, category, target_price = 0 } = {}) {
+  const records = queryPriceHistory({ keyword, category, limit: 1000 });
+  return computePriceHistoryStats(records, target_price);
+}
+
+/**
+ * Retrieve configuration value from system_config.
+ */
+export function getConfig(key, defaultValue = null) {
+  const db = getDb();
+  initSchema(db);
+  const row = db.prepare('SELECT value FROM system_config WHERE key = ?').get(key);
+  if (!row) return defaultValue;
+  try {
+    return JSON.parse(row.value);
+  } catch (e) {
+    return row.value;
+  }
+}
+
+/**
+ * Persist configuration value into system_config.
+ */
+export function setConfig(key, value) {
+  const db = getDb();
+  initSchema(db);
+  const now = new Date().toISOString();
+  const valStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  db.prepare(`
+    INSERT INTO system_config (key, value, updated_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      value = excluded.value,
+      updated_at = excluded.updated_at
+  `).run(key, valStr, now);
+  dbEmitter.emit('mutation', { table: 'system_config', action: 'set', key });
+  return true;
+}
+

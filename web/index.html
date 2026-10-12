@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>闲鱼低价监控与捡漏中控台 · Goofish Ops</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo">🐟</div>
+      <div>
+        <div class="brand-title">闲鱼低价监控与捡漏中控台</div>
+        <div class="brand-subtitle">SQLite SSOT 单一事实来源 · Notion 数据库双向对账 · 实时推送订阅</div>
+      </div>
+      <div id="sseStatusPill" class="header-status-pill">
+        <span class="header-status-dot"></span>
+        <span id="sseStatusText">实时同步已就绪</span>
+      </div>
+    </div>
+
+    <div class="stats-ticker">
+      <div class="ticker-item">
+        <span class="ticker-label">监控任务</span>
+        <span class="ticker-value" id="tickerTasks">-</span>
+      </div>
+      <div class="ticker-item">
+        <span class="ticker-label">低价突刺</span>
+        <span class="ticker-value" id="tickerSpikes" style="color: var(--accent-rose);">-</span>
+      </div>
+      <div class="ticker-item">
+        <span class="ticker-label">候选宝贝</span>
+        <span class="ticker-value" id="tickerCandidates">-</span>
+      </div>
+      <div class="ticker-item">
+        <span class="ticker-label">历史价格点</span>
+        <span class="ticker-value" id="tickerHistory">-</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tabs Navigation -->
+  <nav class="tabs-bar">
+    <button class="tab-btn active" data-tab="tab-queue" id="tabBtnQueue">
+      🎯 监控队列 <span class="tab-badge" id="badgeQueueCount">0</span>
+    </button>
+    <button class="tab-btn" data-tab="tab-feed" id="tabBtnFeed">
+      🔥 捡漏发现 <span class="tab-badge" id="badgeFeedCount">0</span>
+    </button>
+    <button class="tab-btn" data-tab="tab-history" id="tabBtnHistory">
+      📈 历史底价走势
+    </button>
+    <button class="tab-btn" data-tab="tab-inspector" id="tabBtnInspector">
+      🔍 规则诊断器 (能读·能试·能调)
+    </button>
+    <button class="tab-btn" data-tab="tab-notion" id="tabBtnNotion">
+      🔄 Notion 双向同步
+    </button>
+  </nav>
+
+  <!-- Main Content Container -->
+  <main class="main-content">
+    
+    <!-- Tab 1: 监控队列 -->
+    <section id="tab-queue" class="tab-panel active">
+      <div class="summary-grid">
+        <div class="stat-card">
+          <div class="stat-icon cyan">🎯</div>
+          <div class="stat-info">
+            <div class="stat-num" id="statTotalTasks">0</div>
+            <div class="stat-desc">已注册监控任务</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">🟢</div>
+          <div class="stat-info">
+            <div class="stat-num" id="statActiveTasks">0</div>
+            <div class="stat-desc">活跃监控中</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon rose">🚨</div>
+          <div class="stat-info">
+            <div class="stat-num" id="statAlertingTasks">0</div>
+            <div class="stat-desc">发现低价突刺</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon amber">📦</div>
+          <div class="stat-info">
+            <div class="stat-num" id="statTotalSpotted">0</div>
+            <div class="stat-desc">历史抓取频次</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-bar">
+        <div class="action-buttons">
+          <button class="btn btn-primary" id="btnOpenNewTaskModal">
+            <span>➕</span> 新建监控任务
+          </button>
+          <button class="btn btn-secondary" id="btnRefreshTasks">
+            <span>🔄</span> 刷新
+          </button>
+        </div>
+        <div class="action-buttons">
+          <select class="select-input" id="filterTaskStatus">
+            <option value="">全部状态</option>
+            <option value="active">🟢 监控中</option>
+            <option value="paused">⚪ 已暂停</option>
+            <option value="alerting">🚨 发现低价</option>
+          </select>
+          <input type="text" class="search-input" id="searchTaskKeyword" placeholder="搜索关键词或品类...">
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-responsive">
+          <table id="tasksTable">
+            <thead>
+              <tr>
+                <th>状态</th>
+                <th>关键词 / 监控品类</th>
+                <th>目标捡漏价</th>
+                <th>防杂音地板</th>
+                <th>当前低价</th>
+                <th>历史最低价</th>
+                <th>捕获频次</th>
+                <th>突刺次数</th>
+                <th>最近扫描</th>
+                <th style="text-align: right;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="tasksTableBody">
+              <tr>
+                <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                  加载中...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 2: 捡漏发现 Feed -->
+    <section id="tab-feed" class="tab-panel">
+      <div class="controls-bar">
+        <div class="action-buttons">
+          <select class="select-input" id="filterFeedCategory">
+            <option value="">全部品类</option>
+            <option value="nexg2_nylon">恩雅 NEXG 2N 智能吉他</option>
+            <option value="ugreen_hub">绿联 15375 9合1拓展坞</option>
+            <option value="lava_me_air">拿火 LAVA ME play/Air</option>
+            <option value="sony_a7m4">索尼 A7M4 相机</option>
+          </select>
+          <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-main); cursor: pointer;">
+            <input type="checkbox" id="checkFeedSpikesOnly"> 仅看低价突刺
+          </label>
+        </div>
+        <div class="action-buttons">
+          <select class="select-input" id="sortFeed">
+            <option value="price_asc">价格从低到高</option>
+            <option value="price_desc">价格从高到低</option>
+            <option value="time_desc">最新扫描入库</option>
+          </select>
+          <button class="btn btn-secondary" id="btnRefreshFeed">
+            <span>🔄</span> 刷新 Feed
+          </button>
+        </div>
+      </div>
+
+      <div class="feed-grid" id="feedGrid">
+        <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 50px;">
+          暂无候选宝贝记录，请先在监控队列中添加任务并运行扫描
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: 历史底价走势 -->
+    <section id="tab-history" class="tab-panel">
+      <div class="controls-bar">
+        <div class="action-buttons">
+          <select class="select-input" id="historyKeywordSelect" style="min-width: 260px;">
+            <option value="nexg 2n 尼龙">恩雅 NEXG 2N 智能吉他 (nexg 2n 尼龙)</option>
+            <option value="绿联 15375">绿联 15375 9合1拓展坞 (绿联 15375)</option>
+          </select>
+          <button class="btn btn-secondary" id="btnRefreshHistory">
+            <span>📊</span> 查询走势
+          </button>
+        </div>
+      </div>
+
+      <!-- History Summary Metrics -->
+      <div class="summary-grid" style="margin-bottom: 20px;">
+        <div class="stat-card">
+          <div class="stat-icon rose">🏆</div>
+          <div class="stat-info">
+            <div class="stat-num" id="historyLowestPrice">-</div>
+            <div class="stat-desc">历史曾出现最低价 (Floor)</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon cyan">📊</div>
+          <div class="stat-info">
+            <div class="stat-num" id="historyAveragePrice">-</div>
+            <div class="stat-desc">市场平均在售标价</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon purple">⚖️</div>
+          <div class="stat-info">
+            <div class="stat-num" id="historyMedianPrice">-</div>
+            <div class="stat-desc">市场价格中位数</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon amber">🔥</div>
+          <div class="stat-info">
+            <div class="stat-num" id="historyBelowTargetCount">-</div>
+            <div class="stat-desc">低于目标价突刺次数</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Price Distribution Bar -->
+      <div class="card" style="margin-bottom: 20px;">
+        <div style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #fff;">
+          📊 价格区间分布与异常低价突刺雷达
+        </div>
+        <div id="priceDistributionBars" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- History Records Table -->
+      <div class="table-card">
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>捕获时间</th>
+                <th>标价</th>
+                <th>判定标签</th>
+                <th>成色</th>
+                <th>质检注记</th>
+                <th>卖家</th>
+                <th>商品标题</th>
+                <th style="text-align: right;">闲鱼直达</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: 规则诊断器 Inspector ("能读·能试·能调") -->
+    <section id="tab-inspector" class="tab-panel">
+      <div style="margin-bottom: 16px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: #fff;">对账器优先：全链路业务规则诊断器</h2>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+          “凡称可配置，必须可检查；凡有业务规则，必须能找到对账依据。” 输入商品标题与价格，验算完整的过滤判定流水线。
+        </p>
+      </div>
+
+      <div class="diagnostic-container">
+        <!-- "能试" Panel -->
+        <div class="card">
+          <h3 style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 16px;">
+            🧪 样本输入与实时对账 (能试)
+          </h3>
+          
+          <div class="form-group">
+            <label class="form-label">商品标题 *</label>
+            <input type="text" class="form-control" id="diagTitle" value="恩雅 NEXG 2N 静音智能吉他 尼龙弦款 黑色 99新">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">在售标价 (元) *</label>
+            <input type="number" class="form-control" id="diagPrice" value="1550">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">归一化品类 (可选)</label>
+            <select class="form-control" id="diagCategory">
+              <option value="">自动启发式识别</option>
+              <option value="nexg2_nylon">nexg2_nylon (恩雅 NEXG 2N)</option>
+              <option value="ugreen_hub">ugreen_hub (绿联 15375)</option>
+              <option value="lava_me_air">lava_me_air (拿火 LAVA)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">目标报警阈值 (低于此价格报警)</label>
+            <input type="number" class="form-control" id="diagTargetPrice" value="1600">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">排除词 (逗号分隔)</label>
+            <input type="text" class="form-control" id="diagExclude" value="配件,琴包,吉他包,踏板,钢弦">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">必须包含词 (逗号分隔)</label>
+            <input type="text" class="form-control" id="diagRequire" value="2N,尼龙">
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-primary" id="btnRunDiagnosis" style="flex: 1;">
+              <span>🚀</span> 运行规则诊断
+            </button>
+            <button class="btn btn-secondary" id="btnFillPresetAccessory">
+              测试配件负样本
+            </button>
+          </div>
+        </div>
+
+        <!-- Diagnostic Stepper & Receipt -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="font-size: 14px; font-weight: 600; color: #fff;">
+              📋 规则判定审计收据 (Trace Receipt)
+            </h3>
+            <div id="diagFinalVerdictBadge">
+              <span class="badge badge-gray">等待运行诊断</span>
+            </div>
+          </div>
+
+          <div id="diagActionNotice" style="padding: 10px 14px; background: rgba(56, 189, 248, 0.1); border-left: 3px solid var(--accent-cyan); border-radius: 4px; font-size: 13px; color: var(--text-main); margin-bottom: 14px;">
+            点击左侧“运行规则诊断”即可查看执行流水线与过滤决策依据。
+          </div>
+
+          <div class="stepper" id="diagStepper">
+            <!-- Dynamically populated steps -->
+          </div>
+
+          <!-- "能调" Panel -->
+          <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+            <button class="btn btn-primary" id="btnSaveDiagAsTask">
+              <span>💾</span> 将此诊断规则保存为监控任务 (能调)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- "能读" Panel: Active Specs Table -->
+      <div class="card" style="margin-top: 24px;">
+        <h3 style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 14px;">
+          📖 当前生效的系统品类规则库 (能读)
+        </h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>品类标识 (Key)</th>
+                <th>品类原型 (Archetype)</th>
+                <th>品类全称描述</th>
+                <th>默认查询词</th>
+                <th>价格地板 (防杂音)</th>
+                <th>别名库</th>
+              </tr>
+            </thead>
+            <tbody id="rulesTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 5: Notion 双向同步 -->
+    <section id="tab-notion" class="tab-panel">
+      <div class="summary-grid" style="margin-bottom: 24px;">
+        <div class="stat-card">
+          <div class="stat-icon purple">🪐</div>
+          <div class="stat-info">
+            <div class="stat-num" style="font-size: 18px;">Vec Yang's Notion</div>
+            <div class="stat-desc">授权工作空间 (Student's Space)</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">🤖</div>
+          <div class="stat-info">
+            <div class="stat-num" style="font-size: 18px;">Antigravity_260528</div>
+            <div class="stat-desc">1Password 无人值守凭证</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon cyan">📊</div>
+          <div class="stat-info">
+            <div class="stat-num" style="font-size: 18px;">已挂载数据库</div>
+            <div class="stat-desc"><a href="https://notion.so/1d9aeec44cd948fcbfefacbe8f0859bd" target="_blank" style="color: var(--accent-cyan); text-decoration: none;">1d9aeec44cd948fc... ↗</a></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 15px; font-weight: 700; color: #fff;">双向对账机制说明</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+              - <strong>上行推送</strong>：将本地 SQLite SSOT 中的监控任务、最低标价、捕获频次及捡漏突刺自动推送到 Notion。<br>
+              - <strong>下行拉回</strong>：若操作员在 Notion 界面修改了“目标价格”或将状态改为“⚪ 已暂停”，同步时将自动回写到本地 SQLite SSOT。
+            </p>
+          </div>
+          <button class="btn btn-primary" id="btnTriggerNotionSync">
+            <span>🚀</span> 立即执行双向同步
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 12px;">
+          🖥️ 同步控制台与执行日志 (Sync Ledger)
+        </h3>
+        <pre id="notionSyncLog" style="background: var(--bg-input); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: monospace; font-size: 12px; color: #cbd5e1; max-height: 320px; overflow-y: auto;">
+[系统] Notion 同步模块就绪，点击上方按钮触发全量对账。
+        </pre>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: 新建 / 编辑监控任务 -->
+  <div class="modal-overlay" id="taskModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 16px; font-weight: 700; color: #fff;" id="modalTaskTitle">新建低价监控任务</h3>
+        <button class="modal-close" id="btnModalClose">&times;</button>
+      </div>
+
+      <form id="taskForm">
+        <input type="hidden" id="formTaskId">
+
+        <div class="form-group">
+          <label class="form-label">监控关键词 * (如 nexg 2n 尼龙 或 绿联 15375)</label>
+          <input type="text" class="form-control" id="formKeyword" required placeholder="例如: nexg 2n 尼龙">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">归一化品类 (可选，自动推断)</label>
+          <select class="form-control" id="formCategory">
+            <option value="">自动识别</option>
+            <option value="nexg2_nylon">nexg2_nylon (恩雅 NEXG 2N)</option>
+            <option value="ugreen_hub">ugreen_hub (绿联 15375)</option>
+            <option value="lava_me_air">lava_me_air (拿火 LAVA ME play/Air)</option>
+            <option value="sony_a7m4">sony_a7m4 (索尼 A7M4 相机)</option>
+            <option value="other">other (其他通用)</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">目标捡漏价 (低于此价格报警) *</label>
+            <input type="number" class="form-control" id="formTargetPrice" required placeholder="例如: 1600">
+          </div>
+          <div class="form-group">
+            <label class="form-label">防杂音地板价 (低于此视为配件)</label>
+            <input type="number" class="form-control" id="formPriceFloor" placeholder="例如: 700">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">必须包含词 (逗号分隔)</label>
+          <input type="text" class="form-control" id="formRequire" placeholder="例如: 2N,尼龙">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">排除词 (逗号分隔)</label>
+          <input type="text" class="form-control" id="formExclude" placeholder="例如: 配件,琴包,踏板,钢弦">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">轮询扫描间隔 (秒)</label>
+            <input type="number" class="form-control" id="formInterval" value="1800">
+          </div>
+          <div class="form-group">
+            <label class="form-label">任务初始状态</label>
+            <select class="form-control" id="formStatus">
+              <option value="active">🟢 立即开启监控</option>
+              <option value="paused">⚪ 暂存 (已暂停)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">操作员备注 / 备忘</label>
+          <input type="text" class="form-control" id="formNotes" placeholder="例如: 蹲个黑色尼龙弦自用">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnModalCancel">取消</button>
+          <button type="submit" class="btn btn-primary" id="btnModalSubmit">保存并持久化到数据库</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

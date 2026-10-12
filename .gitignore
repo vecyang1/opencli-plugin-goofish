@@ -24,3 +24,7 @@ PROJECT_LINKS.md
 MEMORY.md
 operations/
 vault/
+.agents/
+tests/*.png
+.env
+.env.*
