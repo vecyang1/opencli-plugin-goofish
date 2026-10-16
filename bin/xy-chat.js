@@ -541,6 +541,13 @@ async function main() {
       break;
     }
 
+    case 'explain':
+    case 'diagnose': {
+      const res = spawnSync('opencli', ['xianyu', 'explain', ...subArgs], { stdio: 'inherit' });
+      process.exit(res.status ?? 0);
+      break;
+    }
+
     case 'ui':
     case 'serve':
     case 'dashboard': {
@@ -601,6 +608,7 @@ async function main() {
   xy-chat watch [query] [options]    周期性/实时监听新上架宝贝与降价动态 (支持 --webhook, --notify, --diff-only, --category, --max-price, --exclude, --iterations)
   xy-chat track [query] [options]    低价监控任务队列管理 (添加/查询/暂停/恢复/删除, 支持 --target-price, --price-floor)
   xy-chat history [query] [options]  历史价格走势、底价分析、中位数与捡漏突刺查询 (支持 --spikes-only, --target-price)
+  xy-chat explain <标题/商品ID> [options] 契约可解释性诊断与底价对账 (支持 --price, --category, --exclude, --require)
   xy-chat ui [--port 3838]           启动人机协同 Web 管理中控台 (含规则诊断器与实时看板)
   xy-chat notion-sync                触发与 Notion 数据库双向对账同步
   xy-chat purge                      清理本地 SQLite SSOT 中的配件、噪音及异常低价无效记录

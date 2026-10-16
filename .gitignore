@@ -28,3 +28,5 @@ vault/
 tests/*.png
 .env
 .env.*
+.run/
+reports/

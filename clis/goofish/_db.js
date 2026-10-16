@@ -533,8 +533,10 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
     for (const raw of items) {
       if (!raw.item_id || raw.item_id === '-') continue;
 
+      const effectiveCat = category || raw.category || inferCategory({ keyword: keyword || raw.keyword, title: raw.title });
+
       // Filter out accessories before writing to SSOT
-      if (filterAccessories && isAccessoryTitle(raw.title, category || raw.category)) {
+      if (filterAccessories && isAccessoryTitle(raw.title, effectiveCat)) {
         continue;
       }
 
@@ -543,7 +545,7 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
         valid = validateCandidate({
           ...raw,
           keyword: keyword || raw.keyword,
-          category: category || raw.category,
+          category: (effectiveCat && effectiveCat !== 'other') ? effectiveCat : (category || raw.category || ''),
         });
       } catch (e) {
         continue;

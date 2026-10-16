@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.2] - 2026-10-14
+
+### Added & Hardened
+- **Power Bank & Multi-functional 3-in-1 Charging Archetype (`power_bank`, `baseus_picogo_67w`)**:
+  - Registered `power_bank` as the 10th hardware archetype in `inferArchetype`, `ARCHETYPE_ACCESSORY_PATTERNS`, and `getProductSpec`.
+  - Implemented `POWER_BANK_ACCESSORY_REGEX` catching cases, protective boxes, and bare shells (`收纳包|收纳盒|保护套|硅胶套|保护盒|外壳|套料|DIY套料|空壳|空盒|仅外壳`).
+  - Added `baseus_picogo_67w` catalog entry in `PRODUCT_CATALOG` (aliases: `picogo`, `picogo_67w`, `倍思67w`, `超能充pro`, `倍思三合一`), default query `倍思 PicoGo 67W`, price floor ¥220, target price ¥310, description `倍思 PicoGo 超能充 Pro 67W 三合一移动电源 (10000mAh 带伸缩线)`.
+  - Enforced negative exclusion `/(?:灵动充|35w|单充头|仅充电头|纯充电器)/i` eliminating the silent failure mode where pure wall chargers (灵动充 ¥59-¥130) or older 35W models (NT11) are mistaken for 3-in-1 power banks.
+  - Hardened `goofish-ops` canonical skill with **Agent 决策核心守卫 3** (多合一移动电源 vs 纯充电插头防混淆宪法).
+  - All 91 automated tests passing green across contract, adapter drift guard, and test suites.
+
+## [2026-10-13] - 2026-10-13
+
+### Fixed & Hardened
+- **Watch Engine SPA Hydration & State Hardening (`clis/goofish/watch.js`)**:
+  - Added SPA dynamic hydration retry loop (5 retries with `window.scrollBy(0, 600)`) preventing early DOM evaluation on fast browser navigations.
+  - Added authoritative `updateMonitoringTask(taskId, { last_checked_at })` call ensuring tasks always log their latest verification timestamp regardless of diff presence.
+  - Redeployed adapters via `scripts/install-adapters.sh` and verified 91/91 test suite passing.
+
+### Operations
+- **Cadence Execution (`CAD-20260913-goofish-nexg2n-watch`)**:
+  - Performed price watch scan & Notion bidirectional reconciliation across morning, noon, and evening rounds.
+  - Verified 76 spotted candidates in SQLite SSOT (`data/goofish.db`), current low price ¥2699, historical low ¥2699 (no alert spike below ¥1600).
+  - Reconciled 3 tasks with Notion database (`https://notion.so/3f7e1b43239381f7bc8ee3131a3534be`) in 5.14s.
+
+### Documentation
+- Establish project-local DESIGN.md for dark luxury operations dashboard (`98ddf84`)
+
+## [1.9.1] - 2026-10-12
+
+### Added
+- **Air Drum & PocketDrum Archetype Support (`air_drum`, `aeroband_pocketdrum`)**:
+  - Registered `air_drum` hardware archetype in `inferArchetype`, `ARCHETYPE_ACCESSORY_PATTERNS`, and `getProductSpec`.
+  - Added `aeroband_pocketdrum` catalog entry in `PRODUCT_CATALOG` with aliases (`pocketdrum2_ultra`, `pocketdrum2_max`, `空气鼓`, `体感鼓`), default query `aeroband pocketdrum 2`, price floor ¥400, target price ¥750.
+  - Implemented `AIR_DRUM_ACCESSORY_REGEX` intercepting single sticks, foot pedal-only teasers, stand-alone Bluetooth receivers/adapters, and wanted posts, while cleanly preserving authentic full sets (e.g. `双鼓棒双脚擦全套`).
+  - Enhanced `assessLowPriceTrap` with `deposit_teaser` tier classification when listed price falls below category floor (e.g. ¥88 deposit teasers).
+- **Unified Diagnostic & Reconcile Engine (`explainCandidateEvaluation` & `opencli xianyu explain`)**:
+  - Implemented 4-step diagnostic pipeline (`clis/goofish/_contract.js`) as the Single Source of Truth (SSOT): (1) Accessory & Noise Filter, (2) Category & Archetype Inference, (3) Price Floor Gate, (4) Bargain Spike & Low-Price Trap Tier.
+  - Added CLI command `clis/goofish/explain.js` (`xy-chat explain` / `opencli xianyu explain`) for instant sub-millisecond evaluation of raw titles, prices, descriptions, or existing SQLite candidate IDs.
+  - Refactored Web Dashboard REST endpoint `POST /api/diagnose` in `src/server.js` to delegate 100% to `explainCandidateEvaluation`, eliminating duplicate inline rules and guaranteeing zero rule drift between UI and CLI.
+- **SSOT Auto-Category Normalization on Ingestion (`clis/goofish/_db.js`)**:
+  - `saveCandidates` now automatically runs `inferCategory` before accessory checking and candidate validation, preventing empty categories from entering `candidates` table.
+
+### Tested & Verified
+- 91/91 automated tests green (`npm test`), including new `tests/air_drum_and_explain.test.js` validating archetype classification, noise interception, low price trap detection, and 4-step diagnostic trace.
+- 34 CLI adapters synchronized across `~/.opencli/clis/goofish` and `~/.opencli/clis/xianyu`.
+
 ## [1.9.0] - 2026-10-12
 
 ### Added
@@ -27,8 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Connects local SQLite SSOT with Notion database `https://notion.so/3f7e1b43239381f7bc8ee3131a3534be` under Dash collection (`12be1b43-2393-8064-a99f-eb2a407187fe`).
   - Caches database ID in `system_config` table to eliminate duplicate creation.
   - Pushes task metrics, statuses, and links; pulls operator edits (target price, pause/resume) back into SQLite SSOT.
-- **Scheduled Cadence & Antigravity Automations Sidecar (`cadence-records.md`, `cadence-commands.md`, `~/.config/goofish/sidecar.json`)**:
-  - Registered and activated `CAD-20260913-goofish-nexg2n-watch` in Knowledge Base vault (`00 - System/registries/cadence-commands.md`) and local repo `cadence-records.md`.
+- **Scheduled Cadence & Antigravity Automations Sidecar (`cadence-records.md`, `cadence-commands.md`, `sidecars/goofish-nexg2n-watch/sidecar.json`)**:
+  - Registered and activated `CAD-20260913-goofish-nexg2n-watch` in cadence registries and local repo `cadence-records.md`.
   - Provisioned and auto-tuned Antigravity 2.0 Automations sidecar `goofish-nexg2n-watch` with autopoietic self-healing directives, daytime 4-times daily window (`30 9,13,18,21 * * *`), and project binding `goofish-nexg2n-watch`.
   - Unified scheduled execution pipeline chaining task-bound scanning with Notion dual-sync: `./bin/xy-chat.js watch --task-id task_1791773688487_v4pnsy --iterations 1 --diff-only --webhook http://127.0.0.1:9423/webhook/goofish --notify && ./bin/xy-chat.js notion-sync`.
   - Passed live E2E dry-run (`cadence_ctl test-sidecar goofish-nexg2n-watch --execute`) in 7.46s (exit code 0).

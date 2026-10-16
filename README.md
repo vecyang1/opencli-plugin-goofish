@@ -87,9 +87,10 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu export` | `[read]` | 将订单或收藏导出为 Markdown、JSON 或 HTML 报表 | `[type orders/favorites] [--output path] [--file-type md/html/json]` |
 | `opencli xianyu candidates` | `[read]` | 候选池管理与离线全文检索 (按品类/价格/卖家状态筛选) | `[query] [--category <cat>] [--keyword <kw>] [--min-price N] [--max-price N] [--exclude-ghosted] [--limit 50]` |
 | `opencli xianyu reviews` | `[read]` | 卖家信誉与沟通记录评估 (活跃报价/已读不回/无货标注) | `[seller] [--status responsive/ghosted/unfit] [--sync] [--limit 50]` |
-| `opencli xianyu pick` | `[read/write]` | 通用多品类候选聚合、正向必选过滤、风险卖家剔除与最优解推荐 | `[target nexg2_nylon/ugreen_hub/sony_a7m4/all] [--require 词1,词2] [--exclude 词1,词2] [--min-price N] [--max-price N] [--limit 20]` |
-| `opencli xianyu watch` | `[read/write]` | 实时/定时监听新上架宝贝与降价动态 (8大硬件原型配件过滤、低价地板拦截与推送式实时真理库同步) | `[query] [--category <cat>] [--require 词1,词2] [--price-floor N] [--min-price N] [--max-price N] [--interval 3600] [--iterations 1]` |
-| `xy-chat <cmd>` | `[all]` | 统一独立可执行命令行表面，与 OpenCLI 共享相同底层契约与 SSOT 数据库 | `xy-chat <doctor/whoami/personal/orders/favorites/search/detail/seller/candidates/reviews/pick/watch/purge/sync/stats>` |
+| `opencli xianyu pick` | `[read/write]` | 通用多品类候选聚合、正向必选过滤、风险卖家剔除与最优解推荐 | `[target nexg2_nylon/ugreen_hub/sony_a7m4/baseus_picogo_67w/all] [--require 词1,词2] [--exclude 词1,词2] [--min-price N] [--max-price N] [--limit 20]` |
+| `opencli xianyu watch` | `[read/write]` | 实时/定时监听新上架宝贝与降价动态 (10大硬件原型配件过滤包括power_bank、低价地板拦截与推送式实时真理库同步) | `[query] [--category <cat>] [--require 词1,词2] [--price-floor N] [--min-price N] [--max-price N] [--interval 3600] [--iterations 1]` |
+| `opencli xianyu explain` | `[read]` | 契约对账与规则可解释性诊断器 (4步流水线推演: 配件过滤/品类对齐/底价拦截/捡漏突刺) | `<target> [--price N] [--target-price N] [--price-floor N] [--category <cat>]` |
+| `xy-chat <cmd>` | `[all]` | 统一独立可执行命令行表面，与 OpenCLI 共享相同底层契约与 SSOT 数据库 | `xy-chat <doctor/whoami/personal/orders/favorites/search/detail/seller/candidates/reviews/pick/watch/explain/purge/sync/stats>` |
 
 ---
 
@@ -177,6 +178,23 @@ opencli xianyu export orders --limit 50 --output ./my-orders.md
 # 导出收藏夹为美观的 HTML 交互报表
 opencli xianyu export favorites --file-type html --output ./my-favorites.html
 ```
+
+### 8. 规则可解释性推演与契约对账 (explain / diagnose)
+支持对商品标题、标价、描述或已有候选商品进行 4 步流水线推演（配件杂音过滤、品类智能对齐、底价占位拦截、捡漏突刺告警）：
+```bash
+# 诊断低价定金/配件引流帖（触发底价拦截）
+opencli xianyu explain "AeroBand PocketDrum 2 Ultra 空气架子鼓 全套" --price 88
+
+# 诊断配件拆单（单只鼓棒/丢了一只，触发配件杂音拦截）
+opencli xianyu explain "Areoband空气鼓棒（只有一个鼓棒 另一个丢了）" --price 150
+
+# 诊断正向捡漏突刺（标价低于目标价，触发突刺告警）
+opencli xianyu explain "AeroBand PocketDrum 2 Max 纯白双鼓棒双脚擦全套 箱说全" --price 650 --target-price 700
+
+# 也可以直接针对 SQLite SSOT 中已有商品 ID 进行回溯对账
+opencli xianyu explain 1074341458523
+```
+
 
 ---
 

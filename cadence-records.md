@@ -35,7 +35,7 @@
 | Network Required | `true` |
 | Manual Paste Required | `false` |
 | Manual Paste Payload | `not_required_sidecar_active` |
-| Source Refs | `~/.config/goofish/sidecar.json; ./bin/xy-chat.js; webhook-hub:9423` |
+| Source Refs | `sidecars/goofish-nexg2n-watch/sidecar.json; ./bin/xy-chat.js; webhook-hub:9423` |
 | Checkpoint Path | `.run/cadence/CAD-20260913-goofish-nexg2n-watch/state.json` |
 | Success Marker Pattern | `.run/cadence/CAD-20260913-goofish-nexg2n-watch/YYYY-MM-DD.success` |
 | Resume Policy | `stateless` |
@@ -52,7 +52,7 @@ Cadence card: CAD-20260913-goofish-nexg2n-watch
 Language requirement: All conversation replies, findings, and summary messages to the user must be in Chinese (全程使用中文回复与输出汇报).
 
 Before doing work:
-cd "."
+# working directory is repository root
 
 Execute recurring cadence for Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync.
 

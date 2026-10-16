@@ -162,7 +162,7 @@ try {
 
   // Step 9: Visual Screenshots
   console.log("7. Capturing screenshots...");
-  const desktopPath = "./tests/e2e_desktop.png";
+  const desktopPath = "tests/e2e_desktop.png";
   await page.screenshot({ path: desktopPath });
   console.log("Saved Desktop Screenshot:", desktopPath);
 
@@ -171,7 +171,7 @@ try {
     document.body.style.width = "390px";
   });
   await page.waitForTimeout(300);
-  const mobilePath = "./tests/e2e_mobile.png";
+  const mobilePath = "tests/e2e_mobile.png";
   await page.screenshot({ path: mobilePath });
   console.log("Saved Mobile Screenshot:", mobilePath);
 

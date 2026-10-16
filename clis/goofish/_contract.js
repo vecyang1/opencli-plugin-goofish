@@ -352,9 +352,12 @@ export const PHONE_TABLET_ACCESSORY_REGEX = /(?:手机壳|平板壳|保护套|�
 export const AUDIO_ACCESSORY_REGEX = /(?:耳机套|耳塞套|耳帽|海绵套|保护套|硅胶套|收纳包|收纳盒|仅充电仓|单充电仓|单出充电盒|单耳|左耳|右耳|单出左耳|单出右耳|耳机线|升级线|平衡线|音频线|防尘塞)/i;
 export const PC_HARDWARE_ACCESSORY_REGEX = /(?:包装盒|空盒|显卡盒|主板盒|散热风扇|冷排|风冷|水冷头|挡板|转接线|模组线|显卡支架|导热垫|导热硅脂|硅脂|铜片|假卡|模型卡|损坏卡|报废卡)/i;
 export const DRAWING_TABLET_ACCESSORY_REGEX = /(?:笔尖|替换笔尖|笔芯|压感笔|单笔|手写笔|笔筒|笔盒|笔座|数位板膜|类纸膜|保护膜|快捷键盘|单键盘|收纳包|支架|转接线|连接线|数据线|电源线|三合一(?:连接)?线)/i;
+export const AIR_DRUM_ACCESSORY_REGEX = /(?:单只鼓棒|单根鼓棒|单支鼓棒|只有单支|单出鼓棒|单鼓棒|仅鼓棒|(?:只|仅)有?(?:一|1)[只个根支]鼓棒|丢了(?:一|1)[只个根支]|(?:单出|仅|只有|只出)\s*(?:[一两12单双]?个?)?\s*(?:脚擦|踏板|踩镲|感应器)|(?:无|不带|不含|缺)(?:鼓棒|脚踏|脚擦|踏板)|只要适配器|单接收器|单适配器|(?<!(?:带|含|有|\+|及))\s*(?:单出|仅|只有|单|单独|专用)?(?:蓝牙|音频)?(?:适配器|发射器|接收器)(?!(?:全套|套装|完整))|鼓棒套|鼓槌套|硅胶套|保护套|哑鼓垫|哑鼓板|练习垫|鼓皮|消音垫|鼓包|防尘袋|转接线|转接头|求购|收一个|收一套|想收)/i;
+export const POWER_BANK_ACCESSORY_REGEX = /(?:收纳包|收纳盒|保护套|硅胶套|保护盒|外壳|套料|DIY套料|空壳|空盒|仅外壳|单外壳|转接线|纯挂绳|贴纸|保护壳|手绳|挂绳线)/i;
 
 export const ARCHETYPE_ACCESSORY_PATTERNS = {
   guitar: GUITAR_ACCESSORY_REGEX,
+  air_drum: AIR_DRUM_ACCESSORY_REGEX,
   digital_hub: DIGITAL_NOISE_REGEX,
   camera: CAMERA_ACCESSORY_REGEX,
   gaming_console: CONSOLE_ACCESSORY_REGEX,
@@ -362,6 +365,7 @@ export const ARCHETYPE_ACCESSORY_PATTERNS = {
   audio_headphone: AUDIO_ACCESSORY_REGEX,
   pc_hardware: PC_HARDWARE_ACCESSORY_REGEX,
   drawing_tablet: DRAWING_TABLET_ACCESSORY_REGEX,
+  power_bank: POWER_BANK_ACCESSORY_REGEX,
 };
 
 /**
@@ -371,11 +375,13 @@ export function inferArchetype(text = '') {
   const str = String(text || '').trim().toLowerCase();
   if (ARCHETYPE_ACCESSORY_PATTERNS[str]) return str;
   if (/(?:吉他|guitar|nexg|lava|拿火|恩雅|民谣|古典|开声|电吉他|尤克里里)/i.test(str)) return 'guitar';
+  if (/(?:架子鼓|空气鼓|电鼓|体感鼓|鼓棒|鼓槌|pocketdrum|打击乐|咚咚鼓|airdondon|(?:aeroband|体感)(?:.*(?:鼓|drum|棒|pocket|脚踏|踏板))?)/i.test(str)) return 'air_drum';
   if (/(?:数位板|数位屏|绘图板|手绘屏|wacom|xppen|高漫|绘王|drawing|tablet)/i.test(str)) return 'drawing_tablet';
   if (/(?:耳机|耳麦|降噪|airpods|wh-1000|xm5|xm4|bose|森海塞尔|漫步者|充电仓|耳塞|headphone|earphone|earbuds)/i.test(str)) return 'audio_headphone';
   if (/(?:相机|微单|单反|单电|摄影|镜头|索尼a7|佳能|尼康|富士|理光|松下|哈苏|徕卡|action|gopro|dji|camera)/i.test(str)) return 'camera';
   if (/(?:switch|ps5|ps4|xbox|steam\s*deck|rog\s*ally|掌机|游戏机|ns|oled|console)/i.test(str)) return 'gaming_console';
   if (/(?:iphone|ipad|华为|小米|荣耀|vivo|oppo|魅族|红米|一加|平板|手机|phone)/i.test(str)) return 'phone_tablet';
+  if (/(?:充电宝|移动电源|超能充|磁吸宝|储能|power\s*bank|快充宝|picogo)/i.test(str)) return 'power_bank';
   if (/(?:显卡|主板|cpu|内存|固态硬盘|rtx|gtx|amd|intel|电源|机箱|gpu)/i.test(str)) return 'pc_hardware';
   if (/(?:拓展坞|扩展坞|分线器|转接器|集线器|多功能转换器|hub|dock|15375)/i.test(str)) return 'digital_hub';
   return 'general';
@@ -478,6 +484,28 @@ export const PRODUCT_CATALOG = new Map([
     priceFloor: 800,
     description: '任天堂 Switch OLED 版掌机',
   }],
+  ['aeroband_pocketdrum', {
+    category: 'aeroband_pocketdrum',
+    archetype: 'air_drum',
+    defaultQuery: 'aeroband pocketdrum 2',
+    aliases: ['aeroband', 'pocketdrum', 'pocketdrum2', 'pocketdrum_2', 'pocketdrum2_ultra', 'pocketdrum2_max', '空气鼓', '空气架子鼓', '体感鼓', '体感架子鼓', '鼓棒2代'],
+    mustInclude: /(?:pocketdrum|ultra|max|plus|2代|二代|升级版|体感鼓|空气鼓)/i,
+    mustExclude: /(?:只有单支|无鼓棒|单只鼓棒|仅脚踏|单接收器|只要适配器)/i,
+    priceFloor: 400,
+    targetPrice: 750,
+    description: 'AeroBand PocketDrum 2 Ultra / Max 体感空气架子鼓',
+  }],
+  ['baseus_picogo_67w', {
+    category: 'baseus_picogo_67w',
+    archetype: 'power_bank',
+    defaultQuery: '倍思 PicoGo 67W',
+    aliases: ['picogo', 'picogo_67w', '倍思67w', '超能充pro', '倍思三合一', 'picogo67w'],
+    mustInclude: /(?:67w|超能充|picogo)/i,
+    mustExclude: /(?:灵动充|35w|单充头|仅充电头|纯充电器)/i,
+    priceFloor: 220,
+    targetPrice: 310,
+    description: '倍思 PicoGo 超能充 Pro 67W 三合一移动电源 (10000mAh 带伸缩线)',
+  }],
 ]);
 
 /**
@@ -519,6 +547,7 @@ export function getProductSpec(nameOrQuery = '') {
   const archetype = inferArchetype(q);
   const archetypeFloors = {
     guitar: 300,
+    air_drum: 400,
     digital_hub: 40,
     camera: 500,
     gaming_console: 250,
@@ -526,6 +555,7 @@ export function getProductSpec(nameOrQuery = '') {
     audio_headphone: 80,
     pc_hardware: 100,
     drawing_tablet: 200,
+    power_bank: 30,
     general: 0,
     general_electronics: 0,
   };
@@ -696,6 +726,7 @@ export function inferCategory({ category = '', keyword = '', title = '' } = {}) 
   if (cat === 'sony_a7m4' || cat === 'a7m4' || cat === 'a74') return 'sony_a7m4';
   if (cat === 'switch_oled' || cat === 'ns_oled') return 'switch_oled';
   if (cat === 'xppen_artist16_gen2' || cat === 'artist16_gen2') return 'xppen_artist16_gen2';
+  if (cat === 'aeroband_pocketdrum' || cat === 'pocketdrum' || cat === 'pocketdrum2' || cat === 'aeroband') return 'aeroband_pocketdrum';
 
   // Digital hub detection
   if (
@@ -703,6 +734,14 @@ export function inferCategory({ category = '', keyword = '', title = '' } = {}) 
     (/(?:绿联|ugreen)/i.test(all) && /(?:9合[1一]|hub|dock|转换器|转接头|千兆|4k60)/i.test(all))
   ) {
     return 'ugreen_hub';
+  }
+
+  // Air drum detection
+  if (
+    /(?:pocketdrum|aeroband.*鼓|体感空气鼓|空气架子鼓|体感架子鼓|空气乐队.*鼓)/i.test(all) ||
+    (/(?:aeroband|空气鼓|体感鼓)/i.test(all) && /(?:pocket|drum|ultra|max|plus|鼓棒|鼓槌|2代|二代)/i.test(all))
+  ) {
+    return 'aeroband_pocketdrum';
   }
 
   // Guitar detection
@@ -1401,13 +1440,26 @@ export function assessLowPriceTrap({
     highlights.push(`实拍图共${imgList.length}张已核验`);
   }
 
+  // 6.5 Price floor check (identifies deposit / accessory teasers)
+  const spec = getProductSpec(category || title);
+  const effectiveFloor = spec ? spec.priceFloor : 0;
+  const isBelowFloor = effectiveFloor > 0 && numPrice > 0 && numPrice < effectiveFloor;
+  if (isBelowFloor) {
+    flags.push(`标价 ¥${numPrice} 低于品类有效底价 ¥${effectiveFloor}，疑似订金帖、引流帖或配件单卖`);
+  }
+
   // 7. Determine Tier and Risk Level
   let tier = 'sweet_spot';
   let riskLevel = 'LOW';
   let isTrapRisk = false;
   let advice = '';
 
-  if (isSevereWear || (isModerateWear && isMissingParts) || (isMissingParts && !isPristine && !isNearNew)) {
+  if (isBelowFloor) {
+    isTrapRisk = true;
+    riskLevel = 'HIGH';
+    tier = 'deposit_teaser';
+    advice = `⚠️ 警惕低价定金/配件陷阱：标价 ¥${numPrice} 远低于主商品最低有效底价 ¥${effectiveFloor}，大概率为订金、求购或配件冒充整机。`;
+  } else if (isSevereWear || (isModerateWear && isMissingParts) || (isMissingParts && !isPristine && !isNearNew)) {
     isTrapRisk = true;
     riskLevel = 'HIGH';
     tier = 'absolute_low_trap';
@@ -1665,6 +1717,178 @@ export function computePriceHistoryStats(records = [], targetPrice = 0) {
       tier2_sweet_spot: t2,
       tier3_premium: t3,
     },
+  };
+}
+
+/**
+ * Diagnostic & Explainability Engine (对账器优先 · SSOT)
+ * Evaluates candidate items or raw title/price inputs against the authoritative contract,
+ * producing step-by-step verification traces, rule triggers, and risk ratings.
+ */
+export function explainCandidateEvaluation({
+  title = '',
+  price = 0,
+  description = '',
+  images = [],
+  category = '',
+  customExclude = [],
+  customRequire = [],
+  targetPrice = 0,
+  priceFloor = null,
+} = {}) {
+  const t = String(title || '').trim();
+  const d = String(description || '').trim();
+
+  // 1. Numerical price parsing
+  let numPrice = 0;
+  if (typeof price === 'number') {
+    numPrice = price;
+  } else if (typeof price === 'string') {
+    const clean = price.replace(/,/g, '').replace(/[^\d.]/g, '');
+    numPrice = parseFloat(clean) || 0;
+  }
+
+  // 2. Archetype & Category Resolution
+  const spec = getProductSpec(category || t);
+  const resolvedCategory = category || (spec ? spec.category : inferCategory({ title: t, keyword: t }));
+  const resolvedArchetype = spec ? spec.archetype : inferArchetype(resolvedCategory || t);
+  const effectiveFloor = (priceFloor !== null && !isNaN(Number(priceFloor)) && Number(priceFloor) > 0)
+    ? Number(priceFloor)
+    : (spec ? spec.priceFloor : getPriceFloor(resolvedCategory));
+
+  // 3. Accessory & Noise Check
+  const excludeList = Array.isArray(customExclude) ? customExclude : (customExclude ? [customExclude] : []);
+  const requireList = Array.isArray(customRequire) ? customRequire : (customRequire ? [customRequire] : []);
+  const isAccessory = isAccessoryTitle(t, resolvedCategory, excludeList, {
+    require: requireList,
+    archetype: resolvedArchetype,
+  });
+
+  // Identify specific accessory match reason
+  let accessoryReason = null;
+  if (isAccessory) {
+    if (UNIVERSAL_JUNK_REGEX.test(t)) {
+      accessoryReason = '命中通用垃圾/定金/求购/纸箱过滤 (UNIVERSAL_JUNK_REGEX)';
+    } else if (excludeList.some(kw => kw && t.toLowerCase().includes(String(kw).toLowerCase()))) {
+      accessoryReason = '命中自定义排除关键词';
+    } else if (spec?.mustExclude && (spec.mustExclude instanceof RegExp ? spec.mustExclude.test(t) : false)) {
+      accessoryReason = '命中品类规范必须排除规则 (spec.mustExclude)';
+    } else if (requireList.length > 0 && !requireList.every(req => req && t.toLowerCase().includes(String(req).toLowerCase()))) {
+      accessoryReason = '缺少指定正向约束必含关键词 (require)';
+    } else if (spec?.mustInclude && (spec.mustInclude instanceof RegExp ? !spec.mustInclude.test(t) : false)) {
+      accessoryReason = '缺少该品类必须包含的核心型号关键词 (spec.mustInclude)';
+    } else {
+      accessoryReason = `命中硬件原型专属配件拆分正则 (${resolvedArchetype.toUpperCase()}_ACCESSORY_REGEX)`;
+    }
+  }
+
+  // 4. Floor Price Gate
+  const isBelowFloor = effectiveFloor > 0 && numPrice > 0 && numPrice < effectiveFloor;
+
+  // 5. Low Price Trap Assessment
+  const lowPriceTrap = assessLowPriceTrap({
+    title: t,
+    description: d,
+    price: numPrice,
+    images,
+    category: resolvedCategory,
+  });
+
+  // 6. Bargain Target Snipe Detection
+  const numTargetPrice = Number(targetPrice) || 0;
+  const isSpike = !isAccessory && !isBelowFloor && numTargetPrice > 0 && numPrice <= numTargetPrice;
+
+  // 7. Four-Step Pipeline Trace (Standard Observability Contract)
+  const trace = [
+    {
+      step: 1,
+      name: '配件黑名单与正向词校验 (Accessory Filter)',
+      passed: !isAccessory,
+      result: isAccessory ? 'FAIL (判定为配件/杂音/非主商品)' : 'PASS (判定为主商品有效标题)',
+      detail: isAccessory ? (accessoryReason || '标题命中排除词或未满足正向约束') : '标题未命中配件杂音正则',
+    },
+    {
+      step: 2,
+      name: '商品品类智能对齐 (Category Inference)',
+      passed: true,
+      result: `归一化品类: ${resolvedCategory} (原型: ${resolvedArchetype})`,
+      detail: spec ? `命中规格目录: ${spec.description || resolvedCategory}` : '通用启发式分类',
+    },
+    {
+      step: 3,
+      name: '最低有效价格地板拦截 (Price Floor Gate)',
+      passed: !isBelowFloor,
+      result: !isBelowFloor 
+        ? `PASS (标价 ¥${numPrice} >= 地板 ¥${effectiveFloor})` 
+        : `FAIL (标价 ¥${numPrice} < 地板 ¥${effectiveFloor})`,
+      detail: !isBelowFloor 
+        ? '价格处于有效区间' 
+        : '标价异常过低，判定为订金帖、求购帖或低价配件',
+    },
+    {
+      step: 4,
+      name: '捡漏突刺与低价告警判定 (Bargain Spike Detection)',
+      passed: true,
+      result: isSpike 
+        ? `🔥 触发突刺告警 (¥${numPrice} <= 目标 ¥${numTargetPrice})` 
+        : (numTargetPrice > 0 ? `常规价格 (¥${numPrice} > 目标 ¥${numTargetPrice})` : '未设定目标价'),
+      detail: isSpike 
+        ? '符合所有捡漏条件，将立即推送至多渠道通知' 
+        : '属于市场常规价格，记录走势但不触发强提醒',
+    },
+  ];
+
+  // 8. Verdict & Action
+  let verdict = 'PASS_NORMAL';
+  let verdictBadge = '📊 常规在售';
+  let action = 'KEEP';
+  let explanation = '商品符合主商品契约，价格处于合理区间。';
+
+  if (isAccessory) {
+    verdict = 'REJECT_ACCESSORY';
+    verdictBadge = '🚫 拦截配件杂音';
+    action = 'REJECT_ACCESSORY';
+    explanation = accessoryReason || '判定为非整机配件或引流垃圾帖。';
+  } else if (isBelowFloor) {
+    verdict = 'REJECT_PRICE_FLOOR';
+    verdictBadge = '⚠️ 拦截异常占位';
+    action = 'REJECT_BELOW_FLOOR';
+    explanation = `标价 ¥${numPrice} 低于品类底价 ¥${effectiveFloor}，判定为定金、引流或单配件陷阱。`;
+  } else if (isSpike) {
+    verdict = 'TRIGGER_ALERT';
+    verdictBadge = '🚨 触发低价捡漏告警';
+    action = 'ALERT_SNIPE';
+    explanation = `标价 ¥${numPrice} 低于设定目标价 ¥${numTargetPrice}，成色评级【${lowPriceTrap.tier}】。`;
+  } else if (lowPriceTrap.isTrapRisk) {
+    verdict = 'FLAG_LOW_PRICE_TRAP';
+    verdictBadge = '⚠️ 警惕成色陷阱';
+    action = 'FLAG_TRAP';
+    explanation = lowPriceTrap.advice;
+  }
+
+  return {
+    title: t,
+    price: numPrice,
+    archetype: resolvedArchetype,
+    category: resolvedCategory,
+    product_spec: spec ? {
+      category: spec.category,
+      archetype: spec.archetype,
+      defaultQuery: spec.defaultQuery,
+      description: spec.description,
+      priceFloor: spec.priceFloor,
+    } : null,
+    price_floor: effectiveFloor,
+    is_below_floor: isBelowFloor,
+    is_accessory: isAccessory,
+    accessory_reason: accessoryReason,
+    low_price_assessment: lowPriceTrap,
+    is_spike: isSpike,
+    trace,
+    verdict,
+    verdict_badge: verdictBadge,
+    action,
+    explanation,
   };
 }
 

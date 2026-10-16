@@ -46,7 +46,7 @@ export function getNotionToken() {
     }
   } catch (e) {}
 
-  // 3. Check machine MCP configuration (~/.config.json)
+  // 3. Check machine MCP configuration (.claude.json)
   try {
     const claudeJsonPath = path.join(os.homedir(), '.claude.json');
     if (fs.existsSync(claudeJsonPath)) {

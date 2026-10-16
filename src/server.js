@@ -37,7 +37,8 @@ import {
   isAccessoryTitle, 
   extractMultiImageDefects,
   assessLowPriceTrap,
-  validateMonitoringTask
+  validateMonitoringTask,
+  explainCandidateEvaluation
 } from '../clis/goofish/_contract.js';
 
 import { syncWithNotion } from './notion-sync.js';
@@ -343,88 +344,35 @@ export function createDashboardServer(options = {}) {
         return sendJson(res, 200, { success: true, catalog: catalogList });
       }
 
-      // 8. REST API: Diagnostic Engine ("能试")
+      // 8. REST API: Diagnostic Engine ("能试" - 统一 SSOT 契约调用)
       if (pathname === '/api/diagnose' && method === 'POST') {
         const body = await parseJsonBody(req);
-        const title = String(body.title || '').trim();
-        const priceNum = parseFloat(body.price) || 0;
-        const rawCategory = body.category ? String(body.category).trim() : '';
-        const spec = getProductSpec(rawCategory || title);
-        const category = rawCategory || (spec ? spec.category : inferCategory({ title }));
-        const targetPrice = parseFloat(body.target_price) || (body.targetPrice ? parseFloat(body.targetPrice) : 0);
-
-        const excludeList = body.exclude ? String(body.exclude).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
-        const requireList = body.require ? String(body.require).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
-
-        // Pipeline execution trace
-        const trace = [];
-
-        // Step 1: Accessory check
-        const isAccessory = isAccessoryTitle(title, category, excludeList, { require: requireList });
-        trace.push({
-          step: 1,
-          name: '配件黑名单与正向词校验 (Accessory Filter)',
-          passed: !isAccessory,
-          result: isAccessory ? 'FAIL (判定为配件/杂音/非主商品)' : 'PASS (判定为主商品有效标题)',
-          detail: isAccessory ? '标题命中排除词或未满足正向约束' : '标题未命中配件杂音正则',
+        const evalResult = explainCandidateEvaluation({
+          title: body.title,
+          price: body.price,
+          description: body.description,
+          category: body.category,
+          customExclude: body.exclude ? String(body.exclude).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [],
+          customRequire: body.require ? String(body.require).split(/[,，]/).map(s => s.trim()).filter(Boolean) : [],
+          targetPrice: body.target_price || body.targetPrice,
+          priceFloor: body.price_floor,
         });
-
-        // Step 2: Category Inference
-        trace.push({
-          step: 2,
-          name: '商品品类智能对齐 (Category Inference)',
-          passed: true,
-          result: `归一化品类: ${category}`,
-          detail: spec ? `命中规格目录: ${spec.description || category}` : '通用启发式分类',
-        });
-
-        // Step 3: Hard Price Floor Gate
-        const effectiveFloor = spec ? spec.priceFloor : (parseFloat(body.price_floor) || 0);
-        const isAboveFloor = priceNum >= effectiveFloor;
-        trace.push({
-          step: 3,
-          name: '最低有效价格地板拦截 (Price Floor Gate)',
-          passed: isAboveFloor,
-          result: isAboveFloor ? `PASS (标价 ¥${priceNum} >= 地板 ¥${effectiveFloor})` : `FAIL (标价 ¥${priceNum} < 地板 ¥${effectiveFloor})`,
-          detail: isAboveFloor ? '价格处于有效区间' : '标价异常过低，判定为订金帖、求购帖或低价配件',
-        });
-
-        // Step 4: Target Price & Snipe Spike Detection
-        const isSpike = !isAccessory && isAboveFloor && targetPrice > 0 && priceNum <= targetPrice;
-        trace.push({
-          step: 4,
-          name: '捡漏突刺与低价告警判定 (Bargain Spike Detection)',
-          passed: true,
-          result: isSpike ? `🔥 触发突刺告警 (¥${priceNum} <= 目标 ¥${targetPrice})` : (targetPrice > 0 ? `常规价格 (¥${priceNum} > 目标 ¥${targetPrice})` : '未设定目标价'),
-          detail: isSpike ? '符合所有捡漏条件，将立即推送至多渠道通知' : '属于市场常规价格，记录走势但不触发强提醒',
-        });
-
-        // Step 5: Final Verdict
-        let verdict = 'PASS_NORMAL';
-        let verdictBadge = '📊 常规在售';
-        let action = '仅入库记录价格走势';
-
-        if (isAccessory) {
-          verdict = 'REJECT_ACCESSORY';
-          verdictBadge = '🚫 拦截配件杂音';
-          action = '直接过滤淘汰，不污染历史底价库';
-        } else if (!isAboveFloor) {
-          verdict = 'REJECT_PRICE_FLOOR';
-          verdictBadge = '⚠️ 拦截异常占位';
-          action = '低于价格地板，视为订金/求购/配件，直接淘汰';
-        } else if (isSpike) {
-          verdict = 'TRIGGER_ALERT';
-          verdictBadge = '🚨 触发低价捡漏告警';
-          action = '触发多渠道桌面弹窗 + Webhook + Notion 数据库高亮推送';
-        }
 
         return sendJson(res, 200, {
           success: true,
-          input: { title, price: priceNum, category, target_price: targetPrice, price_floor: effectiveFloor },
-          verdict,
-          verdict_badge: verdictBadge,
-          action,
-          trace,
+          input: {
+            title: evalResult.title,
+            price: evalResult.price,
+            category: evalResult.category,
+            target_price: parseFloat(body.target_price) || (body.targetPrice ? parseFloat(body.targetPrice) : 0),
+            price_floor: evalResult.price_floor,
+          },
+          verdict: evalResult.verdict,
+          verdict_badge: evalResult.verdict_badge,
+          action: evalResult.action,
+          trace: evalResult.trace,
+          low_price_assessment: evalResult.low_price_assessment,
+          explanation: evalResult.explanation,
         });
       }
 

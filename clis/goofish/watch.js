@@ -6,7 +6,8 @@ import {
   queryCandidates, 
   subscribeLiveQuery,
   recordPriceHistory,
-  getMonitoringTask
+  getMonitoringTask,
+  updateMonitoringTask
 } from './_db.js';
 import { 
   isAccessoryTitle, 
@@ -193,6 +194,20 @@ export const command = cli({
           break;
         }
 
+        // Wait for items to be present and scroll slightly (SPA hydration guard)
+        if (typeof page.evaluate === 'function') {
+          for (let retry = 0; retry < 5; retry++) {
+            const hasLinks = await page.evaluate(() => document.querySelectorAll('a[href*="item?id="]').length > 0);
+            if (hasLinks) break;
+            await page.evaluate(() => window.scrollBy(0, 600));
+            if (typeof page.wait === 'function') {
+              await page.wait(1.5);
+            } else {
+              await new Promise(r => setTimeout(r, 1500));
+            }
+          }
+        }
+
         // Extract items from page
         const items = await page.evaluate(() => {
           const itemLinks = Array.from(document.querySelectorAll('a[href*="item?id="]')).slice(0, 25);
@@ -277,6 +292,12 @@ export const command = cli({
               target_price: maxPriceNum 
             });
           }
+        }
+
+        if (taskId) {
+          updateMonitoringTask(taskId, {
+            last_checked_at: new Date().toISOString(),
+          });
         }
 
         if (iter < maxIterations - 1) {

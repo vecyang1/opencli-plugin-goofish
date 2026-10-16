@@ -183,7 +183,7 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(closedCase.status, 'unfit');
   });
 
-  await t.test('inferArchetype correctly classifies products across 8 major hardware archetypes', async () => {
+  await t.test('inferArchetype correctly classifies products across major hardware archetypes including power_bank', async () => {
     const { inferArchetype } = await import('../src/contract.js');
     assert.equal(inferArchetype('恩雅 NEXG 2N 尼龙静音吉他'), 'guitar');
     assert.equal(inferArchetype('拿火 LAVA ME AIR 碳纤维吉他'), 'guitar');
@@ -199,6 +199,8 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(inferArchetype('华硕 ROG RTX 4090 猛禽独立显卡'), 'pc_hardware');
     assert.equal(inferArchetype('XP-Pen Artist 16 2nd 二代数位屏手绘屏'), 'drawing_tablet');
     assert.equal(inferArchetype('Wacom 新帝 Pro 16 数位板手绘板'), 'drawing_tablet');
+    assert.equal(inferArchetype('倍思 PicoGo 67W 超能充 Pro 三合一移动电源'), 'power_bank');
+    assert.equal(inferArchetype('罗马仕 20000毫安 移动电源 充电宝 快充'), 'power_bank');
     assert.equal(inferArchetype('未知通用商品'), 'general');
   });
 
@@ -216,6 +218,11 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.ok(switchSpec);
     assert.equal(switchSpec.archetype, 'gaming_console');
     assert.equal(switchSpec.priceFloor, 800);
+
+    const picogoSpec = getProductSpec('baseus_picogo_67w');
+    assert.ok(picogoSpec);
+    assert.equal(picogoSpec.archetype, 'power_bank');
+    assert.equal(picogoSpec.priceFloor, 220);
 
     // Dynamic registration
     registerProductSpec({
@@ -237,7 +244,9 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(getPriceFloor('nexg2_nylon'), 700);
     assert.equal(getPriceFloor('sony_a7m4'), 5000);
     assert.equal(getPriceFloor('switch_oled'), 800);
+    assert.equal(getPriceFloor('baseus_picogo_67w'), 220);
     assert.equal(getPriceFloor('camera'), 500); // Archetype fallback
+    assert.equal(getPriceFloor('power_bank'), 30); // Power bank archetype fallback
     assert.equal(getPriceFloor('unknown_cat'), 0); // Safe fallback
   });
 
@@ -261,6 +270,12 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(isAccessoryTitle('XP-Pen Artist 16 2nd 专用手写笔 替换笔尖 芯', 'xppen_artist16_gen2'), true);
     assert.equal(isAccessoryTitle('数位屏 三合一连接线 扩展坞线', 'xppen_artist16_gen2'), true);
     assert.equal(isAccessoryTitle('XP-Pen Artist 16 2nd 二代数位屏 99新 箱说全 原装画屏', 'xppen_artist16_gen2'), false);
+
+    // Power bank archetype: accessories/cases vs genuine power bank, and pure wall charger exclusion
+    assert.equal(isAccessoryTitle('倍思超能充PRO三合一充电宝专用收纳包 保护盒', 'baseus_picogo_67w'), true);
+    assert.equal(isAccessoryTitle('倍思灵动充67W氮化镓快充充电器 自带伸缩线', 'baseus_picogo_67w'), true, 'Pure wall charger (灵动充) must be rejected for 3-in-1 power bank');
+    assert.equal(isAccessoryTitle('倍思NT11超能充移动电源 10000mAh 35W快充', 'baseus_picogo_67w'), true, 'Low power 35W model must be rejected for 67W spec');
+    assert.equal(isAccessoryTitle('倍思PicoGo超能充Pro三合一移动电源 10000mAh 67W快充 全新未拆封', 'baseus_picogo_67w'), false);
 
     // Positive require enforcement via options.require
     assert.equal(isAccessoryTitle('恩雅 NEXG 2N 尼龙静音吉他', 'nexg2_nylon', [], { require: ['尼龙'] }), false);
