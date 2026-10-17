@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.3] - 2026-10-17
+
+### Fixed & Hardened
+- **Test Suite Ephemeral Port Dynamic Binding (`tests/dashboard_server.test.js`)**:
+  - Replaced hardcoded listening port 3999 with dynamic ephemeral port allocation (`dashboard.listen(0, '127.0.0.1')`).
+  - Completely resolved `EADDRINUSE: address already in use 127.0.0.1:3999` conflict caused by concurrent local background services (e.g. `ego Headless`).
+  - Guaranteed 100% green test execution (91/91 passing) in both CI and unattended cadence environments.
+
+### Operations
+- **Cadence Execution (`CAD-20260913-goofish-nexg2n-watch`)**:
+  - Executed periodic watch for NEXG 2N Smart Guitar (`task_1791773688487_v4pnsy`) with `--diff-only` and webhook notification.
+  - Snapshot state verified: 146 total spotted candidates in SQLite SSOT (`data/goofish.db`), current low price ¥2699, historical low ¥2699.
+  - Notion bidirectional sync completed in 13.46s (4 tasks pulled, 4 tasks updated with latest metrics at `https://notion.so/3f7e1b43239381f7bc8ee3131a3534be`).
+  - Emitted dated execution receipt `reports/runs/2026-10-17.md` and checkpoint `.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-10-17.success`.
+
 ## [1.9.2] - 2026-10-14
 
 ### Added & Hardened

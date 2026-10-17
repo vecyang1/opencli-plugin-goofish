@@ -5,7 +5,7 @@ import { getMonitoringTask, deleteMonitoringTask } from '../clis/goofish/_db.js'
 
 test('Web Operations Dashboard Server & REST API Test Suite', async (t) => {
   const dashboard = createDashboardServer();
-  const addr = await dashboard.listen(3999, '127.0.0.1');
+  const addr = await dashboard.listen(0, '127.0.0.1');
   const baseUrl = `http://127.0.0.1:${addr.port}`;
 
   let createdTaskId = null;
