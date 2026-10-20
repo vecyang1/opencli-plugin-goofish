@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.4] - 2026-10-20
+
+### Operations
+- **Cadence Execution (`CAD-20260913-goofish-nexg2n-watch`)**:
+  - Executed periodic watch for NEXG 2N Smart Guitar (`task_1791773688487_v4pnsy`) with `--diff-only` and webhook notification (Round 1 morning check & Round 2 afternoon check).
+  - Snapshot state verified: 191 total spotted candidates in SQLite SSOT (`data/goofish.db`), current low price ¥2699, historical low ¥2699 (no change).
+  - Notion bidirectional sync completed in 33.74s (4 tasks pulled, 4 tasks updated with latest metrics at `https://notion.so/3f7e1b43239381f7bc8ee3131a3534be`).
+  - Emitted dated execution receipt `reports/runs/2026-10-20.md` and checkpoint `.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-10-20.success`.
+
 ## [1.9.4] - 2026-10-19
 
 ### Operations
