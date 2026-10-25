@@ -1,5 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'goofish-price-test-'));
+const testDbPath = path.join(tmpDir, 'test_price.db');
+process.env.GOOFISH_DB = testDbPath;
+
 import { 
   validateMonitoringTask, 
   validatePriceHistoryRecord, 
@@ -18,6 +26,11 @@ import {
 } from '../clis/goofish/_db.js';
 
 test('Price Tracking & Low-Price Snipe Engine Test Suite', async (t) => {
+  t.after(() => {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {}
+  });
   await t.test('1. validateMonitoringTask enforces schema, defaults, and type normalization', () => {
     // Basic valid task
     const task = validateMonitoringTask({

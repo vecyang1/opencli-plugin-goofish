@@ -1,5 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'goofish-dash-test-'));
+const testDbPath = path.join(tmpDir, 'test_dashboard.db');
+process.env.GOOFISH_DB = testDbPath;
+
 import { createDashboardServer } from '../src/server.js';
 import { getMonitoringTask, deleteMonitoringTask } from '../clis/goofish/_db.js';
 
@@ -15,6 +23,9 @@ test('Web Operations Dashboard Server & REST API Test Suite', async (t) => {
       deleteMonitoringTask(createdTaskId);
     }
     await dashboard.close();
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {}
   });
 
   await t.test('1. Static File Serving: index.html, styles.css, app.js', async () => {

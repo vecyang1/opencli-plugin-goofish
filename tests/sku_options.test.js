@@ -1,9 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'goofish-sku-test-'));
+const testDbPath = path.join(tmpDir, 'test_sku.db');
+process.env.GOOFISH_DB = testDbPath;
+
 import { parseItemSkus, validateCandidate, SCHEMA_CONTRACT } from '../clis/goofish/_contract.js';
 import { getDb, initSchema, saveCandidates, queryCandidates } from '../clis/goofish/_db.js';
 
 test('Multi-SKU & Different Options Parsing Suite', async (t) => {
+  t.after(() => {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {}
+  });
   await t.test('1. Authoritatively parses Goofish MTOP multi-SKU response (Anker 140W Case)', () => {
     const mockMtopData = {
       itemDO: {
