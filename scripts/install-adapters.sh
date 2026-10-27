@@ -40,9 +40,11 @@ for alias in $ALIASES; do install_site "$alias"; done
 
 "$OPENCLI" daemon restart >/dev/null 2>&1 || true
 sleep 1
-# The receipt is OpenCLI's own command list, not the copy's exit code.
+# The receipt is OpenCLI's own command list or help check, not the copy's exit code.
 for site in goofish $ALIASES; do
-  if "$OPENCLI" list 2>/dev/null | grep -A60 "^  $site\$" | grep -q '^    whoami '; then
+  if "$OPENCLI" "$site" whoami --help >/dev/null 2>&1; then
+    echo "receipt: opencli $site whoami is registered"
+  elif "$OPENCLI" list 2>/dev/null | grep -A60 "^  $site\$" | grep -q '^    whoami '; then
     echo "receipt: opencli $site whoami is registered"
   else
     echo "FAIL: 'opencli list' does not show '$site whoami' — OpenCLI did not load $DEST_ROOT/$site" >&2

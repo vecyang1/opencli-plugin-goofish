@@ -25,14 +25,31 @@ const args = process.argv.slice(2);
 const command = args[0] || 'help';
 const subArgs = args.slice(1);
 
+const defaultBrowserEnv = {
+  ...process.env,
+  OPENCLI_BROWSER_COMMAND_TIMEOUT: process.env.OPENCLI_BROWSER_COMMAND_TIMEOUT || '120',
+};
+
 function runOpenCli(siteCmd, extraArgs = []) {
   const fullCmd = ['xianyu', siteCmd, ...extraArgs];
-  const res = spawnSync('opencli', fullCmd, { stdio: 'pipe', encoding: 'utf-8' });
+  const res = spawnSync('opencli', fullCmd, { 
+    stdio: 'pipe', 
+    encoding: 'utf-8',
+    env: defaultBrowserEnv,
+  });
   return {
     status: res.status,
     stdout: res.stdout || '',
     stderr: res.stderr || '',
   };
+}
+
+function spawnOpenCli(openCliArgs, opts = {}) {
+  return spawnSync('opencli', openCliArgs, {
+    stdio: 'inherit',
+    env: defaultBrowserEnv,
+    ...opts,
+  });
 }
 
 function printTable(rows, columns) {
@@ -126,19 +143,19 @@ async function main() {
     }
 
     case 'whoami': {
-      const res = spawnSync('opencli', ['xianyu', 'whoami', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'whoami', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
 
     case 'personal': {
-      const res = spawnSync('opencli', ['xianyu', 'personal', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'personal', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
 
     case 'account': {
-      const res = spawnSync('opencli', ['xianyu', 'account', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'account', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
@@ -166,7 +183,7 @@ async function main() {
       }
 
       console.log('🔄 正在从闲鱼线上实时拉取订单...');
-      const res = spawnSync('opencli', ['xianyu', 'orders', ...cleanArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'orders', ...cleanArgs]);
       process.exit(res.status ?? 0);
       break;
     }
@@ -192,7 +209,7 @@ async function main() {
         process.exit(0);
       }
 
-      const res = spawnSync('opencli', ['xianyu', 'favorites', ...cleanArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'favorites', ...cleanArgs]);
       process.exit(res.status ?? 0);
       break;
     }
@@ -219,7 +236,7 @@ async function main() {
       }
 
       console.log('🔄 正在从闲鱼线上实时拉取私信会话...');
-      const res = spawnSync('opencli', ['xianyu', 'inbox', ...cleanArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'inbox', ...cleanArgs]);
       process.exit(res.status ?? 0);
       break;
     }
@@ -247,26 +264,26 @@ async function main() {
       }
 
       console.log(`🔄 正在从闲鱼线上实时拉取与 [${contact || '未知'}] 的聊天记录...`);
-      const res = spawnSync('opencli', ['xianyu', 'messages', ...cleanArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'messages', ...cleanArgs]);
       process.exit(res.status ?? 0);
       break;
     }
 
     case 'chat':
     case 'reply': {
-      const res = spawnSync('opencli', ['xianyu', command, ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', command, ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
 
     case 'search': {
-      const res = spawnSync('opencli', ['xianyu', 'search', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'search', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
 
     case 'detail': {
-      const res = spawnSync('opencli', ['xianyu', 'detail', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'detail', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
@@ -322,7 +339,7 @@ async function main() {
     }
 
     case 'seller': {
-      const res = spawnSync('opencli', ['xianyu', 'seller', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'seller', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
@@ -516,7 +533,7 @@ async function main() {
     }
 
     case 'pick': {
-      const res = spawnSync('opencli', ['xianyu', 'pick', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'pick', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
@@ -524,26 +541,26 @@ async function main() {
 
     case 'watch': {
       console.log('📡 正在启动闲鱼新上架与降价实时监听 (推送式实时订阅)...');
-      const res = spawnSync('opencli', ['xianyu', 'watch', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'watch', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
 
     case 'track': {
-      const res = spawnSync('opencli', ['xianyu', 'track', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'track', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
 
     case 'history': {
-      const res = spawnSync('opencli', ['xianyu', 'history', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'history', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }
 
     case 'explain':
     case 'diagnose': {
-      const res = spawnSync('opencli', ['xianyu', 'explain', ...subArgs], { stdio: 'inherit' });
+      const res = spawnOpenCli(['xianyu', 'explain', ...subArgs]);
       process.exit(res.status ?? 0);
       break;
     }

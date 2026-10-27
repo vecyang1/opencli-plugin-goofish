@@ -49,6 +49,7 @@ export const command = cli({
     { name: 'diff-only', type: 'bool', default: false, help: '仅在产生新上架或降价事件时输出结果 (稳态静默)' },
     { name: 'inspect-images', type: 'bool', default: false, help: '对新上架候选执行多图深度客观瑕疵质检' },
     { name: 'task-id', type: 'str', help: '关联的监控任务 ID' },
+    { name: 'timeout', type: 'int', default: 120, help: '超时时间 (秒，支持浏览器冷启动与多轮抓取)' },
   ],
   columns: [
     'timestamp',
