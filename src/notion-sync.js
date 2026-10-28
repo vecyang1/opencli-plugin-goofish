@@ -60,9 +60,9 @@ export function getNotionToken() {
 }
 
 /**
- * Fetch helper with exponential backoff retry on ECONNRESET / 429 / 5xx
+ * Fetch helper with exponential backoff retry on ECONNRESET / 429 / 5xx / socket timeout
  */
-async function notionFetch(endpoint, options = {}, retries = 3) {
+async function notionFetch(endpoint, options = {}, retries = 5) {
   const token = getNotionToken();
   const url = endpoint.startsWith('http') ? endpoint : `${NOTION_API_BASE}${endpoint}`;
   
@@ -76,7 +76,11 @@ async function notionFetch(endpoint, options = {}, retries = 3) {
   let lastError = null;
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const res = await fetch(url, { ...options, headers });
+      const res = await fetch(url, {
+        signal: options.signal || AbortSignal.timeout(20000),
+        ...options,
+        headers,
+      });
       if (res.status === 429) {
         const retryAfter = parseInt(res.headers.get('Retry-After') || '2', 10);
         await new Promise(r => setTimeout(r, retryAfter * 1000));
@@ -89,7 +93,10 @@ async function notionFetch(endpoint, options = {}, retries = 3) {
       return await res.json();
     } catch (err) {
       lastError = err;
-      const delay = Math.pow(2, attempt) * 1000;
+      const delay = Math.min(Math.pow(2, attempt) * 1000 + Math.floor(Math.random() * 500), 10000);
+      if (attempt < retries - 1) {
+        console.warn(`[notion-sync] Notion API 请求异常 (${err.cause?.code || err.code || err.message})，将在 ${delay}ms 后进行第 ${attempt + 2}/${retries} 次重试...`);
+      }
       await new Promise(r => setTimeout(r, delay));
     }
   }
@@ -111,6 +118,11 @@ export async function ensureNotionDatabase(parentPageId = DEFAULT_PARENT_PAGE_ID
       const db = await notionFetch(`/databases/${cachedId}`);
       if (db && db.id) return db.id;
     } catch (e) {
+      // If error is 404/object_not_found, cached ID is truly dead: proceed to search/create.
+      // If error is transient network error, rethrow so caller can retry or fail safely.
+      if (!e.message?.includes('(404)') && !e.message?.includes('object_not_found')) {
+        throw e;
+      }
       // Cached ID was invalid or removed; proceed to search/create
     }
   }
