@@ -8,17 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.9.4] - 2026-10-28
 
 ### Fixed & Hardened
-- **Notion Sync Network Resilience & TLS Socket Keepalive Hardening (`src/notion-sync.js`)**:
-  - Upgraded `notionFetch` retries from 3 to 5 attempts with randomized exponential backoff (1000ms–10000ms + 0–500ms jitter) and comprehensive retry diagnostics.
-  - Added request timeout guard `signal: options.signal || AbortSignal.timeout(20000)` to prevent socket hangs during connection pool resets.
+- **Notion Sync Stale Socket Pool Isolation & Retry Resilience (`src/notion-sync.js`)**:
+  - Injected `'Connection': 'close'` header during retry rounds or following `ECONNRESET` / network errors to force immediate teardown of dead Keep-Alive connections and bypass Undici's stale socket reuse.
+  - Increased `notionFetch` maximum retry limit from 5 to 6 attempts and extended request timeout from 20s to 25s.
   - Hardened `ensureNotionDatabase` error handling to distinguish true HTTP 404/`object_not_found` from transient network socket errors (`ECONNRESET`, `ETIMEDOUT`), eliminating false fallback searches and cascaded network exhaustion.
-  - Validated 100% test suite pass rate (91/91 tests passing in 4251ms).
+  - Re-executed live Notion sync verifying latency dropped from 44s (4 resets) to 5.59s with zero connection resets.
+  - Validated 100% test suite pass rate (91/91 tests passing in 4230ms).
 
 ### Operations
 - **Cadence Execution (`CAD-20260913-goofish-nexg2n-watch`)**:
-  - Executed periodic watch for NEXG 2N Smart Guitar (`task_1791773688487_v4pnsy`) with `--diff-only` and webhook notification (Round 1 morning, Round 2 afternoon, Round 3 evening checks).
+  - Executed periodic watch for NEXG 2N Smart Guitar (`task_1791773688487_v4pnsy`) with `--diff-only` and webhook notification (Round 1 morning, Round 2 afternoon, Round 3 evening, Round 4 night checks).
   - Snapshot state verified: 326 total spotted candidates in SQLite SSOT (`data/goofish.db`), current low price ¥2699, historical low ¥2699 (steady state / no below-target spike).
-  - Notion bidirectional sync completed in 5.06s (4 tasks pulled, 4 tasks updated with latest metrics at `https://notion.so/3f7e1b43239381f7bc8ee3131a3534be`).
+  - Notion bidirectional sync completed in 5.59s (4 tasks pulled, 4 tasks updated with latest metrics at `https://notion.so/3f7e1b43239381f7bc8ee3131a3534be`).
   - Emitted dated execution receipt `reports/runs/2026-10-28.md` and checkpoint `.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-10-28.success`.
 
 ## [1.9.4] - 2026-10-27

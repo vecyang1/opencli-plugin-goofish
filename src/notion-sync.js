@@ -62,22 +62,32 @@ export function getNotionToken() {
 /**
  * Fetch helper with exponential backoff retry on ECONNRESET / 429 / 5xx / socket timeout
  */
-async function notionFetch(endpoint, options = {}, retries = 5) {
+async function notionFetch(endpoint, options = {}, retries = 6) {
   const token = getNotionToken();
   const url = endpoint.startsWith('http') ? endpoint : `${NOTION_API_BASE}${endpoint}`;
-  
-  const headers = {
-    'Authorization': `Bearer ${token}`,
-    'Notion-Version': NOTION_VERSION,
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-  };
 
   let lastError = null;
   for (let attempt = 0; attempt < retries; attempt++) {
+    // If previous attempt hit connection reset or network error, force Connection: close to avoid reusing stale socket pool
+    const isRetry = attempt > 0;
+    const isConnReset = lastError && (
+      lastError.cause?.code === 'ECONNRESET' || 
+      lastError.code === 'ECONNRESET' || 
+      lastError.message?.includes('ECONNRESET') ||
+      lastError.message?.includes('fetch failed')
+    );
+
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Notion-Version': NOTION_VERSION,
+      'Content-Type': 'application/json',
+      ...(isConnReset || isRetry ? { 'Connection': 'close' } : {}),
+      ...(options.headers || {}),
+    };
+
     try {
       const res = await fetch(url, {
-        signal: options.signal || AbortSignal.timeout(20000),
+        signal: options.signal || AbortSignal.timeout(25000),
         ...options,
         headers,
       });
