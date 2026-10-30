@@ -287,7 +287,7 @@ test('Contract-First Architecture & Type Safety', async (t) => {
   await t.test('auditRentalListing contract enforces two-sided verification for rental listings', async () => {
     const { auditRentalListing } = await import('../src/contract.js');
 
-    // Case 1: High aesthetic nomad-ready listing (Should pass and score >= 80)
+    // Case 1: High aesthetic remote-work-ready listing (Should pass and score >= 80)
     const goodListing = auditRentalListing({
       title: '阳朔西街漓江畔 漓水东舍 日式原木侘寂风大床房',
       description: '大落地窗直面喀斯特峰林，配实木书桌与百兆高速宽带，可月租短租，包水电网费，拎包入住。',

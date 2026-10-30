@@ -1190,15 +1190,15 @@ export const RENTAL_FRAUD_AND_LONGTERM_REGEX = /(?:月租房非照片|非照片�
 export const RENTAL_INFERIOR_AND_UNFURNISHED_REGEX = /(?:毛坯|自备家具|自备床|自备床垫|无家具|无床|无热水器|无空调|不带家具|不提供家具|红塑料|塑料盆|红脸盆|毛坯铝合金|裸床垫|老旧招待所)/i;
 
 /**
- * High aesthetic & digital nomad lifestyle indicators for rental properties.
+ * High aesthetic & remote work lifestyle indicators for rental properties.
  */
 export const RENTAL_AESTHETIC_HIGHLIGHTS_REGEX = /(?:原木|侘寂|极简|日式|奶油风|复古|设计感|独栋|野奢|艺术|断桥铝|高织棉麻)/i;
 export const RENTAL_VIEW_LIGHT_REGEX = /(?:落地窗|大落地窗|观景阳台|超大阳台|全景落地|大飘窗|山景|江景|漓江|遇龙河|峰林|采光好|采光通透|视野开阔)/i;
-export const RENTAL_NOMAD_WORK_REGEX = /(?:书桌|电脑桌|工作台|写字台|实木大桌|高速宽带|光纤|百兆宽带|千兆宽带|wifi|独立卫浴|包水电|包水电气|包网费|电梯|拎包入住)/i;
+export const RENTAL_REMOTE_WORK_REGEX = /(?:书桌|电脑桌|工作台|写字台|实木大桌|高速宽带|光纤|百兆宽带|千兆宽带|wifi|独立卫浴|包水电|包水电气|包网费|电梯|拎包入住)/i;
 export const RENTAL_SHORT_TERM_FRIENDLY_REGEX = /(?:月租|短租|按月付|押一付一|灵活租期|周租)/i;
 
 /**
- * Audits a rental housing listing on Goofish for digital nomads and travelers.
+ * Audits a rental housing listing on Goofish for remote workers and travelers.
  * Enforces:
  * 1. Zero tolerance for deceptive listings ("room not in picture") and mandatory long-term (>半年/一年起租).
  * 2. Mandatory furnished & move-in ready (no bare mattress, no missing furniture, no rough construction).
@@ -1260,8 +1260,8 @@ export function auditRentalListing({
     highlights.push(`采光与景观: ${m[0]}`);
   }
 
-  if (RENTAL_NOMAD_WORK_REGEX.test(fullText)) {
-    const matches = fullText.match(new RegExp(RENTAL_NOMAD_WORK_REGEX.source, 'gi'));
+  if (RENTAL_REMOTE_WORK_REGEX.test(fullText)) {
+    const matches = fullText.match(new RegExp(RENTAL_REMOTE_WORK_REGEX.source, 'gi'));
     if (matches) {
       highlights.push(`游民工作生活设施: ${[...new Set(matches)].slice(0, 3).join('/')}`);
     }
