@@ -198,6 +198,8 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(inferArchetype('AirPods Pro 2 二代 Type-C 充电仓款'), 'audio_headphone');
     assert.equal(inferArchetype('华硕 ROG RTX 4090 猛禽独立显卡'), 'pc_hardware');
     assert.equal(inferArchetype('XP-Pen Artist 16 2nd 二代数位屏手绘屏'), 'drawing_tablet');
+    assert.equal(inferArchetype('xpen pro 16 手绘屏'), 'drawing_tablet');
+    assert.equal(inferArchetype('xp-pen 16 2.5K 数位屏'), 'drawing_tablet');
     assert.equal(inferArchetype('Wacom 新帝 Pro 16 数位板手绘板'), 'drawing_tablet');
     assert.equal(inferArchetype('倍思 PicoGo 67W 超能充 Pro 三合一移动电源'), 'power_bank');
     assert.equal(inferArchetype('罗马仕 20000毫安 移动电源 充电宝 快充'), 'power_bank');
@@ -265,6 +267,15 @@ test('Contract-First Architecture & Type Safety', async (t) => {
     assert.equal(isAccessoryTitle('Switch 摇杆帽 按键帽 防尘塞', 'switch_oled'), true);
     assert.equal(isAccessoryTitle('Switch 塞尔达王国之泪 游戏卡带 仅卡', 'switch_oled'), true);
     assert.equal(isAccessoryTitle('任天堂 Switch OLED 日版白色 主机全套 原装在盒', 'switch_oled'), false);
+
+    // Drawing tablet archetype: accessories vs genuine drawing displays
+    assert.equal(isAccessoryTitle('XPPen数位屏PD51毛毡笔尖手绘板X3Pro细笔无源电磁', 'xppen_artist_pro_16'), true);
+    assert.equal(isAccessoryTitle('XP Pen X4芯片数字笔，支持型号：Artist 12 16', 'xppen_artist_pro_16'), true);
+    assert.equal(isAccessoryTitle('友基USB-C to C数据线 全功能数据线数位屏专用', 'xppen_artist_pro_16'), true);
+    assert.equal(isAccessoryTitle('XPPen Deco 640数位板，99新，16K压感', 'xppen_artist_pro_16'), true);
+    assert.equal(isAccessoryTitle('XPPen Artist Pro16数位屏手写屏 99新，配件齐全', 'xppen_artist_pro_16'), false);
+    assert.equal(isAccessoryTitle('XP-Pen Artist Pro16二代（2.5K）数位屏', 'xppen_artist16_gen2'), false);
+    assert.equal(isAccessoryTitle('xppen Artist Pro 16 tp数位屏 4k分辨率，可触控自用闲置', 'xppen_artist_pro_16_tp'), false);
 
     // Drawing tablet archetype: accessories vs genuine tablet
     assert.equal(isAccessoryTitle('XP-Pen Artist 16 2nd 专用手写笔 替换笔尖 芯', 'xppen_artist16_gen2'), true);

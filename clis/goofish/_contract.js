@@ -351,7 +351,7 @@ export const CONSOLE_ACCESSORY_REGEX = /(?:游戏卡|卡带|卡盒|收纳包|收
 export const PHONE_TABLET_ACCESSORY_REGEX = /(?:手机壳|平板壳|保护套|皮套|硅胶套|钢化膜|水凝膜|背膜|镜头膜|贴膜|笔尖|笔套|电容笔|手写笔|保护膜|桌面支架|手机支架|车载支架|散热背夹|防尘塞)/i;
 export const AUDIO_ACCESSORY_REGEX = /(?:耳机套|耳塞套|耳帽|海绵套|保护套|硅胶套|收纳包|收纳盒|仅充电仓|单充电仓|单出充电盒|单耳|左耳|右耳|单出左耳|单出右耳|耳机线|升级线|平衡线|音频线|防尘塞)/i;
 export const PC_HARDWARE_ACCESSORY_REGEX = /(?:包装盒|空盒|显卡盒|主板盒|散热风扇|冷排|风冷|水冷头|挡板|转接线|模组线|显卡支架|导热垫|导热硅脂|硅脂|铜片|假卡|模型卡|损坏卡|报废卡)/i;
-export const DRAWING_TABLET_ACCESSORY_REGEX = /(?:笔尖|替换笔尖|笔芯|压感笔|单笔|手写笔|笔筒|笔盒|笔座|数位板膜|类纸膜|保护膜|快捷键盘|单键盘|收纳包|支架|转接线|连接线|数据线|电源线|三合一(?:连接)?线)/i;
+export const DRAWING_TABLET_ACCESSORY_REGEX = /(?:笔尖|替换笔尖|笔芯|压感笔|单笔|手写笔|数位笔|数字笔|芯片笔|电磁笔|无源笔|毛毡笔尖|取芯器|替换芯|笔筒|笔盒|笔座|数位板膜|类纸膜|保护膜|快捷键盘|单键盘|小键盘|ack05|收纳包|支架|acs18|转接线|连接线|数据线|电源线|三合一(?:连接)?线|纯板|无屏幕|非数位屏)/i;
 export const AIR_DRUM_ACCESSORY_REGEX = /(?:单只鼓棒|单根鼓棒|单支鼓棒|只有单支|单出鼓棒|单鼓棒|仅鼓棒|(?:只|仅)有?(?:一|1)[只个根支]鼓棒|丢了(?:一|1)[只个根支]|(?:单出|仅|只有|只出)\s*(?:[一两12单双]?个?)?\s*(?:脚擦|踏板|踩镲|感应器)|(?:无|不带|不含|缺)(?:鼓棒|脚踏|脚擦|踏板)|只要适配器|单接收器|单适配器|(?<!(?:带|含|有|\+|及))\s*(?:单出|仅|只有|单|单独|专用)?(?:蓝牙|音频)?(?:适配器|发射器|接收器)(?!(?:全套|套装|完整))|鼓棒套|鼓槌套|硅胶套|保护套|哑鼓垫|哑鼓板|练习垫|鼓皮|消音垫|鼓包|防尘袋|转接线|转接头|求购|收一个|收一套|想收)/i;
 export const POWER_BANK_ACCESSORY_REGEX = /(?:收纳包|收纳盒|保护套|硅胶套|保护盒|外壳|套料|DIY套料|空壳|空盒|仅外壳|单外壳|转接线|纯挂绳|贴纸|保护壳|手绳|挂绳线)/i;
 
@@ -376,7 +376,7 @@ export function inferArchetype(text = '') {
   if (ARCHETYPE_ACCESSORY_PATTERNS[str]) return str;
   if (/(?:吉他|guitar|nexg|lava|拿火|恩雅|民谣|古典|开声|电吉他|尤克里里)/i.test(str)) return 'guitar';
   if (/(?:架子鼓|空气鼓|电鼓|体感鼓|鼓棒|鼓槌|pocketdrum|打击乐|咚咚鼓|airdondon|(?:aeroband|体感)(?:.*(?:鼓|drum|棒|pocket|脚踏|踏板))?)/i.test(str)) return 'air_drum';
-  if (/(?:数位板|数位屏|绘图板|手绘屏|wacom|xppen|高漫|绘王|drawing|tablet)/i.test(str)) return 'drawing_tablet';
+  if (/(?:数位板|数位屏|绘图板|手绘屏|wacom|xp-?pen|xpen|高漫|绘王|huion|gaomon|drawing|tablet)/i.test(str)) return 'drawing_tablet';
   if (/(?:耳机|耳麦|降噪|airpods|wh-1000|xm5|xm4|bose|森海塞尔|漫步者|充电仓|耳塞|headphone|earphone|earbuds)/i.test(str)) return 'audio_headphone';
   if (/(?:相机|微单|单反|单电|摄影|镜头|索尼a7|佳能|尼康|富士|理光|松下|哈苏|徕卡|action|gopro|dji|camera)/i.test(str)) return 'camera';
   if (/(?:switch|ps5|ps4|xbox|steam\s*deck|rog\s*ally|掌机|游戏机|ns|oled|console)/i.test(str)) return 'gaming_console';
@@ -457,12 +457,35 @@ export const PRODUCT_CATALOG = new Map([
   ['xppen_artist16_gen2', {
     category: 'xppen_artist16_gen2',
     archetype: 'drawing_tablet',
-    defaultQuery: 'xppen 16 gen2',
-    aliases: ['xppen16_gen2', 'artist16_gen2', 'xppen二代'],
-    mustInclude: /(?:gen\s*2|2代|二代|2\.5k|x3\s*pro|16384|16383)/i,
-    mustExclude: /(?:1代|一代|1080p|1920|8192|旧款)/i,
-    priceFloor: 800,
+    defaultQuery: 'Artist Pro 16 Gen 2',
+    aliases: ['xppen16_gen2', 'artist16_gen2', 'xppen二代', 'xpen_artist16_gen2', 'xpen_pro_16_gen2', 'xppen_pro_16_gen2', 'artist_pro_16_gen2', 'artist_pro_16_二代', 'xpen 16 gen2', 'artist pro 16 gen2', 'artist pro 16 二代'],
+    mustInclude: /(?:gen\s*2|2代|二代|2\.5k|x3\s*pro|16384|16383|16k)/i,
+    mustExclude: /(?:1代|一代|1080p|1920|8192|旧款|deco|纯板|无屏幕)/i,
+    priceFloor: 900,
+    targetPrice: 1550,
     description: 'XPPen Artist Pro 16 Gen 2 2.5K 16384级压感数位屏',
+  }],
+  ['xppen_artist_pro_16', {
+    category: 'xppen_artist_pro_16',
+    archetype: 'drawing_tablet',
+    defaultQuery: 'Artist Pro 16',
+    aliases: ['xpen_pro_16', 'xppen_pro_16', 'artist_pro_16', 'xpen_artist_pro_16', 'xppen_artist_pro_16', 'artist_pro16', 'artist pro 16', 'xpen pro 16', 'xppen pro 16', 'xpen 16 pro', 'xppen 16 pro'],
+    mustInclude: /(?:artist\s*pro\s*16|pro\s*16|15\.4)/i,
+    mustExclude: /(?:deco|01|640|纯板|无屏幕|数位板(?!\s*屏)|单笔|仅笔)/i,
+    priceFloor: 600,
+    targetPrice: 950,
+    description: 'XPPen Artist Pro 16 (一代 1080P 双滚轮全贴合屏)',
+  }],
+  ['xppen_artist_pro_16_tp', {
+    category: 'xppen_artist_pro_16_tp',
+    archetype: 'drawing_tablet',
+    defaultQuery: 'Artist Pro 16 TP',
+    aliases: ['artist_pro_16_tp', 'xppen_16_tp', 'xpen_16_tp', 'artist pro 16 tp', 'pro 16 tp'],
+    mustInclude: /(?:tp|4k|触控)/i,
+    mustExclude: /(?:deco|纯板|无屏幕|单笔)/i,
+    priceFloor: 1200,
+    targetPrice: 1700,
+    description: 'XPPen Artist Pro 16 TP 4K超清多点触控数位屏',
   }],
   ['sony_a7m4', {
     category: 'sony_a7m4',
@@ -527,21 +550,47 @@ export function getProductSpec(nameOrQuery = '') {
   const q = String(nameOrQuery || '').trim().toLowerCase();
   if (!q) return null;
 
-  // 1. Direct or alias match in catalog
+  // 1. Direct key match in catalog
+  if (PRODUCT_CATALOG.has(q)) {
+    return PRODUCT_CATALOG.get(q);
+  }
+
+  // 2. Direct exact alias match
   for (const [cat, spec] of PRODUCT_CATALOG.entries()) {
-    if (cat.toLowerCase() === q || (spec.aliases && spec.aliases.some(a => a.toLowerCase() === q))) {
+    if (cat.toLowerCase() === q || (spec.aliases && spec.aliases.some(a => a.toLowerCase() === q || a.toLowerCase().replace(/_/g, ' ') === q))) {
       return spec;
     }
   }
 
-  // 2. Substring or defaultQuery match in catalog
+  // 3. Inferred canonical category match
+  const inferredCat = inferCategory({ keyword: q, title: q });
+  if (inferredCat && PRODUCT_CATALOG.has(inferredCat)) {
+    return PRODUCT_CATALOG.get(inferredCat);
+  }
+
+  // 4. Longest-match substring or defaultQuery in catalog
+  let bestMatch = null;
+  let bestMatchLen = 0;
   for (const [cat, spec] of PRODUCT_CATALOG.entries()) {
-    if (q.includes(cat.toLowerCase()) || 
-        (spec.defaultQuery && q.includes(spec.defaultQuery.toLowerCase())) ||
-        (spec.aliases && spec.aliases.some(a => q.includes(a.toLowerCase())))) {
-      return spec;
+    if (q.includes(cat.toLowerCase()) && cat.length > bestMatchLen) {
+      bestMatch = spec;
+      bestMatchLen = cat.length;
+    }
+    if (spec.defaultQuery && q.includes(spec.defaultQuery.toLowerCase()) && spec.defaultQuery.length > bestMatchLen) {
+      bestMatch = spec;
+      bestMatchLen = spec.defaultQuery.length;
+    }
+    if (spec.aliases) {
+      for (const a of spec.aliases) {
+        const normA = a.toLowerCase().replace(/_/g, ' ');
+        if ((q.includes(a.toLowerCase()) || q.includes(normA)) && a.length > bestMatchLen) {
+          bestMatch = spec;
+          bestMatchLen = a.length;
+        }
+      }
     }
   }
+  if (bestMatch) return bestMatch;
 
   // 3. Dynamic generic archetype fallback
   const archetype = inferArchetype(q);
@@ -766,8 +815,14 @@ export function inferCategory({ category = '', keyword = '', title = '' } = {}) 
   }
 
   // Drawing tablet detection
-  if (/(?:xppen.*16.*(?:gen\s*2|2代|二代)|artist\s*16.*gen\s*2)/i.test(all)) {
+  if (/(?:xppen|xpen|xp-pen|artist).*16.*(?:gen\s*2|2代|二代|2\.5k|16k|16384)/i.test(all)) {
     return 'xppen_artist16_gen2';
+  }
+  if (/(?:xppen|xpen|xp-pen|artist).*16.*(?:tp|4k|触控)/i.test(all)) {
+    return 'xppen_artist_pro_16_tp';
+  }
+  if (/(?:xppen|xpen|xp-pen|artist).*(?:pro\s*16|16\s*pro|artist\s*16)/i.test(all)) {
+    return 'xppen_artist_pro_16';
   }
 
   if (cat && cat !== 'all' && cat !== '全部') {
