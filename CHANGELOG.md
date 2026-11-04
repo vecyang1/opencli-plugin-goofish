@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-04] - 2026-11-04
+
+### Features
+- Enhance XPPen drawing tablet catalog, aliases, and accessory filters (`745cffb`)
+
+### Maintenance
+- Record morning run for CAD-20260913-goofish-nexg2n-watch on 2026-11-04
+- Record evening run for CAD-20260913-goofish-nexg2n-watch on 2026-11-03 (`e0c3887`)
+- Log 2026-11-01 evening run for goofish-nexg2n-watch (`db9b3ac`)
+
 ## [1.9.4] - 2026-10-30
 
 ### Operations
