@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-08] - 2026-11-08
+
+### Fixed & Resilient Evolution
+- Hardened `bin/xy-chat.js` watch execution with automatic retry & 2.5s backoff on exit code 69 (`BROWSER_CONNECT` Browser Bridge cold-start reconnection).
+
+### Maintenance
+- Record evening cadence for CAD-20260913-goofish-nexg2n-watch on 2026-11-08 (421 spotted, low ¥2699, Notion sync 6 tasks, 0 below target).
+- Record morning cadence for CAD-20260913-goofish-nexg2n-watch on 2026-11-08 (411 spotted, low ¥2699, Notion sync auto-healed after ECONNRESET).
+
 ## [2026-11-07] - 2026-11-07
 
 ### Maintenance

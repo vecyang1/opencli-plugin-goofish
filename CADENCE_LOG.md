@@ -70,3 +70,7 @@
 - **Summary**: 早间例行巡检完成：现货最低价维持 ¥2699 (无变动，未达 ¥1600 门限)，Notion 双向同步在遭遇 ECONNRESET 网络抖动后经重试自愈成功 (6更新, 6拉回)
 - **Metrics**: spotted_count=411, current_low_price=2699, below_target=0, notion_updated=6, notion_pulled=6, duration_ms=21001
 
+
+## [2026-11-08 20:20:17] [SUCCESS] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 晚间例行巡检完成：现货最低价维持 ¥2699 (无变动，未达 ¥1600 门限)，Notion 双向同步成功 (6更新, 6拉回)，Browser Bridge 冷启动重试自愈加固
+- **Metrics**: spotted_count=421, current_low_price=2699, below_target=0, notion_updated=6, notion_pulled=6, duration_ms=6274

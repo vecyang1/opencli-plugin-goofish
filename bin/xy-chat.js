@@ -541,7 +541,13 @@ async function main() {
 
     case 'watch': {
       console.log('📡 正在启动闲鱼新上架与降价实时监听 (推送式实时订阅)...');
-      const res = spawnOpenCli(['xianyu', 'watch', ...subArgs]);
+      let res = spawnOpenCli(['xianyu', 'watch', ...subArgs]);
+      // 核心脆弱点自愈：若遇到浏览器扩展桥接冷启动抖动 (退出码 69)，自动等待并重试 1 次
+      if (res.status === 69) {
+        console.warn('⚠️ 检测到 Browser Bridge (Chrome Profile 38) 处于冷启动或重连状态 (退出码 69)，等待 2.5s 后自动重试...');
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        res = spawnOpenCli(['xianyu', 'watch', ...subArgs]);
+      }
       process.exit(res.status ?? 0);
       break;
     }
