@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-09] - 2026-11-09
+
+### Fixed & Resilient Evolution
+- Hardened `src/notion-sync.js` `notionFetch` with fast-fail timeout (15s on initial attempt) and fast jitter recovery backoff (800ms base) to mitigate cold-socket `ECONNRESET` delays and prevent 20s+ stalls.
+
+### Maintenance
+- Record morning cadence for CAD-20260913-goofish-nexg2n-watch on 2026-11-09 (421 spotted, low ¥2699, Notion sync 6 tasks in 9998ms, 0 below target).
+
 ## [2026-11-08] - 2026-11-08
 
 ### Fixed & Resilient Evolution

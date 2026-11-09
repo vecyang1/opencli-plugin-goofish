@@ -85,9 +85,16 @@ async function notionFetch(endpoint, options = {}, retries = 6) {
       ...(options.headers || {}),
     };
 
+    // Fast-fail timeout: first attempt uses 15s to quickly detect stale socket resets, subsequent retries use 20s
+    const timeoutMs = options.timeoutMs || (attempt === 0 ? 15000 : 20000);
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const signal = options.signal && typeof AbortSignal.any === 'function' 
+      ? AbortSignal.any([options.signal, timeoutSignal]) 
+      : timeoutSignal;
+
     try {
       const res = await fetch(url, {
-        signal: options.signal || AbortSignal.timeout(25000),
+        signal,
         ...options,
         headers,
       });
@@ -103,7 +110,9 @@ async function notionFetch(endpoint, options = {}, retries = 6) {
       return await res.json();
     } catch (err) {
       lastError = err;
-      const delay = Math.min(Math.pow(2, attempt) * 1000 + Math.floor(Math.random() * 500), 10000);
+      // Fast recovery backoff on transient socket reset / ECONNRESET: 800ms base for first retry
+      const baseDelay = attempt === 0 ? 800 : Math.pow(2, attempt) * 1000;
+      const delay = Math.min(baseDelay + Math.floor(Math.random() * 400), 10000);
       if (attempt < retries - 1) {
         console.warn(`[notion-sync] Notion API 请求异常 (${err.cause?.code || err.code || err.message})，将在 ${delay}ms 后进行第 ${attempt + 2}/${retries} 次重试...`);
       }
