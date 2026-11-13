@@ -30,6 +30,22 @@ const defaultBrowserEnv = {
   OPENCLI_BROWSER_COMMAND_TIMEOUT: process.env.OPENCLI_BROWSER_COMMAND_TIMEOUT || '120',
 };
 
+function ensureProfile38Connected() {
+  try {
+    const raw = execSync('opencli daemon status', { stdio: 'pipe', encoding: 'utf-8', timeout: 3000 });
+    const jsonStr = raw.trim().split('\n').filter(l => l.trim().startsWith('{')).pop() || '{}';
+    const json = JSON.parse(jsonStr);
+    const isConnected = json?.data?.extensionConnected && (json?.data?.profiles || []).some(p => p.extensionConnected);
+    if (!isConnected) {
+      console.warn('⚠️ 检测到 Chrome Profile 38 桥接未连接，正在自动拉起并接入...');
+      execSync('open -na "Google Chrome" --args --profile-directory="Profile 38" https://www.goofish.com', { stdio: 'ignore' });
+      execSync('sleep 3');
+    }
+  } catch (err) {
+    // 忽略预检偶发错误，由后续常规流程承接
+  }
+}
+
 function runOpenCli(siteCmd, extraArgs = []) {
   const fullCmd = ['xianyu', siteCmd, ...extraArgs];
   const res = spawnSync('opencli', fullCmd, { 
@@ -113,6 +129,7 @@ async function main() {
   switch (command) {
     case 'doctor': {
       console.log('🔍 正在诊断闲鱼 CLI 与浏览器环境...');
+      ensureProfile38Connected();
       const doc = runOpenCli('whoami', ['-f', 'json']);
       let bridgeOk = false;
       let authOk = false;
@@ -541,6 +558,7 @@ async function main() {
 
     case 'watch': {
       console.log('📡 正在启动闲鱼新上架与降价实时监听 (推送式实时订阅)...');
+      ensureProfile38Connected();
       let res = spawnOpenCli(['xianyu', 'watch', ...subArgs]);
       // 核心脆弱点自愈：若遇到浏览器扩展桥接冷启动抖动 (退出码 69)，自动等待并重试 1 次
       if (res.status === 69) {

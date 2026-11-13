@@ -100,3 +100,16 @@
 - **Metrics**: spotted_count=451,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=7302
 - **Artifacts / Files**: [`reports/runs/2026-11-11.md`](reports/runs/2026-11-11.md), [`.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-11-11.success`](.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-11-11.success), [`data/goofish.db`](data/goofish.db)
 
+## [2026-11-12 18:33:17] [SUCCESS] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 晚间例行巡检完成：现货最低价维持 ¥2699 (无变动，未达 ¥1600 门限)，Notion 双向同步成功 (6更新, 6拉回，耗时 8858ms)，SSOT 数据库任务样本增至 456 条
+- **Metrics**: spotted_count=456,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=8858
+- **Artifacts / Files**: [`reports/runs/2026-11-12.md`](reports/runs/2026-11-12.md), [`.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-11-12.success`](.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-11-12.success)
+
+## [2026-11-13 11:05:16] [SUCCESS] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 早间例行巡检完成：现货最低价维持 ¥2699 (无变动，未达 ¥1600 门限)，Notion 双向同步成功 (6更新, 6拉回，耗时 9699ms)，SSOT 数据库任务样本维持 456 条，固化 Profile 38 自动唤起探活
+- **Metrics**: spotted_count=456,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=9699
+- **Artifacts / Files**: [`reports/runs/2026-11-13.md`](reports/runs/2026-11-13.md), [`.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-11-13.success`](.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-11-13.success), [`bin/xy-chat.js`](bin/xy-chat.js), [`CHANGELOG.md`](CHANGELOG.md)
+
+## [2026-11-13 18:47:44] [SUCCESS] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 晚间例行巡检完成：现货最低价维持 2699 元 (无变动，未达 1600 元门限)，Notion 双向同步成功 (6更新, 6拉回，耗时 8956ms)，SSOT 数据库任务样本增至 461 条
+

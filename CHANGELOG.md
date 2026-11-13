@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-13] - 2026-11-13
+
+### Fixed & Resilient Evolution
+- **Chrome Profile 38 Auto-Launch & Pre-flight**: Added `ensureProfile38Connected()` in `bin/xy-chat.js` for `doctor` and `watch` commands. Proactively detects disconnected bridge status and automatically wakes Chrome Profile 38 via macOS `open` before dispatching OpenCLI commands, preventing transport timeout hangs when the background browser profile is dormant.
+
+### Maintenance
+- Daily routine execution run 2026-11-13 for goofish-nexg2n-watch (No price change, Notion sync 6/6 updated).
+
 ## [2026-11-09] - 2026-11-09
 
 ### Fixed & Resilient Evolution
