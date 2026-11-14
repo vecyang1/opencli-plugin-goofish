@@ -1,5 +1,5 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { safeGoto, checkAuth } from './_shared.js';
+import { safeGoto, checkAuth, AuthRequiredError } from './_shared.js';
 
 export const command = cli({
   site: 'goofish',
@@ -77,6 +77,10 @@ export const command = cli({
         status: '已登录 (Session Active)',
       };
     });
+
+    if (['登录', '立即登录', '扫码登录', '请登录'].includes(String(data?.nick || '').trim())) {
+      throw new AuthRequiredError('goofish');
+    }
 
     return [data];
   },

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-14] - 2026-11-14
+
+### Fixed & Resilient Evolution
+- **Strict Goofish Auth Guard (`_shared.js`, `whoami.js`, `watch.js`, `bin/xy-chat.js`)**: Excluded logged-out `<a href="/personal">登录</a>` links and login labels from `checkAuth(page)`, added explicit login-label rejection in `whoami.js`, and invoked `checkAuth(page)` in `watch.js` when zero cards are extracted so expired sessions fail loudly with `AUTH_REQUIRED` (exit code 77) instead of silently reporting `no_change`.
+- **Multi-Profile Bridge Preflight (`bin/xy-chat.js`)**: Fixed `ensureProfile38Connected()` to inspect `profiles` (`wg7phej7` / `chrome`) rather than top-level `extensionConnected` (which is `false` under `profileRequired: true`), and raised the `opencli daemon status` timeout from 3s to 8s to eliminate spurious Chrome Profile 38 relaunches.
+
 ## [2026-11-13] - 2026-11-13
 
 ### Fixed & Resilient Evolution

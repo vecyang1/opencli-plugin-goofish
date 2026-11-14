@@ -113,3 +113,8 @@
 ## [2026-11-13 18:47:44] [SUCCESS] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
 - **Summary**: 晚间例行巡检完成：现货最低价维持 2699 元 (无变动，未达 1600 元门限)，Notion 双向同步成功 (6更新, 6拉回，耗时 8956ms)，SSOT 数据库任务样本增至 461 条
 
+## [2026-11-14 18:39:21] [ATTENTION_REQUIRED] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 晚间巡检因 Chrome Profile 38 闲鱼账号退登被阻断(退出码77)；已修复 checkAuth/whoami/watch 假绿漏洞与多配置文件桥接误判(93项测试全过)；Notion 双向对账已完成(6更新/6拉回，耗时14623ms)；待用户在 Profile 38 重新扫码登录
+- **Metrics**: spotted_count=461,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=14623,auth_exit_code=77
+- **Artifacts / Files**: [`reports/runs/2026-11-14.md`](reports/runs/2026-11-14.md), [`bin/xy-chat.js`](bin/xy-chat.js), [`clis/goofish/_shared.js`](clis/goofish/_shared.js), [`clis/goofish/whoami.js`](clis/goofish/whoami.js), [`clis/goofish/watch.js`](clis/goofish/watch.js), [`tests/auth_guard.test.js`](tests/auth_guard.test.js), [`CHANGELOG.md`](CHANGELOG.md)
+

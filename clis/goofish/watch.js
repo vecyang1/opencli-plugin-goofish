@@ -1,6 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { spawnSync } from 'child_process';
-import { safeGoto, humanDelay } from './_shared.js';
+import { safeGoto, humanDelay, checkAuth, AuthRequiredError } from './_shared.js';
 import { 
   saveCandidates, 
   queryCandidates, 
@@ -177,9 +177,12 @@ export const command = cli({
       for (let iter = 0; iter < maxIterations; iter++) {
         await safeGoto(page, searchUrl);
 
-        // Anti-bot risk check
+        // Anti-bot / Auth risk check
         const currentUrl = page.url ? page.url() : '';
-        if (currentUrl.includes('sec.taobao.com') || currentUrl.includes('login.m.taobao.com')) {
+        if (currentUrl.includes('login.m.taobao.com') || currentUrl.includes('passport.goofish.com')) {
+          throw new AuthRequiredError('goofish');
+        }
+        if (currentUrl.includes('sec.taobao.com')) {
           eventsLog.push({
             timestamp: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
             event_type: '⚠️ 安全风控拦截',
@@ -269,6 +272,10 @@ export const command = cli({
             };
           });
         });
+
+        if (!Array.isArray(items) || items.length === 0) {
+          await checkAuth(page);
+        }
 
         if (Array.isArray(items) && items.length > 0) {
           const validCandidates = items.filter(it => !isAccessoryTitle(it.title, category, customExclude, { require: customRequire }));

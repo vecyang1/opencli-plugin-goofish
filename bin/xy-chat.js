@@ -32,10 +32,13 @@ const defaultBrowserEnv = {
 
 function ensureProfile38Connected() {
   try {
-    const raw = execSync('opencli daemon status', { stdio: 'pipe', encoding: 'utf-8', timeout: 3000 });
+    const raw = execSync('opencli daemon status', { stdio: 'pipe', encoding: 'utf-8', timeout: 8000 });
     const jsonStr = raw.trim().split('\n').filter(l => l.trim().startsWith('{')).pop() || '{}';
     const json = JSON.parse(jsonStr);
-    const isConnected = json?.data?.extensionConnected && (json?.data?.profiles || []).some(p => p.extensionConnected);
+    const profiles = Array.isArray(json?.data?.profiles) ? json.data.profiles : [];
+    const isConnected = profiles.length > 0
+      ? profiles.some(p => (p.contextId === 'wg7phej7' || p.alias === 'chrome') && p.extensionConnected)
+      : Boolean(json?.data?.extensionConnected);
     if (!isConnected) {
       console.warn('⚠️ 检测到 Chrome Profile 38 桥接未连接，正在自动拉起并接入...');
       execSync('open -na "Google Chrome" --args --profile-directory="Profile 38" https://www.goofish.com', { stdio: 'ignore' });
@@ -135,18 +138,20 @@ async function main() {
       let authOk = false;
       let nick = '-';
 
-      if (doc.stdout.includes('"status"') || doc.stdout.includes('已登录')) {
-        bridgeOk = true;
-        authOk = true;
-        try {
-          const parsed = JSON.parse(doc.stdout);
-          nick = parsed[0]?.nick || '已登录用户';
-        } catch (e) {
-          nick = '已登录用户';
-        }
-      } else if (doc.stdout.includes('AUTH_REQUIRED') || doc.stderr.includes('AUTH_REQUIRED')) {
+      if (doc.status === 77 || doc.stdout.includes('AUTH_REQUIRED') || doc.stderr.includes('AUTH_REQUIRED')) {
         bridgeOk = true;
         authOk = false;
+      } else if (doc.stdout.includes('"status"') || doc.stdout.includes('已登录')) {
+        bridgeOk = true;
+        try {
+          const parsed = JSON.parse(doc.stdout);
+          const row = Array.isArray(parsed) ? parsed[0] : (Array.isArray(parsed?.data) ? parsed.data[0] : null);
+          nick = row?.nick || '已登录用户';
+          authOk = !['登录', '立即登录', '扫码登录', '请登录'].includes(String(nick).trim());
+        } catch (e) {
+          nick = '已登录用户';
+          authOk = true;
+        }
       }
 
       console.log(`[1/3] OpenCLI 桥接状态 : ${bridgeOk ? '✅ 正常 (Chrome Profile 38 已接入)' : '❌ 未就绪 (请检查 opencli daemon)'}`);

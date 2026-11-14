@@ -252,11 +252,25 @@ export async function safeGoto(page, url, options = {}) {
  */
 export async function checkAuth(page) {
   const isAuthed = await page.evaluate(() => {
-    // 1. Check for logged-in links and profile selectors
-    const hasPersonalLink = Boolean(
-      document.querySelector('a[href*="/personal"], a[href*="personal?userId="]') ||
-      document.querySelector('div[class*="infoCenter--"], span[class*="nick--"]')
-    );
+    const url = String(window.location.href || '');
+    if (url.includes('login.m.taobao.com') || url.includes('passport.goofish.com') || url.includes('sec.taobao.com')) {
+      return false;
+    }
+
+    const loginLabels = new Set(['登录', '立即登录', '扫码登录', '请登录']);
+
+    // 1. Check for genuine logged-in links and profile selectors (exclude logged-out <a href="/personal">登录</a>)
+    const personalLinks = Array.from(document.querySelectorAll('a[href*="/personal"], a[href*="personal?userId="]'));
+    const hasAuthedPersonalLink = personalLinks.some(el => {
+      const t = (el.innerText || '').trim();
+      return t.length > 0 && !loginLabels.has(t);
+    });
+    const profileNodes = Array.from(document.querySelectorAll('div[class*="infoCenter--"], span[class*="nick--"], div[class*="nick--"]'));
+    const hasAuthedProfileNode = profileNodes.some(el => {
+      const t = (el.innerText || '').trim();
+      return t.length > 0 && !loginLabels.has(t);
+    });
+    const hasPersonalLink = hasAuthedPersonalLink || hasAuthedProfileNode;
 
     // 2. Check for trade/order navigation markers
     const hasTradeNav = Boolean(
@@ -268,7 +282,7 @@ export async function checkAuth(page) {
     const bodyText = document.body ? document.body.innerText : '';
     const hasLoginButton = Array.from(document.querySelectorAll('button, a, span')).some(el => {
       const t = el.innerText ? el.innerText.trim() : '';
-      return (t === '登录' || t === '立即登录' || t === '扫码登录') && el.children.length === 0;
+      return loginLabels.has(t) && el.children.length === 0;
     });
 
     if (hasLoginButton && !hasPersonalLink) {
