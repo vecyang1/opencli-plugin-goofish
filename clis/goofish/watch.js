@@ -198,6 +198,9 @@ export const command = cli({
           break;
         }
 
+        // Unconditional auth guard: Goofish renders generic homepage recommendation cards behind mini_login.htm when logged out
+        await checkAuth(page);
+
         // Wait for items to be present and scroll slightly (SPA hydration guard)
         if (typeof page.evaluate === 'function') {
           for (let retry = 0; retry < 5; retry++) {
@@ -273,9 +276,7 @@ export const command = cli({
           });
         });
 
-        if (!Array.isArray(items) || items.length === 0) {
-          await checkAuth(page);
-        }
+        await checkAuth(page);
 
         if (Array.isArray(items) && items.length > 0) {
           const validCandidates = items.filter(it => !isAccessoryTitle(it.title, category, customExclude, { require: customRequire }));

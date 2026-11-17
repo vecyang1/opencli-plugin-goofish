@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-17] - 2026-11-17
+
+### Fixed & Resilient Evolution
+- **Unconditional Search/Watch Auth Gate & Login-Iframe Guard (`_shared.js`, `watch.js`, `search.js`, `tests/auth_guard.test.js`)**:
+  - Added embedded login iframe detection (`passport.goofish.com`, `login.m.taobao.com`) inside `checkAuth(page)` so unauthenticated `/search` pages rendering background homepage recommendation cards (`a[href*="item?id="]`) are caught and fail loudly with `AUTH_REQUIRED` (exit code 77).
+  - Updated `dismissBaxiaDialog(page)` to skip `passport.goofish.com`, `login.m.taobao.com`, and `xdomain-storage` iframes instead of mistaking the login modal for a Baxia slider.
+  - Enforced unconditional `await checkAuth(page)` in both `watch.js` and `search.js` before extracting items, writing to SQLite SSOT, or updating `last_checked_at`, preventing false-green `no_change` exits and SSOT pollution.
+  - Added explicit `150000ms` process timeout on `spawnSync` in `bin/xy-chat.js` (`runOpenCli`, `spawnOpenCli`) to prevent indefinite runner stalls on dead CDP sockets.
+  - Added 3 regression and contract-gate tests in `tests/auth_guard.test.js` (96/96 tests passing).
+
 ## [2026-11-14] - 2026-11-14
 
 ### Fixed & Resilient Evolution

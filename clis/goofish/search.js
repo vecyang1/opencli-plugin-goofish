@@ -1,6 +1,6 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError } from '@jackwener/opencli/errors';
-import { safeGoto } from './_shared.js';
+import { safeGoto, checkAuth } from './_shared.js';
 import { saveCandidates } from './_db.js';
 
 export const command = cli({
@@ -58,6 +58,7 @@ export const command = cli({
 
     const searchUrl = 'https://www.goofish.com/search?q=' + encodeURIComponent(query);
     await safeGoto(page, searchUrl);
+    await checkAuth(page);
 
     // 1. Regional Filter (Only when explicitly specified, defaults to nationwide 全国)
     if (region && region !== '全国') {
@@ -316,6 +317,9 @@ export const command = cli({
         deduplicated.push(it);
       }
     }
+
+    // Re-verify auth after interactions before persisting into SSOT
+    await checkAuth(page);
 
     // Unidirectional write-back into SQLite SSOT
     if (deduplicated.length > 0) {

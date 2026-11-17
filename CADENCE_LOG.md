@@ -118,3 +118,28 @@
 - **Metrics**: spotted_count=461,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=14623,auth_exit_code=77
 - **Artifacts / Files**: [`reports/runs/2026-11-14.md`](reports/runs/2026-11-14.md), [`bin/xy-chat.js`](bin/xy-chat.js), [`clis/goofish/_shared.js`](clis/goofish/_shared.js), [`clis/goofish/whoami.js`](clis/goofish/whoami.js), [`clis/goofish/watch.js`](clis/goofish/watch.js), [`tests/auth_guard.test.js`](tests/auth_guard.test.js), [`CHANGELOG.md`](CHANGELOG.md)
 
+## [2026-11-15 09:33:30] [ATTENTION_REQUIRED] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 早间巡检因 Chrome Profile 38 闲鱼账号退登被阻断(退出码77)；本地接收端口9423离线；Notion双向对账已完成(6更新/6拉回，耗时8152ms)；93项测试全过；待用户在 Profile 38 重新扫码登录
+- **Metrics**: spotted_count=461,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=8152,tests_passed=93
+- **Artifacts / Files**: [`reports/runs/2026-11-15.md`](reports/runs/2026-11-15.md)
+
+## [2026-11-15 18:33:24] [ATTENTION_REQUIRED] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 晚间巡检因 Chrome Profile 38 闲鱼账号退登被阻断(退出码77)；本地接收端口9423已恢复在线(200 OK)；Notion双向对账已完成(6更新/6拉回，耗时6388ms)；93项测试全过；待用户在 Profile 38 重新扫码登录
+- **Metrics**: spotted_count=461,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=6388,tests_passed=93,webhook_online=true,auth_exit_code=77
+- **Artifacts / Files**: [`reports/runs/2026-11-15.md`](reports/runs/2026-11-15.md)
+
+## [2026-11-16 09:34:27] [ATTENTION_REQUIRED] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 早间巡检因 Chrome Profile 38 闲鱼账号退登被阻断(退出码77)；本地接收端口9423在线(200 OK)；Notion双向对账已完成(6更新/6拉回，耗时7347ms)；93项测试全过；待用户在 Profile 38 重新扫码登录
+- **Metrics**: spotted_count=461,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=7347,tests_passed=93,webhook_online=true,auth_exit_code=77
+- **Artifacts / Files**: [`reports/runs/2026-11-16.md`](reports/runs/2026-11-16.md)
+
+## [2026-11-16 18:33:12] [ATTENTION_REQUIRED] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 晚间巡检因 Chrome Profile 38 闲鱼账号退登被阻断(退出码77)；本地接收端口9423在线(200)；Notion双向对账已完成(6更新/6拉回，耗时6816ms)；93项测试全过；待用户在 Profile 38 重新扫码登录
+- **Metrics**: spotted_count=461,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=6816,tests_passed=93,webhook_online=true,auth_exit_code=77
+- **Artifacts / Files**: [`reports/runs/2026-11-16.md`](reports/runs/2026-11-16.md)
+
+## [2026-11-17 10:35:52] [ATTENTION_REQUIRED] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 早间巡检因 Chrome Profile 38 闲鱼账号退登被阻断(退出码77)；已修复内嵌登录框假绿绕过与搜索污染漏洞并通过96项测试；本地端口9423在线(200)；Notion双向对账已完成(6更新/6拉回，耗时9341ms)；待在 Profile 38 重新扫码登录
+- **Metrics**: spotted_count=461,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=9341,tests_passed=96,webhook_online=true,auth_exit_code=77
+- **Artifacts / Files**: [`reports/runs/2026-11-17.md`](reports/runs/2026-11-17.md), [`clis/goofish/_shared.js`](clis/goofish/_shared.js), [`clis/goofish/watch.js`](clis/goofish/watch.js), [`clis/goofish/search.js`](clis/goofish/search.js), [`bin/xy-chat.js`](bin/xy-chat.js), [`tests/auth_guard.test.js`](tests/auth_guard.test.js), [`CHANGELOG.md`](CHANGELOG.md)
+

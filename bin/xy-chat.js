@@ -55,6 +55,7 @@ function runOpenCli(siteCmd, extraArgs = []) {
     stdio: 'pipe', 
     encoding: 'utf-8',
     env: defaultBrowserEnv,
+    timeout: 150000,
   });
   return {
     status: res.status,
@@ -67,6 +68,7 @@ function spawnOpenCli(openCliArgs, opts = {}) {
   return spawnSync('opencli', openCliArgs, {
     stdio: 'inherit',
     env: defaultBrowserEnv,
+    timeout: 150000,
     ...opts,
   });
 }

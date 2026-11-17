@@ -166,6 +166,10 @@ export async function dismissBaxiaDialog(page) {
       const iframeInfo = await page.evaluate(() => {
         const iframes = Array.from(document.querySelectorAll('iframe'));
         for (const iframe of iframes) {
+          const src = String(iframe.src || '');
+          if (src.includes('passport.goofish.com') || src.includes('login.m.taobao.com') || src.includes('xdomain-storage')) {
+            continue;
+          }
           const rect = iframe.getBoundingClientRect();
           if (rect.width > 200 && rect.height > 200) {
             return {
@@ -254,6 +258,12 @@ export async function checkAuth(page) {
   const isAuthed = await page.evaluate(() => {
     const url = String(window.location.href || '');
     if (url.includes('login.m.taobao.com') || url.includes('passport.goofish.com') || url.includes('sec.taobao.com')) {
+      return false;
+    }
+
+    // Embedded mini_login iframe indicates unauthenticated state even when background URL remains /search or /
+    const loginIframe = document.querySelector('iframe[src*="passport.goofish.com"], iframe[src*="login.m.taobao.com"]');
+    if (loginIframe) {
       return false;
     }
 
