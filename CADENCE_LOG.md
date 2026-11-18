@@ -143,3 +143,8 @@
 - **Metrics**: spotted_count=461,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=9341,tests_passed=96,webhook_online=true,auth_exit_code=77
 - **Artifacts / Files**: [`reports/runs/2026-11-17.md`](reports/runs/2026-11-17.md), [`clis/goofish/_shared.js`](clis/goofish/_shared.js), [`clis/goofish/watch.js`](clis/goofish/watch.js), [`clis/goofish/search.js`](clis/goofish/search.js), [`bin/xy-chat.js`](bin/xy-chat.js), [`tests/auth_guard.test.js`](tests/auth_guard.test.js), [`CHANGELOG.md`](CHANGELOG.md)
 
+## [2026-11-18 18:43:15] [ATTENTION_REQUIRED] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 晚间巡检确认个人主页Vector_Y已登录，但/search触发Baxia二次扫码弹窗被阻断(退出码77)；已修复xy-chat桥接冷启动轮询与分裂登录态假绿诊断(97/97测试通过)；端口9423在线(200)；Notion双向对账已完成(6更新/6拉回，耗时6293ms)；待在Profile 38搜索页扫码解除
+- **Metrics**: spotted_count=461,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=6293,tests_passed=97,webhook_online=true,auth_exit_code=77
+- **Artifacts / Files**: [`reports/runs/2026-11-18.md`](reports/runs/2026-11-18.md), [`bin/xy-chat.js`](bin/xy-chat.js), [`tests/auth_guard.test.js`](tests/auth_guard.test.js), [`CHANGELOG.md`](CHANGELOG.md)
+

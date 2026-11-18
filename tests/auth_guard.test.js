@@ -130,3 +130,11 @@ test('Adapter Contract Gate: watch.js and search.js enforce unconditional checkA
     );
   }
 });
+
+test('Doctor & Bridge Contract Gate: xy-chat doctor probes search Baxia gate and polls bridge readiness', () => {
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+  const cliSrc = fs.readFileSync(path.join(root, 'bin/xy-chat.js'), 'utf-8');
+  assert.match(cliSrc, /isProfile38BridgeConnected/, 'bin/xy-chat.js must poll bridge readiness after launch');
+  assert.match(cliSrc, /runOpenCli\('search'/, 'bin/xy-chat.js doctor must probe /search Baxia auth gate');
+  assert.match(cliSrc, /!authOk \|\| !searchOk/, 'bin/xy-chat.js doctor must fail non-zero when /search is Baxia-gated');
+});

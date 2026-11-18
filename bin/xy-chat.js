@@ -30,19 +30,28 @@ const defaultBrowserEnv = {
   OPENCLI_BROWSER_COMMAND_TIMEOUT: process.env.OPENCLI_BROWSER_COMMAND_TIMEOUT || '120',
 };
 
+function isProfile38BridgeConnected() {
+  const raw = execSync('opencli daemon status', { stdio: 'pipe', encoding: 'utf-8', timeout: 8000 });
+  const jsonStr = raw.trim().split('\n').filter(l => l.trim().startsWith('{')).pop() || '{}';
+  const json = JSON.parse(jsonStr);
+  const profiles = Array.isArray(json?.data?.profiles) ? json.data.profiles : [];
+  return profiles.length > 0
+    ? profiles.some(p => (p.contextId === 'wg7phej7' || p.alias === 'chrome') && p.extensionConnected)
+    : Boolean(json?.data?.extensionConnected);
+}
+
 function ensureProfile38Connected() {
   try {
-    const raw = execSync('opencli daemon status', { stdio: 'pipe', encoding: 'utf-8', timeout: 8000 });
-    const jsonStr = raw.trim().split('\n').filter(l => l.trim().startsWith('{')).pop() || '{}';
-    const json = JSON.parse(jsonStr);
-    const profiles = Array.isArray(json?.data?.profiles) ? json.data.profiles : [];
-    const isConnected = profiles.length > 0
-      ? profiles.some(p => (p.contextId === 'wg7phej7' || p.alias === 'chrome') && p.extensionConnected)
-      : Boolean(json?.data?.extensionConnected);
-    if (!isConnected) {
+    if (!isProfile38BridgeConnected()) {
       console.warn('⚠️ 检测到 Chrome Profile 38 桥接未连接，正在自动拉起并接入...');
       execSync('open -na "Google Chrome" --args --profile-directory="Profile 38" https://www.goofish.com', { stdio: 'ignore' });
-      execSync('sleep 3');
+      // Poll bridge readiness up to 10s (5 x 2s) to avoid cold-start cookie/session hydration races
+      for (let i = 0; i < 5; i++) {
+        execSync('sleep 2');
+        try {
+          if (isProfile38BridgeConnected()) break;
+        } catch (e) {}
+      }
     }
   } catch (err) {
     // 忽略预检偶发错误，由后续常规流程承接
@@ -133,11 +142,14 @@ function parseCliArgs(args) {
 async function main() {
   switch (command) {
     case 'doctor': {
+      const quickMode = subArgs.includes('--quick');
       console.log('🔍 正在诊断闲鱼 CLI 与浏览器环境...');
       ensureProfile38Connected();
       const doc = runOpenCli('whoami', ['-f', 'json']);
       let bridgeOk = false;
       let authOk = false;
+      let searchOk = false;
+      let searchGateMsg = '⏭️ 已跳过 (--quick)';
       let nick = '-';
 
       if (doc.status === 77 || doc.stdout.includes('AUTH_REQUIRED') || doc.stderr.includes('AUTH_REQUIRED')) {
@@ -156,12 +168,32 @@ async function main() {
         }
       }
 
-      console.log(`[1/3] OpenCLI 桥接状态 : ${bridgeOk ? '✅ 正常 (Chrome Profile 38 已接入)' : '❌ 未就绪 (请检查 opencli daemon)'}`);
-      console.log(`[2/3] 闲鱼账号登录态   : ${authOk ? `✅ 已登录 (${nick})` : '⚠️ 未登录 (退出码 77, 请在 Profile 38 扫码)'}`);
-      console.log(`[3/3] SQLite 离线真理库: ✅ 已挂载 (${resolveDbPath()})`);
+      if (bridgeOk && authOk && !quickMode) {
+        const searchProbe = runOpenCli('search', ['吉他', '--limit', '1', '-f', 'json']);
+        if (searchProbe.status === 77 || searchProbe.stdout.includes('AUTH_REQUIRED') || searchProbe.stderr.includes('AUTH_REQUIRED')) {
+          searchOk = false;
+          searchGateMsg = '⚠️ 个人主页已登录，但 /search 触发 Baxia 二次登录校验 (退出码 77，请在 Profile 38 打开搜索页扫码)';
+        } else if (searchProbe.status === 0) {
+          searchOk = true;
+          searchGateMsg = '✅ 正常 (MTOP 搜索通道畅通)';
+        } else {
+          searchOk = false;
+          searchGateMsg = `⚠️ 搜索探活异常 (退出码 ${searchProbe.status ?? 'unknown'})`;
+        }
+      } else if (!authOk) {
+        searchOk = false;
+        searchGateMsg = '⚠️ 未登录，搜索通道不可用';
+      } else {
+        searchOk = true;
+      }
+
+      console.log(`[1/4] OpenCLI 桥接状态 : ${bridgeOk ? '✅ 正常 (Chrome Profile 38 已接入)' : '❌ 未就绪 (请检查 opencli daemon)'}`);
+      console.log(`[2/4] 闲鱼账号登录态   : ${authOk ? `✅ 已登录 (${nick})` : '⚠️ 未登录 (退出码 77, 请在 Profile 38 扫码)'}`);
+      console.log(`[3/4] 搜索通道风控态   : ${searchGateMsg}`);
+      console.log(`[4/4] SQLite 离线真理库: ✅ 已挂载 (${resolveDbPath()})`);
 
       if (!bridgeOk) process.exit(1);
-      if (!authOk) process.exit(3);
+      if (!authOk || !searchOk) process.exit(3);
       process.exit(0);
       break;
     }

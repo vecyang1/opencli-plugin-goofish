@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-18] - 2026-11-18
+
+### Fixed & Resilient Evolution
+- **Split-Brain Auth & Cold-Start Bridge Readiness (`bin/xy-chat.js`, `tests/auth_guard.test.js`)**:
+  - Updated `ensureProfile38Connected()` to poll `opencli daemon status` up to 10s (5 x 2s) after cold-launching Chrome Profile 38 instead of a blind 3s sleep, eliminating premature `whoami` exit 77 races on cold start.
+  - Updated `xy-chat doctor` to probe `/search` (`runOpenCli('search', ['吉他', '--limit', '1', '-f', 'json'])`) whenever `/personal` (`whoami`) is authenticated (`--quick` skips probe). Prevents false-green `exit 0` diagnostics when `Vector_Y` is logged in on `/personal` while `/search` MTOP is gated by `baxia-dialog-content` (`passport.goofish.com/mini_login.htm?appEntrance=baxia`, exit 77).
+  - Added regression contract gate test in `tests/auth_guard.test.js` (97/97 tests passing).
+
 ## [2026-11-17] - 2026-11-17
 
 ### Fixed & Resilient Evolution
