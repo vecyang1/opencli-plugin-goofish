@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-19] - 2026-11-19
+
+### Fixed & Resilient Evolution
+- **Cold-Wake Hydration Grace Window & Probe-Guarded Watch Retry (`_shared.js`, `bin/xy-chat.js`, `tests/auth_guard.test.js`)**:
+  - Updated `checkAuth(page)` in `clis/goofish/_shared.js` with a single 2.5s SPA hydration confirmation wait when `!isAuthed` outside test environments, preventing transient false `AUTH_REQUIRED` (exit 77) on dormant Chrome Profile 38 tabs while `xdomain-storage` hydrates.
+  - Updated `xy-chat watch` in `bin/xy-chat.js` to probe `whoami` before retrying once when `watch` exits `77`, healing cold-wake session hydration races without masking genuine logouts.
+  - Added regression test in `tests/auth_guard.test.js` (98/98 tests passing).
+
 ## [2026-11-18] - 2026-11-18
 
 ### Fixed & Resilient Evolution

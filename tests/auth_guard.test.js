@@ -137,4 +137,54 @@ test('Doctor & Bridge Contract Gate: xy-chat doctor probes search Baxia gate and
   assert.match(cliSrc, /isProfile38BridgeConnected/, 'bin/xy-chat.js must poll bridge readiness after launch');
   assert.match(cliSrc, /runOpenCli\('search'/, 'bin/xy-chat.js doctor must probe /search Baxia auth gate');
   assert.match(cliSrc, /!authOk \|\| !searchOk/, 'bin/xy-chat.js doctor must fail non-zero when /search is Baxia-gated');
+  assert.match(cliSrc, /res\.status === 77[\s\S]*runOpenCli\('whoami'/, 'bin/xy-chat.js watch must probe whoami before retrying transient exit 77');
+});
+
+test('Auth Guard Hydration Retry: recovers when xdomain-storage hydrates after initial shell without masking real logouts', async () => {
+  let evalCount = 0;
+  const hydratingPage = {
+    evaluate: async (fn) => {
+      evalCount += 1;
+      const prevWindow = globalThis.window;
+      const prevDocument = globalThis.document;
+      globalThis.window = { location: { href: 'https://www.goofish.com/personal' } };
+      const isHydrated = evalCount >= 2;
+      globalThis.document = {
+        body: { innerText: isHydrated ? '编辑资料 18 粉丝 11 关注' : '登录 首页' },
+        querySelectorAll: (selector) => {
+          if (selector.includes('a[href*="/personal"]')) {
+            return [{ innerText: isHydrated ? '测试用户' : '登录', children: [] }];
+          }
+          if (selector.includes('button, a, span')) {
+            return [{ innerText: isHydrated ? '测试用户' : '登录', children: [] }];
+          }
+          return [];
+        },
+        querySelector: () => null,
+      };
+      try {
+        return fn();
+      } finally {
+        globalThis.window = prevWindow;
+        globalThis.document = prevDocument;
+      }
+    },
+  };
+
+  const ok = await checkAuth(hydratingPage, { allowHydrationRetry: true, hydrationWaitSec: 0.01 });
+  assert.equal(ok, true);
+  assert.equal(evalCount, 2);
+
+  const trulyLoggedOut = makeMockPage({
+    url: 'https://www.goofish.com/personal',
+    elements: {
+      'a[href*="/personal"]': [{ innerText: '登录', children: [] }],
+      'button, a, span': [{ innerText: '登录', children: [] }],
+    },
+    bodyText: '登录 首页',
+  });
+  await assert.rejects(
+    () => checkAuth(trulyLoggedOut, { allowHydrationRetry: true, hydrationWaitSec: 0.01 }),
+    (err) => err instanceof AuthRequiredError || err.exitCode === 77
+  );
 });

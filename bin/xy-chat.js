@@ -604,6 +604,14 @@ async function main() {
         console.warn('⚠️ 检测到 Browser Bridge (Chrome Profile 38) 处于冷启动或重连状态 (退出码 69)，等待 2.5s 后自动重试...');
         await new Promise((resolve) => setTimeout(resolve, 2500));
         res = spawnOpenCli(['xianyu', 'watch', ...subArgs]);
+      } else if (res.status === 77) {
+        // 冷唤醒态 xdomain-storage 水合竞态自愈：先用 whoami 探活并预热会话，仅在确认已登录时重试 1 次
+        const probe = runOpenCli('whoami', ['-f', 'json']);
+        if (probe.status === 0 && !probe.stdout.includes('AUTH_REQUIRED')) {
+          console.warn('⚠️ 检测到冷唤醒会话水合竞态 (whoami 在线但首次 watch 返回 77)，等待 2s 后自动重试...');
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          res = spawnOpenCli(['xianyu', 'watch', ...subArgs]);
+        }
       }
       process.exit(res.status ?? 0);
       break;

@@ -254,8 +254,8 @@ export async function safeGoto(page, url, options = {}) {
  * Resilient semantic authentication verification.
  * Strictly verifies real DOM session indicators without any hardcoded usernames.
  */
-export async function checkAuth(page) {
-  const isAuthed = await page.evaluate(() => {
+export async function checkAuth(page, options = {}) {
+  const evaluateAuth = () => page.evaluate(() => {
     const url = String(window.location.href || '');
     if (url.includes('login.m.taobao.com') || url.includes('passport.goofish.com') || url.includes('sec.taobao.com')) {
       return false;
@@ -311,6 +311,19 @@ export async function checkAuth(page) {
 
     return hasPersonalLink || (hasTradeNav && hasKeywords);
   });
+
+  let isAuthed = await evaluateAuth();
+
+  // Cold-wake SPA hydration grace window: xdomain-storage / MTOP session may lag 2-4s behind settleMs on dormant tabs
+  if (!isAuthed && (!isTestEnv() || options.allowHydrationRetry)) {
+    const waitSec = options.hydrationWaitSec ?? 2.5;
+    if (typeof page.wait === 'function') {
+      await page.wait(waitSec);
+    } else {
+      await new Promise(r => setTimeout(r, waitSec * 1000));
+    }
+    isAuthed = await evaluateAuth();
+  }
 
   if (!isAuthed) {
     throw new AuthRequiredError('goofish');
