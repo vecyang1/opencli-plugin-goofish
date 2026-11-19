@@ -148,3 +148,8 @@
 - **Metrics**: spotted_count=461,current_low_price=2699,below_target=0,notion_updated=6,notion_pulled=6,duration_ms=6293,tests_passed=97,webhook_online=true,auth_exit_code=77
 - **Artifacts / Files**: [`reports/runs/2026-11-18.md`](reports/runs/2026-11-18.md), [`bin/xy-chat.js`](bin/xy-chat.js), [`tests/auth_guard.test.js`](tests/auth_guard.test.js), [`CHANGELOG.md`](CHANGELOG.md)
 
+## [2026-11-19 09:37:53] [AUTO_HEALED] - Goofish NEXG 2N Smart Guitar Price Watch & Notion Sync (`CAD-20260913-goofish-nexg2n-watch`)
+- **Summary**: 修复冷唤醒xdomain-storage水合竞态导致的瞬态退出码77(98/98测试通过+34双站点适配器同步)；watch实时采集5条(样本471/最低2699/低于1600阈值0条/no_change)及Notion双向对账(6更新/6拉回)全部通过；另端口9423因launchd TCC阻塞不可达(本次无告警触发)
+- **Metrics**: {"spotted_count":471,"current_low_price":2699,"historical_low_price":2699,"below_target_count":0,"price_history_total":667,"candidates_total":1663,"notion_pulled":6,"notion_updated":6,"unit_tests":"98/98","webhook_9423":"unreachable_tcc"}
+- **Artifacts / Files**: [`clis/goofish/_shared.js`](clis/goofish/_shared.js), [`bin/xy-chat.js`](bin/xy-chat.js), [`tests/auth_guard.test.js`](tests/auth_guard.test.js), [`CHANGELOG.md`](CHANGELOG.md), [`reports/runs/2026-11-19.md`](reports/runs/2026-11-19.md), [`.run/cadence/CAD-20260913-goofish-nexg2n-watch/state.json`](.run/cadence/CAD-20260913-goofish-nexg2n-watch/state.json), [`.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-11-19.success`](.run/cadence/CAD-20260913-goofish-nexg2n-watch/2026-11-19.success)
+
