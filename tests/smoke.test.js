@@ -10,7 +10,7 @@ const clisDir = path.resolve(__dirname, '../clis/goofish');
 const expectedFiles = [
   'whoami.js', 'personal.js', 'account.js', 'stats.js',
   'orders.js', 'favorites.js', 'published.js', 'search.js',
-  'detail.js', 'inbox.js', 'messages.js', 'chat.js',
+  'detail.js', 'checkout.js', 'inbox.js', 'messages.js', 'chat.js',
   'reply.js', 'reason.js', 'seller.js', 'recommend.js',
   'suggest.js', 'export.js', 'candidates.js', 'reviews.js',
   'pick.js', 'watch.js', 'edit.js', 'offline.js', 'relist.js',

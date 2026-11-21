@@ -2,6 +2,7 @@ import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError } from '@jackwener/opencli/errors';
 import { safeGoto, checkAuth } from './_shared.js';
 import { saveCandidates } from './_db.js';
+import { normalizeGoofishSearchCard } from './_pricing.js';
 
 export const command = cli({
   site: 'goofish',
@@ -28,6 +29,13 @@ export const command = cli({
     'item_id',
     'title',
     'price',
+    'price_num',
+    'listing_price',
+    'activity_price',
+    'coupon_price',
+    'estimated_payable',
+    'price_basis',
+    'price_source',
     'original_price',
     'price_drop',
     'publish_time',
@@ -296,6 +304,7 @@ export const command = cli({
           price: price || '¥0',
           original_price: origPrice,
           price_drop: priceDrop,
+          price_context: text,
           publish_time: publishTime,
           location: location,
           seller: seller,
@@ -318,15 +327,16 @@ export const command = cli({
       }
     }
 
-    // Re-verify auth after interactions before persisting into SSOT
-    await checkAuth(page);
-
-    // Unidirectional write-back into SQLite SSOT
-    if (deduplicated.length > 0) {
-      try {
-        saveCandidates(deduplicated, { keyword: query, filterAccessories: true });
-      } catch (e) {}
-    }
+    deduplicated = deduplicated
+      .map(it => ({
+        ...it,
+        ...normalizeGoofishSearchCard({
+          price: it.price,
+          context: it.price_context,
+          originalPrice: it.original_price,
+        }),
+      }))
+      .filter(it => it.item_id !== '-' && Number(it.price_amount) > 0);
 
     if (excludeKeywords.length > 0) {
       deduplicated = deduplicated.filter(it => {
@@ -340,7 +350,7 @@ export const command = cli({
       const minVal = parseFloat(minPrice);
       if (!isNaN(minVal)) {
         deduplicated = deduplicated.filter(it => {
-          const p = parseFloat(it.price.replace(/[^\d.]/g, ''));
+          const p = Number(it.price_num);
           return isNaN(p) || p >= minVal;
         });
       }
@@ -349,15 +359,25 @@ export const command = cli({
       const maxVal = parseFloat(maxPrice);
       if (!isNaN(maxVal)) {
         deduplicated = deduplicated.filter(it => {
-          const p = parseFloat(it.price.replace(/[^\d.]/g, ''));
+          const p = Number(it.price_num);
           return isNaN(p) || p <= maxVal;
         });
       }
     }
     if (sort === '价格升序' || sort === '价格' || sort === 'price_asc') {
-      deduplicated.sort((a, b) => (parseFloat(a.price.replace(/[^\d.]/g, '')) || 0) - (parseFloat(b.price.replace(/[^\d.]/g, '')) || 0));
+      deduplicated.sort((a, b) => (Number(a.price_num) || 0) - (Number(b.price_num) || 0));
     } else if (sort === '价格降序' || sort === 'price_desc') {
-      deduplicated.sort((a, b) => (parseFloat(b.price.replace(/[^\d.]/g, '')) || 0) - (parseFloat(a.price.replace(/[^\d.]/g, '')) || 0));
+      deduplicated.sort((a, b) => (Number(b.price_num) || 0) - (Number(a.price_num) || 0));
+    }
+
+    // Re-verify auth after interactions before persisting into SSOT.
+    await checkAuth(page);
+
+    // Only write validated, post-filter rows to the SSOT.
+    if (deduplicated.length > 0) {
+      try {
+        saveCandidates(deduplicated, { keyword: query, filterAccessories: true });
+      } catch (e) {}
     }
 
     return deduplicated.slice(0, limit).map((item, idx) => ({
@@ -365,6 +385,13 @@ export const command = cli({
       item_id: item.item_id,
       title: item.title,
       price: item.price,
+      price_num: item.price_num,
+      listing_price: item.listing_price,
+      activity_price: item.activity_price,
+      coupon_price: item.coupon_price,
+      estimated_payable: item.estimated_payable,
+      price_basis: item.price_basis,
+      price_source: item.price_source,
       original_price: item.original_price,
       price_drop: item.price_drop,
       publish_time: item.publish_time,

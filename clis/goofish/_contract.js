@@ -105,6 +105,8 @@ export const SCHEMA_CONTRACT = {
         title: { type: 'TEXT', notNull: true, description: '商品标题' },
         price: { type: 'TEXT', notNull: true, description: '商品标价字符串 (如 ¥1650)' },
         price_num: { type: 'REAL', notNull: true, default: 0, description: '数值型价格 (供精准排序与区间筛选)' },
+        price_basis: { type: 'TEXT', default: 'legacy', description: 'price_num 的价格口径: listing/activity/coupon/estimated/displayed_card/legacy; legacy 保留但不参与目标/最低价指标' },
+        price_source: { type: 'TEXT', default: '', description: '价格来源: mtop_detail/search_card_dom/checkout' },
         original_price: { type: 'TEXT', default: '-', description: '划线原价' },
         price_drop: { type: 'TEXT', default: '-', description: '降价幅度' },
         publish_time: { type: 'TEXT', default: '-', description: '发布相对时间' },
@@ -122,6 +124,7 @@ export const SCHEMA_CONTRACT = {
         min_price: { type: 'REAL', default: 0, description: '多规格最低价 (元)' },
         max_price: { type: 'REAL', default: 0, description: '多规格最高价 (元)' },
         skus_json: { type: 'TEXT', default: '', description: '多规格结构化 JSON 数据' },
+        pricing_json: { type: 'TEXT', default: '', description: '价格语义、金额、来源与证据 JSON' },
         seller_status: { type: 'TEXT', default: 'unknown', description: '保留兼容字段，真理投影见 candidates_view' },
         seller_note: { type: 'TEXT', default: '', description: '保留兼容字段，真理投影见 candidates_view' },
         status: { type: 'TEXT', default: 'active', description: '候选状态: active | sold | hidden' },
@@ -177,7 +180,10 @@ export const SCHEMA_CONTRACT = {
         title: { type: 'TEXT', notNull: true, description: '商品标题' },
         price: { type: 'TEXT', notNull: true, description: '价格字符串 (如 ¥1650)' },
         price_num: { type: 'REAL', notNull: true, default: 0, description: '数值型价格 (元)' },
+        price_basis: { type: 'TEXT', default: 'legacy', description: '本次价格快照口径; 仅 listing 参与目标/最低价指标，旧记录默认 legacy' },
+        price_source: { type: 'TEXT', default: '', description: '本次价格快照来源' },
         original_price: { type: 'TEXT', default: '-', description: '划线原价' },
+        pricing_json: { type: 'TEXT', default: '', description: '本次快照的价格语义、来源与证据 JSON' },
         seller: { type: 'TEXT', default: '', description: '卖家昵称' },
         seller_user_id: { type: 'TEXT', default: '', description: '卖家用户ID' },
         condition: { type: 'TEXT', default: '95新', description: '商品成色' },
@@ -211,6 +217,8 @@ export const SCHEMA_CONTRACT = {
         c.title,
         c.price,
         c.price_num,
+        COALESCE(c.price_basis, 'legacy') AS price_basis,
+        COALESCE(c.price_source, '') AS price_source,
         c.original_price,
         c.price_drop,
         c.publish_time,
@@ -228,6 +236,7 @@ export const SCHEMA_CONTRACT = {
         COALESCE(c.min_price, 0) AS min_price,
         COALESCE(c.max_price, 0) AS max_price,
         COALESCE(c.skus_json, '') AS skus_json,
+        COALESCE(c.pricing_json, '') AS pricing_json,
         COALESCE(r.status, c.seller_status, 'unknown') AS seller_status,
         COALESCE(r.reason, c.seller_note, '') AS seller_note,
         c.status,
@@ -966,6 +975,8 @@ export function validateCandidate(data) {
     title,
     price: formattedPrice,
     price_num: priceNum,
+    price_basis: String(data.price_basis || 'legacy').trim(),
+    price_source: String(data.price_source || '').trim(),
     original_price: String(data.original_price || '-').trim(),
     price_drop: String(data.price_drop || '-').trim(),
     publish_time: String(data.publish_time || '-').trim(),
@@ -983,6 +994,9 @@ export function validateCandidate(data) {
     min_price: typeof data.min_price === 'number' ? data.min_price : (parseFloat(String(data.min_price || '0').replace(/[^\d.]/g, '')) || 0),
     max_price: typeof data.max_price === 'number' ? data.max_price : (parseFloat(String(data.max_price || '0').replace(/[^\d.]/g, '')) || 0),
     skus_json: typeof data.skus_json === 'string' ? data.skus_json : (data.skus_json ? JSON.stringify(data.skus_json) : ''),
+    pricing_json: typeof data.pricing_json === 'string'
+      ? data.pricing_json
+      : (data.pricing_json ? JSON.stringify(data.pricing_json) : ''),
     seller_status: String(data.seller_status || 'unknown').trim(),
     seller_note: String(data.seller_note || '').trim(),
     status: String(data.status || 'active').trim(),
@@ -1692,7 +1706,12 @@ export function validatePriceHistoryRecord(data = {}) {
     title: String(data.title || '').trim(),
     price: formattedPrice,
     price_num: priceNum,
+    price_basis: String(data.price_basis || 'legacy').trim(),
+    price_source: String(data.price_source || '').trim(),
     original_price: String(data.original_price || '-').trim(),
+    pricing_json: typeof data.pricing_json === 'string'
+      ? data.pricing_json
+      : (data.pricing_json ? JSON.stringify(data.pricing_json) : ''),
     seller: String(data.seller || '-').trim(),
     seller_user_id: String(data.seller_user_id || '-').trim(),
     condition: String(data.condition || '95新').trim(),
@@ -1712,6 +1731,7 @@ export function computePriceHistoryStats(records = [], targetPrice = 0) {
   if (!Array.isArray(records) || records.length === 0) {
     return {
       count: 0,
+      trustedCount: 0,
       lowestPrice: 0,
       highestPrice: 0,
       averagePrice: 0,
@@ -1723,10 +1743,14 @@ export function computePriceHistoryStats(records = [], targetPrice = 0) {
     };
   }
 
-  const prices = records.map(r => r.price_num).filter(p => p > 0).sort((a, b) => a - b);
+  const trustedRecords = records.filter(
+    record => record.price_basis === 'listing' && Number(record.price_num) > 0,
+  );
+  const prices = trustedRecords.map(r => r.price_num).sort((a, b) => a - b);
   if (prices.length === 0) {
     return {
       count: records.length,
+      trustedCount: 0,
       lowestPrice: 0,
       highestPrice: 0,
       averagePrice: 0,
@@ -1745,9 +1769,11 @@ export function computePriceHistoryStats(records = [], targetPrice = 0) {
   const mid = Math.floor(prices.length / 2);
   const medianPrice = prices.length % 2 === 0 ? +((prices[mid - 1] + prices[mid]) / 2).toFixed(2) : prices[mid];
 
-  const lowestItem = records.find(r => r.price_num === lowestPrice) || null;
+  const lowestItem = trustedRecords.find(r => r.price_num === lowestPrice) || null;
   const targetNum = Number(targetPrice) || 0;
-  const belowTarget = targetNum > 0 ? records.filter(r => r.price_num > 0 && r.price_num <= targetNum) : [];
+  const belowTarget = targetNum > 0
+    ? trustedRecords.filter(r => r.price_num <= targetNum)
+    : [];
 
   const range = highestPrice - lowestPrice;
   const step = range > 0 ? range / 3 : 1;
@@ -1760,6 +1786,7 @@ export function computePriceHistoryStats(records = [], targetPrice = 0) {
 
   return {
     count: records.length,
+    trustedCount: trustedRecords.length,
     lowestPrice,
     highestPrice,
     averagePrice,

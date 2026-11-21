@@ -1,6 +1,7 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { spawnSync } from 'child_process';
 import { safeGoto, humanDelay, checkAuth, AuthRequiredError } from './_shared.js';
+import { normalizeGoofishSearchCard, priceAuditFields } from './_pricing.js';
 import { 
   saveCandidates, 
   queryCandidates, 
@@ -56,6 +57,8 @@ export const command = cli({
     'event_type',
     'item_id',
     'price',
+    'price_basis',
+    'price_source',
     'condition',
     'defect_notes',
     'seller',
@@ -118,11 +121,13 @@ export const command = cli({
           }
 
           if (eventType) {
+            const audit = priceAuditFields(it);
             const row = {
               timestamp: nowStr,
               event_type: eventType,
               item_id: it.item_id,
               price: it.price,
+              ...audit,
               condition: it.condition || '95新',
               defect_notes: it.defect_notes || '待多图深检',
               seller: it.seller,
@@ -148,6 +153,7 @@ export const command = cli({
                   category,
                   title: it.title,
                   price: it.price,
+                  ...audit,
                   old_price: oldPrice ? `¥${oldPrice}` : null,
                   price_drop: priceDropText,
                   condition: it.condition,
@@ -267,6 +273,7 @@ export const command = cli({
               item_id: itemId,
               title,
               price: price || '¥0',
+              price_context: text,
               location,
               seller,
               item_url: a.href,
@@ -279,7 +286,16 @@ export const command = cli({
         await checkAuth(page);
 
         if (Array.isArray(items) && items.length > 0) {
-          const validCandidates = items.filter(it => !isAccessoryTitle(it.title, category, customExclude, { require: customRequire }));
+          const normalized = items
+            .map(it => ({
+              ...it,
+              ...normalizeGoofishSearchCard({
+                price: it.price,
+                context: it.price_context,
+              }),
+            }))
+            .filter(it => it.item_id && Number(it.price_num) > 0);
+          const validCandidates = normalized.filter(it => !isAccessoryTitle(it.title, category, customExclude, { require: customRequire }));
           if (validCandidates.length > 0) {
             // Optional deep inspection on newly arrived candidates
             if (inspectImages) {
@@ -330,6 +346,7 @@ export const command = cli({
         event_type: '🔍 实时对齐',
         item_id: c.item_id,
         price: c.price,
+        ...priceAuditFields(c),
         condition: c.condition || '95新',
         defect_notes: c.defect_notes || '封面完好待深检',
         seller: c.seller,

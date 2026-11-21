@@ -20,6 +20,8 @@ export const command = cli({
   columns: [
     'spotted_at',
     'price',
+    'price_basis',
+    'price_source',
     'tag',
     'condition',
     'defect_notes',
@@ -48,6 +50,8 @@ export const command = cli({
       return [{
         spotted_at: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
         price: '-',
+        price_basis: '-',
+        price_source: '-',
         tag: 'ℹ️ 暂无历史记录',
         condition: '-',
         defect_notes: '未扫描到该关键词的历史价格数据，请先执行 xy-chat watch 或由后台监控任务抓取',
@@ -60,18 +64,21 @@ export const command = cli({
     const summary = getPriceHistorySummary({ keyword, category, target_price: targetPrice });
 
     return records.map(r => {
-      let tag = '📊 常规在售';
-      if (r.price_num === summary.lowestPrice) {
+      const trusted = r.price_basis === 'listing';
+      let tag = trusted ? '📊 常规在售' : `ℹ️ 仅记录 (${r.price_basis || 'legacy'})`;
+      if (trusted && r.price_num === summary.lowestPrice) {
         tag = '🏆 历史最低价';
-      } else if (r.is_below_target || (targetPrice > 0 && r.price_num <= targetPrice)) {
+      } else if (trusted && r.is_below_target) {
         tag = '🔥 捡漏低价突刺';
-      } else if (r.price_num <= summary.averagePrice * 0.85) {
+      } else if (trusted && summary.averagePrice > 0 && r.price_num <= summary.averagePrice * 0.85) {
         tag = '📉 显著偏低';
       }
 
       return {
         spotted_at: r.spotted_at ? new Date(r.spotted_at).toLocaleTimeString('zh-CN', { hour12: false }) : '-',
         price: r.price,
+        price_basis: r.price_basis || 'legacy',
+        price_source: r.price_source || '',
         tag,
         condition: r.condition || '95新',
         defect_notes: r.defect_notes || '-',

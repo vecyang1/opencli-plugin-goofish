@@ -85,6 +85,7 @@ opencli plugin install ./opencli-plugin-goofish
 | `opencli xianyu search` | `[read]` | 全网高级搜索二手商品 (地区/排序/价格/标签/降价/排除词) | `<query> [--region 珠三角/广东] [--sort 综合/新发布/新降价/价格] [--min-price] [--max-price] [--exclude 关键词] [--tags] [--page-num 1]` |
 | `opencli xianyu suggest` | `[read]` | 获取闲鱼全网热搜词与搜索关键词联想补全 | `[query] [--limit 20]` |
 | `opencli xianyu detail` | `[read]` | 获取指定商品详情与卖家信誉档案 | `<item_id>` |
+| `opencli goofish checkout` | `[read]` | 读取验货宝下单预览的价格分项与合计（只读，不提交订单） | `<item_id> [-f table/json/yaml]` |
 | `opencli xianyu seller` | `[read]` | 深度分析卖家画像、在售SKU全貌、历史买家评价与砍价博弈策略 | `<user_id/url/item_id> [--limit 20]` |
 | `opencli xianyu recommend` | `[read]` | 提取商品页面「为你推荐」相似竞品、隐藏好价替代品与生态SKU | `<item_id/url> [--limit 20] [--filter all/same/gear/study]` |
 | `opencli xianyu inbox` | `[read]` | 获取私信联系人列表 (向下虚拟滚动加载) | `[query] [--limit 30] [--scrolls 6] [--unread-only]` |
@@ -146,6 +147,27 @@ opencli xianyu seller 4108054065 -f yaml
 # 提取商品详情页「为你推荐」相似竞品与周边生态好价 SKU
 opencli xianyu recommend 1076198967894 --filter same -f table
 ```
+
+### 结算预览价格与字段口径 (checkout)
+商品 ID 可直接从商品链接 `https://www.goofish.com/item?id=<id>` 获取：
+```bash
+opencli goofish checkout 100000000010 -f json
+```
+
+该命令只读取 `create-order-yhb` 预览接口，不会点击确认购买、领券、提交订单或付款。主要字段：
+
+- `listing_price`：商品标价。
+- `confirm_price`：验货宝预览确认价。
+- `promotion_adjusted_price`：已使用优惠能够解释标价差额时的调整价。
+- `promotion_amount`：已使用优惠金额；存在无法解析的已用优惠时为 `null`。
+- `inspection_fee` / `postage`：验货费 / 运费。
+- `checkout_preview_total`：预览合计，不是最终实付。
+- `checkout_verified`：只有合计等于 `confirm_price + inspection_fee + postage` 且元/分字段无冲突时才为 `true`。
+- `preview_only=true`、`is_final_payable=false`：始终表示只读预览。
+
+接口返回 `FAIL_BIZ_*`、`SECURITY_BLOCK`、商品 ID 不一致、单位冲突或合计无法对账时，命令会失败，不输出看似可信的结算数字。
+
+监控历史会保留 `listing`、`activity`、`coupon`、`displayed_card` 等全部价格口径；只有 `price_basis=listing` 的可信标价参与目标命中、当前最低价和历史最低价。普通 `watch` 的搜索卡片价格是 `displayed_card`，会继续入库并发送带口径的事件，但在取得可信详情标价前不会更新这些指标。没有口径的旧记录按 `legacy` 保留并展示，但不会触发这些指标；既有任务中的 legacy 数值不会被自动迁移或重算。
 
 ### 5. IM 私信会话管理与聊天记录回溯
 ```bash
