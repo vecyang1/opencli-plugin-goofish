@@ -45,6 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Maintenance
 - Daily routine execution run 2026-11-13 for goofish-nexg2n-watch (No price change, Notion sync 6/6 updated).
 
+## [2026-11-10] - 2026-11-10
+
+### Features
+- **Automatic Alibaba slider solving**: `safeGoto` / `assertGoofishPageUsable` now drag `#nc_1_n1z` on `#nc_1_n1t` with trusted CDP mouse events, retry the "验证失败，点击框体重试" reset prompt, and give up after three attempts with the existing `SECURITY_BLOCK` error.
+- **Cross-origin punish iframe support**: challenge geometry is read via `page.frames()` / `evaluateInFrame()` and offset into page coordinates, covering Goofish MTOP detail responses that render the slider in `h5api.m.goofish.com/.../_____tmd_____/punish`.
+- Added best-effort one-tap smart verification and scratch-captcha handling in `clis/goofish/_captcha.js`.
+- Added `OPENCLI_SOLVE_CAPTCHA=0` kill switch.
+- After a failed slider attempt, if the tab is hidden, try `Page.bringToFront` (with tab-selection and one refresh fallback) before retrying; stop instead of hanging when it remains hidden. Normal attempts no longer change foreground/background state.
+
 ## [2026-11-09] - 2026-11-09
 
 ### Fixed & Resilient Evolution

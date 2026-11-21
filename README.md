@@ -57,6 +57,14 @@ opencli plugin install ./opencli-plugin-goofish
   ```
 - 首次使用扫码登录闲鱼；若命令返回 `AUTH_REQUIRED`，依提示扫码完成续期即可。
 
+### 4. 安全验证（滑块）
+
+导航后若出现阿里 NoCaptcha / Baxia 滑块，插件会通过 CDP 可信鼠标事件自动拖动，最多尝试 3 次；失败提示“验证失败，点击框体重试”时会先点击重置再重试。滑块位于跨域 `punish` iframe 内（闲鱼详情 MTOP 风控常见形态）时同样支持。一点即过/智能验证会尝试点击，刮刮乐会按比例拖动。
+
+正常尝试滑块时不会改变前后台状态。只有滑块尝试失败、且标签页报告 `hidden` 时，插件才会尝试 `Page.bringToFront`（回退到选中当前自动化标签页），必要时刷新页面；仍不可见时停止拖动，避免 CDP 输入卡死。更新扩展后需要重新加载 Browser Bridge 扩展使新的 CDP 权限生效。
+
+点选文字、旋转拼图、人脸与短信验证没有可靠的本地识别方案，3 次后仍返回 `SECURITY_BLOCK`，需在浏览器中手动完成。设置 `OPENCLI_SOLVE_CAPTCHA=0` 可关闭自动拖动。
+
 ---
 
 ## 📖 命令完整手册 (Command Reference)

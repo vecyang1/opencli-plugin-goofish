@@ -2,7 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { checkAuth, dismissBaxiaDialog, AuthRequiredError } from '../clis/goofish/_shared.js';
+import {
+  checkAuth,
+  dismissBaxiaDialog,
+  getGoofishPageState,
+  AuthRequiredError,
+} from '../clis/goofish/_shared.js';
 
 function makeMockPage({ url = 'https://www.goofish.com/personal', elements = {}, bodyText = '', spies = {} }) {
   return {
@@ -116,6 +121,15 @@ test('Baxia Guard: dismissBaxiaDialog ignores mini_login and xdomain-storage ifr
   await dismissBaxiaDialog(pageWithLoginIframe);
   assert.equal(dragged, false);
   assert.equal(clicked, false);
+});
+
+test('Baxia Guard: ordinary listing text does not spoof a security challenge', async () => {
+  const page = makeMockPage({
+    url: 'https://www.goofish.com/item?id=100000000010',
+    bodyText: '商品说明：该设备支持安全验证，并提供验证码登录说明。',
+  });
+
+  assert.equal(await getGoofishPageState(page), 'ok');
 });
 
 test('Adapter Contract Gate: watch.js and search.js enforce unconditional checkAuth before SSOT write', () => {

@@ -1,3 +1,5 @@
+import { solveAlibabaCaptcha } from './_captcha.js';
+
 let _AuthRequiredError;
 try {
   const errMod = await import('@jackwener/opencli/errors');
@@ -95,110 +97,95 @@ export async function enforceRateLimit(url, options = {}) {
 }
 
 /**
- * Dismiss anti-bot Baxia verification dialog if a close button exists, or simulate slider drag.
+ * Detect login and verification pages without interacting with the challenge.
+ */
+export async function getGoofishPageState(page) {
+  if (typeof page.evaluate !== 'function') return 'unknown';
+  return page.evaluate(() => {
+    const title = (document.title || '').trim();
+    const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ');
+    const href = typeof window !== 'undefined'
+      ? String(window.location?.href || '')
+      : String(globalThis.location?.href || '');
+    const url = new URL(href || 'https://www.goofish.com/');
+    const isVisible = node => {
+      if (!node || node.closest?.('[hidden], [aria-hidden="true"]')) return false;
+      const style = typeof getComputedStyle === 'function'
+        ? getComputedStyle(node)
+        : { display: 'block', visibility: 'visible', opacity: '1' };
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || 1) === 0) {
+        return false;
+      }
+      const rect = typeof node.getBoundingClientRect === 'function'
+        ? node.getBoundingClientRect()
+        : { width: 1, height: 1 };
+      return rect.width > 0 && rect.height > 0;
+    };
+    const challengeNodes = Array.from(document.querySelectorAll(
+      '#nc_1_wrapper, #nc_1_n1z, .nc_scale, #baxia-dialog-content, [class*="captcha"]',
+    )).filter(isVisible);
+    const challengeIframe = Array.from(document.querySelectorAll('iframe')).filter(isVisible).some(iframe => {
+      const attr = name => typeof iframe.getAttribute === 'function'
+        ? iframe.getAttribute(name)
+        : iframe[name];
+      const src = String(attr('src') || '');
+      const label = `${attr('title') || ''} ${attr('aria-label') || ''}`;
+      return /punish|captcha|verify|_____tmd_____|x5sec/i.test(src)
+        || /验证码|滑块|安全验证|captcha/i.test(label);
+    });
+    const challengeText = [
+      title,
+      challengeNodes.map(node => node.innerText || '').join(' '),
+    ].join(' ');
+
+    if (/(?:^|\/)(?:punish|captcha|verify)(?:\/|$)/i.test(url.pathname)
+      || url.searchParams.has('_____tmd_____') || url.searchParams.has('x5sec')
+      || /验证码拦截|安全验证|滑块验证|请拖动.*滑块|请按住滑块/.test(challengeText)
+      || challengeIframe
+      || challengeNodes.some(node => /滑块|验证|captcha/i.test(node.innerText || ''))) {
+      return 'blocked';
+    }
+    if (/(?:^|\/)login(?:\/|$)/i.test(url.pathname)
+      || /^(?:登录|登入)(?:\s|[-_—]|$)/.test(title)
+      || /扫码登录|密码登录|短信登录/.test(bodyText.slice(0, 500))) {
+      return 'login';
+    }
+    return 'ok';
+  });
+}
+
+export async function assertGoofishPageUsable(page) {
+  let state = await getGoofishPageState(page);
+  if (state === 'blocked') {
+    const result = await solveAlibabaCaptcha(page, {
+      isSolved: async () => (await getGoofishPageState(page)) === 'ok',
+    });
+    if (result.solved) state = await getGoofishPageState(page);
+  }
+  if (state === 'blocked') {
+    const { CliError } = await import('@jackwener/opencli/errors');
+    throw new CliError(
+      'SECURITY_BLOCK',
+      'Goofish requires manual security verification.',
+      'Automatic slider attempts did not clear the challenge. Complete the verification in your browser and rerun the command; it was not retried.',
+    );
+  }
+  if (state === 'login') {
+    await checkAuth(page);
+  }
+}
+
+/**
+ * Best-effort Baxia/NoCaptcha dismissal used by commands that intentionally
+ * inspect a page without asserting its final state.
  */
 export async function dismissBaxiaDialog(page) {
-  try {
-    if (typeof page.evaluate === 'function') {
-      await page.evaluate(() => {
-        const allDocs = [document];
-        document.querySelectorAll('iframe').forEach(f => {
-          try {
-            if (f.contentDocument) allDocs.push(f.contentDocument);
-          } catch (e) {}
-        });
-
-        for (const doc of allDocs) {
-          // 1. Check for dedicated close button
-          const closeEl = doc.querySelector('.baxia-dialog-close, .sufei-dialog-close, [class*="close"], [aria-label*="close" i]');
-          if (closeEl && typeof closeEl.click === 'function') {
-            const rect = closeEl.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-              closeEl.click();
-              return;
-            }
-          }
-
-          // 2. Also look for elements with close glyph
-          const glyphs = Array.from(doc.querySelectorAll('button, div, span, a, svg')).filter(el => {
-            const txt = (el.innerText || '').trim();
-            const cls = typeof el.className === 'string' ? el.className : '';
-            return (txt === '×' || txt === '✕' || txt === 'X' || cls.includes('close')) && el.children.length <= 1;
-          });
-          for (const btn of glyphs) {
-            const rect = btn.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-              btn.click();
-              return;
-            }
-          }
-
-          // 3. Slider handle drag simulation
-          const sliderHandle = doc.querySelector('#nc_1_n1z, .btn_slide, span[class*="btn_slide"], span.nc_iconfont');
-          if (sliderHandle) {
-            const rect = sliderHandle.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-              const startX = rect.left + rect.width / 2;
-              const startY = rect.top + rect.height / 2;
-              const dispatch = (type, x, y) => {
-                const evt = new MouseEvent(type, {
-                  bubbles: true,
-                  cancelable: true,
-                  view: window,
-                  clientX: x,
-                  clientY: y,
-                });
-                sliderHandle.dispatchEvent(evt);
-              };
-              dispatch('mousedown', startX, startY);
-              for (let i = 1; i <= 10; i++) {
-                dispatch('mousemove', startX + (i * 32), startY + (Math.random() * 2 - 1));
-              }
-              dispatch('mouseup', startX + 330, startY);
-            }
-          }
-        }
-      });
-    }
-
-    // 4. Native CDP cross-origin iframe fallback
-    if (typeof page.evaluate === 'function') {
-      const iframeInfo = await page.evaluate(() => {
-        const iframes = Array.from(document.querySelectorAll('iframe'));
-        for (const iframe of iframes) {
-          const src = String(iframe.src || '');
-          if (src.includes('passport.goofish.com') || src.includes('login.m.taobao.com') || src.includes('xdomain-storage')) {
-            continue;
-          }
-          const rect = iframe.getBoundingClientRect();
-          if (rect.width > 200 && rect.height > 200) {
-            return {
-              hasIframe: true,
-              left: rect.left,
-              top: rect.top,
-              width: rect.width,
-              height: rect.height,
-            };
-          }
-        }
-        return { hasIframe: false };
-      });
-
-      if (iframeInfo?.hasIframe) {
-        if (typeof page.tryNativeDrag === 'function') {
-          const sliderStartX = Math.round(iframeInfo.left + iframeInfo.width * 0.28);
-          const sliderStartY = Math.round(iframeInfo.top + iframeInfo.height * 0.61);
-          const sliderEndX = Math.round(iframeInfo.left + iframeInfo.width * 0.78);
-          await page.tryNativeDrag({ x: sliderStartX, y: sliderStartY }, { x: sliderEndX, y: sliderStartY });
-        }
-        if (typeof page.tryNativeClick === 'function') {
-          const closeX = Math.round(iframeInfo.left + iframeInfo.width * 0.88);
-          const closeY = Math.round(iframeInfo.top + iframeInfo.height * 0.14);
-          await page.tryNativeClick(closeX, closeY);
-        }
-      }
-    }
-  } catch (e) {}
+  const state = await getGoofishPageState(page);
+  if (state !== 'blocked') return state;
+  const result = await solveAlibabaCaptcha(page, {
+    isSolved: async () => (await getGoofishPageState(page)) === 'ok',
+  });
+  return result.solved ? getGoofishPageState(page) : state;
 }
 
 /**
@@ -216,9 +203,10 @@ export async function safeGoto(page, url, options = {}) {
   try {
     await page.goto(url, { settleMs });
     await page.wait(waitSec);
-    await dismissBaxiaDialog(page);
+    await assertGoofishPageUsable(page);
     return;
   } catch (error) {
+    if (error?.code === 'SECURITY_BLOCK' || error?.name === 'AuthRequiredError') throw error;
     if (!isRetriableNavigationError(error)) {
       // Fallback: evaluate location.href in the active page context
       try {
@@ -229,15 +217,16 @@ export async function safeGoto(page, url, options = {}) {
             }
           }, url);
           await page.wait(waitSec + 1);
-          await dismissBaxiaDialog(page);
+          await assertGoofishPageUsable(page);
           return;
         }
       } catch (evalError) {
+        if (evalError?.code === 'SECURITY_BLOCK' || evalError?.name === 'AuthRequiredError') throw evalError;
         // Retry with waitUntil none
         await page.wait(1);
         await page.goto(url, { waitUntil: 'none' });
         await page.wait(waitSec);
-        await dismissBaxiaDialog(page);
+        await assertGoofishPageUsable(page);
         return;
       }
       throw error;
@@ -246,7 +235,7 @@ export async function safeGoto(page, url, options = {}) {
     await page.wait(1.5);
     await page.goto(url, { settleMs });
     await page.wait(waitSec);
-    await dismissBaxiaDialog(page);
+    await assertGoofishPageUsable(page);
   }
 }
 
