@@ -75,16 +75,17 @@ test('Price Tracking & Low-Price Snipe Engine Test Suite', async (t) => {
 
   await t.test('3. computePriceHistoryStats calculates floor, median, distribution, and low-price spikes', () => {
     const mockRecords = [
-      { price_num: 1950, is_below_target: 0 },
-      { price_num: 1899, is_below_target: 0 },
-      { price_num: 1920, is_below_target: 0 },
-      { price_num: 1450, is_below_target: 1 }, // Low-price spike!
-      { price_num: 1850, is_below_target: 0 },
-      { price_num: 1550, is_below_target: 1 }, // Second low-price spike
+      { price_num: 1950, price_basis: 'listing', is_below_target: 0 },
+      { price_num: 1899, price_basis: 'listing', is_below_target: 0 },
+      { price_num: 1920, price_basis: 'listing', is_below_target: 0 },
+      { price_num: 1450, price_basis: 'listing', is_below_target: 1 },
+      { price_num: 1850, price_basis: 'listing', is_below_target: 0 },
+      { price_num: 1550, price_basis: 'listing', is_below_target: 1 },
     ];
 
     const stats = computePriceHistoryStats(mockRecords, 1600);
     assert.equal(stats.count, 6);
+    assert.equal(stats.trustedCount, 6);
     assert.equal(stats.lowestPrice, 1450);
     assert.equal(stats.highestPrice, 1950);
     assert.equal(stats.belowTargetCount, 2);
@@ -154,6 +155,8 @@ test('Price Tracking & Low-Price Snipe Engine Test Suite', async (t) => {
         title: '恩雅 NEXG 2N 黑色 尼龙',
         price: '¥1920',
         price_num: 1920,
+        price_basis: 'listing',
+        price_source: 'mtop_detail',
         seller: '琴行',
         item_url: 'https://www.goofish.com/item?id=10998811',
       },
@@ -162,6 +165,8 @@ test('Price Tracking & Low-Price Snipe Engine Test Suite', async (t) => {
         title: '恩雅 NEXG 2N 黑色 尼龙 捡漏急出',
         price: '¥1480',
         price_num: 1480, // Below target price 1600!
+        price_basis: 'listing',
+        price_source: 'mtop_detail',
         seller: '个人自用',
         item_url: 'https://www.goofish.com/item?id=10998822',
       },
@@ -194,6 +199,84 @@ test('Price Tracking & Low-Price Snipe Engine Test Suite', async (t) => {
     assert.equal(belowTargetItems[0].price_num, 1480);
 
     // Cleanup
+    deleteMonitoringTask(testTaskId);
+  });
+
+  await t.test('6. every basis is retained, but only listing drives target and low metrics', () => {
+    const testTaskId = `task_basis_${Date.now()}`;
+    saveMonitoringTask({
+      task_id: testTaskId,
+      keyword: '示例监控商品',
+      category: 'other',
+      target_price: 1600,
+      status: 'active',
+    });
+
+    const inserted = recordPriceHistory([
+      {
+        item_id: '100000000020',
+        title: '券后展示价',
+        price: '¥1400',
+        price_num: 1400,
+        price_basis: 'coupon',
+        price_source: 'search_card_dom',
+      },
+      {
+        item_id: '100000000021',
+        title: '活动展示价',
+        price: '¥1350',
+        price_num: 1350,
+        price_basis: 'activity',
+        price_source: 'search_card_dom',
+      },
+      {
+        item_id: '100000000022',
+        title: '旧口径记录',
+        price: '¥1300',
+        price_num: 1300,
+      },
+      {
+        item_id: '100000000023',
+        title: '可信标价',
+        price: '¥1590',
+        price_num: 1590,
+        price_basis: 'listing',
+        price_source: 'mtop_detail',
+      },
+    ], {
+      task_id: testTaskId,
+      keyword: '示例监控商品',
+      category: 'other',
+      target_price: 1600,
+    });
+
+    assert.equal(inserted, 4);
+    const history = queryPriceHistory({ task_id: testTaskId });
+    assert.equal(history.length, 4);
+    assert.deepEqual(
+      new Set(history.map(row => row.price_basis)),
+      new Set(['coupon', 'activity', 'legacy', 'listing']),
+    );
+    assert.equal(history.filter(row => row.is_below_target).length, 1);
+    assert.equal(history.find(row => row.item_id === '100000000023').is_below_target, 1);
+
+    const task = getMonitoringTask(testTaskId);
+    assert.equal(task.current_low_price, 1590);
+    assert.equal(task.historical_low_price, 1590);
+    assert.equal(task.historical_low_item_id, '100000000023');
+    assert.equal(task.below_target_count, 1);
+    assert.equal(task.total_spotted_count, 4);
+    assert.equal(task.status, 'alerting');
+
+    const summary = getPriceHistorySummary({
+      keyword: '示例监控商品',
+      target_price: 1600,
+    });
+    assert.equal(summary.count, 4);
+    assert.equal(summary.trustedCount, 1);
+    assert.equal(summary.lowestPrice, 1590);
+    assert.equal(summary.belowTargetCount, 1);
+
     deleteMonitoringTask(testTaskId);
   });
 });

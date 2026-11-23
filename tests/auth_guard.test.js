@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { checkAuth, dismissBaxiaDialog, AuthRequiredError } from '../clis/goofish/_shared.js';
+import { fileURLToPath } from 'node:url';
+import {
+  checkAuth,
+  dismissBaxiaDialog,
+  getGoofishPageState,
+  AuthRequiredError,
+} from '../clis/goofish/_shared.js';
 
 function makeMockPage({ url = 'https://www.goofish.com/personal', elements = {}, bodyText = '', spies = {} }) {
   return {
@@ -118,9 +124,18 @@ test('Baxia Guard: dismissBaxiaDialog ignores mini_login and xdomain-storage ifr
   assert.equal(clicked, false);
 });
 
-test('Adapter Contract Gate: watch.js and search.js enforce unconditional checkAuth before SSOT write', () => {
-  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-  for (const rel of ['clis/goofish/watch.js', 'clis/goofish/search.js']) {
+test('Baxia Guard: ordinary listing text does not spoof a security challenge', async () => {
+  const page = makeMockPage({
+    url: 'https://www.goofish.com/item?id=100000000010',
+    bodyText: '商品说明：该设备支持安全验证，并提供验证码登录说明。',
+  });
+
+  assert.equal(await getGoofishPageState(page), 'ok');
+});
+
+test('Adapter Contract Gate: watch.js, search.js, and checkout.js enforce unconditional checkAuth', () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  for (const rel of ['clis/goofish/watch.js', 'clis/goofish/search.js', 'clis/goofish/checkout.js']) {
     const src = fs.readFileSync(path.join(root, rel), 'utf-8');
     assert.match(src, /await\s+checkAuth\s*\(\s*page\s*\)/, `${rel} must invoke await checkAuth(page)`);
     assert.doesNotMatch(
@@ -132,7 +147,7 @@ test('Adapter Contract Gate: watch.js and search.js enforce unconditional checkA
 });
 
 test('Doctor & Bridge Contract Gate: xy-chat doctor probes search Baxia gate and polls bridge readiness', () => {
-  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const cliSrc = fs.readFileSync(path.join(root, 'bin/xy-chat.js'), 'utf-8');
   assert.match(cliSrc, /isProfile38BridgeConnected/, 'bin/xy-chat.js must poll bridge readiness after launch');
   assert.match(cliSrc, /runOpenCli\('search'/, 'bin/xy-chat.js doctor must probe /search Baxia auth gate');

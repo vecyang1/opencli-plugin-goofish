@@ -1,8 +1,9 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
-import { ArgumentError, CommandExecutionError } from '@jackwener/opencli/errors';
-import { safeGoto, dismissBaxiaDialog } from './_shared.js';
+import { ArgumentError, CliError, CommandExecutionError } from '@jackwener/opencli/errors';
+import { safeGoto, assertGoofishPageUsable } from './_shared.js';
 import { saveCandidates } from './_db.js';
 import { extractDefectNotes, extractMultiImageDefects, inferCategory, parseItemSkus } from './_contract.js';
+import { buildGoofishPricing } from './_pricing.js';
 
 export const command = cli({
   site: 'goofish',
@@ -21,6 +22,18 @@ export const command = cli({
     'item_id',
     'title',
     'price',
+    'price_num',
+    'listing_price',
+    'original_price',
+    'activity_price',
+    'activity_discount',
+    'coupon_amount',
+    'coupon_price',
+    'estimated_payable',
+    'checkout_total',
+    'price_source',
+    'price_context',
+    'pricing_json',
     'condition',
     'seller',
     'seller_user_id',
@@ -48,7 +61,7 @@ export const command = cli({
 
     await safeGoto(page, 'https://www.goofish.com/item?id=' + itemId);
     await page.wait(3.0);
-    await dismissBaxiaDialog(page);
+    await assertGoofishPageUsable(page);
     await page.wait(1.5);
 
     if (kwargs.screenshot) {
@@ -58,7 +71,11 @@ export const command = cli({
     }
 
     const evalResult = await page.evaluate(async (itemId) => {
-      let mtopData = null;
+      let mtopResponse = null;
+      let mtopError = null;
+      let mtopErrorRet = [];
+      let mtopErrorHasValidationUrl = false;
+      const text = document.body ? document.body.innerText : '';
       if (window.lib?.mtop?.request) {
         try {
           const res = await window.lib.mtop.request({
@@ -72,13 +89,16 @@ export const command = cli({
             sessionOption: 'AutoLoginOnly',
             ecode: 0,
           });
-          mtopData = res?.data || {};
+          mtopResponse = res || null;
         } catch (e) {
-          mtopData = { error: String(e) };
+          mtopError = String(e?.message || e?.msg || e?.code || '');
+          mtopErrorRet = Array.isArray(e?.ret) ? e.ret.map(String) : [];
+          mtopErrorHasValidationUrl = Boolean(e?.data?.url || e?.url);
         }
+      } else {
+        mtopError = 'window.lib.mtop is unavailable';
       }
 
-      const text = document.body ? document.body.innerText : '';
       if (text.includes('网络不见了') || text.includes('快停止散发魅力')) {
         return { ok: false, error: 'item_offline_or_not_found', message: '商品已下架或不存在' };
       }
@@ -159,10 +179,6 @@ export const command = cli({
         if (specMatch) domSpecs = specMatch[1];
       }
 
-      let domPrice = '¥0';
-      const priceMatch = text.match(/直接买\s*[￥¥]\s*([\d.]+)/) || text.match(/[¥￥]\s*([\d.]+)/);
-      if (priceMatch) domPrice = '¥' + priceMatch[1];
-
       let wantCount = '-';
       let browseCount = '-';
       const wantMatch = text.match(/(\d+人想要)/);
@@ -180,10 +196,12 @@ export const command = cli({
 
       return {
         ok: true,
-        mtopData,
+        mtopResponse,
+        mtopError,
+        mtopErrorRet,
+        mtopErrorHasValidationUrl,
         domData: {
           title: title || '闲鱼商品',
-          price: domPrice,
           seller: seller || '闲鱼卖家',
           seller_user_id: sellerUserId || '-',
           location,
@@ -201,14 +219,56 @@ export const command = cli({
       throw new CommandExecutionError('查询商品详情失败: ' + (evalResult ? evalResult.message : '商品可能已失效或下架'));
     }
 
-    const mtopData = evalResult.mtopData || {};
+    const mtopResponse = evalResult.mtopResponse || {};
+    const ret = Array.isArray(mtopResponse.ret)
+      ? mtopResponse.ret.map(String)
+      : [String(mtopResponse.ret || '')];
+    const retText = ret.join(' ');
+    const mtopData = mtopResponse.data || {};
+    const mtopErrorText = [
+      retText,
+      evalResult.mtopError || '',
+      ...(Array.isArray(evalResult.mtopErrorRet) ? evalResult.mtopErrorRet : []),
+    ].join(' ');
+    if (/FAIL_SYS_USER_VALIDATE|RGV587_ERROR|captcha|punish/i.test(mtopErrorText)
+      || mtopData.url || evalResult.mtopErrorHasValidationUrl) {
+      throw new CliError(
+        'SECURITY_BLOCK',
+        '闲鱼要求安全验证，未读取 DOM 价格作为替代。',
+        '自动验证未清除，或验证在详情请求期间出现；请在浏览器中手动完成验证后重试。',
+      );
+    }
+    if (evalResult.mtopError || Object.keys(mtopResponse).length === 0) {
+      throw new CommandExecutionError(
+        '闲鱼商品详情接口未返回结果',
+        evalResult.mtopError || 'Refresh the page and retry after confirming login.',
+      );
+    }
+    if (!ret[0]?.startsWith('SUCCESS')) {
+      throw new CommandExecutionError(
+        '闲鱼商品详情接口调用失败',
+        retText.slice(0, 200) || 'The detail API returned no success status.',
+      );
+    }
+
     const itemDO = mtopData.itemDO || {};
+    const responseItemId = String(itemDO.itemId || '');
+    if (responseItemId !== itemId) {
+      throw new CommandExecutionError(
+        '闲鱼详情响应与请求商品 ID 不一致',
+        `Requested ${itemId}, received ${responseItemId || 'missing itemId'}.`,
+      );
+    }
     const sellerDO = mtopData.sellerDO || {};
     const domData = evalResult.domData || {};
 
     const skuInfo = parseItemSkus(mtopData);
+    const pricing = buildGoofishPricing(itemDO, skuInfo);
 
     const title = String(itemDO.title || domData.title || '闲鱼商品').trim();
+    if (!title || title === '闲鱼商品' || title === '-') {
+      throw new CommandExecutionError('闲鱼详情缺少可验证的商品标题');
+    }
     const seller = String(sellerDO.nick || sellerDO.uniqueName || domData.seller || '闲鱼卖家').trim();
     const sellerUserId = String(sellerDO.sellerId || domData.seller_user_id || '-').trim();
     const location = String(sellerDO.publishCity || sellerDO.city || domData.location || '-').trim();
@@ -216,21 +276,17 @@ export const command = cli({
     const browseCount = itemDO.browseCnt ? `${itemDO.browseCnt}浏览` : domData.browse_count;
     const description = String(itemDO.desc || domData.description || '-').trim();
 
-    let displayPrice = '';
-    let priceNum = 0;
-    if (skuInfo.isMultiSku && skuInfo.minPrice && skuInfo.maxPrice && skuInfo.minPrice !== skuInfo.maxPrice) {
-      displayPrice = `¥${skuInfo.minPrice} - ¥${skuInfo.maxPrice} (多规格)`;
-      priceNum = skuInfo.minPrice;
-    } else if (skuInfo.minPrice) {
-      displayPrice = `¥${skuInfo.minPrice}`;
-      priceNum = skuInfo.minPrice;
-    } else if (itemDO.soldPrice || itemDO.defaultPrice) {
-      displayPrice = `¥${itemDO.soldPrice || itemDO.defaultPrice}`;
-      priceNum = parseFloat(itemDO.soldPrice || itemDO.defaultPrice) || 0;
-    } else {
-      displayPrice = domData.price;
-      priceNum = parseFloat(String(domData.price).replace(/[^\d.]/g, '')) || 0;
+    if (pricing.listing.amount == null) {
+      throw new CommandExecutionError(
+        '闲鱼详情缺少可验证的商品标价',
+        'The detail response contained no supported listing price field.',
+      );
     }
+    const displayPrice = pricing.listing.display || `¥${pricing.listing.amount}`;
+    const priceNum = pricing.listing.amount;
+    const activityDiscount = pricing.activity.discount_amount ?? null;
+    const couponAmount = pricing.coupon.discount_amount ?? null;
+    const priceContext = JSON.stringify(pricing.context);
 
     const finalSpecs = skuInfo.specs !== '-' ? skuInfo.specs : domData.specs;
     const category = inferCategory({ keyword: title, title });
@@ -249,6 +305,16 @@ export const command = cli({
           title,
           price: displayPrice,
           price_num: priceNum,
+          original_price: pricing.original.amount,
+          activity_price: pricing.activity.amount,
+          coupon_amount: couponAmount,
+          coupon_price: pricing.coupon.amount,
+          estimated_payable: pricing.estimated.amount,
+          checkout_total: pricing.checkout.amount,
+          price_basis: 'listing',
+          price_source: pricing.listing.source_kind,
+          price_context: priceContext,
+          pricing_json: pricing,
           seller,
           seller_user_id: sellerUserId,
           location,
@@ -270,6 +336,19 @@ export const command = cli({
       item_id: itemId,
       title,
       price: displayPrice,
+      price_num: priceNum,
+      listing_price: pricing.listing.amount,
+      original_price: pricing.original.amount,
+      activity_price: pricing.activity.amount,
+      activity_discount: activityDiscount,
+      coupon_amount: couponAmount,
+      coupon_price: pricing.coupon.amount,
+      estimated_payable: pricing.estimated.amount,
+      checkout_total: pricing.checkout.amount,
+      price_basis: 'listing',
+      price_source: pricing.listing.source_kind,
+      price_context: priceContext,
+      pricing_json: JSON.stringify(pricing),
       condition: finalCondition,
       seller,
       seller_user_id: sellerUserId,

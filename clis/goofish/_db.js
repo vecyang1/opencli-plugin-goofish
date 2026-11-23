@@ -104,6 +104,28 @@ export function initSchema(db) {
       if (!cCols.some(c => c.name === 'skus_json')) {
         db.exec("ALTER TABLE candidates ADD COLUMN skus_json TEXT DEFAULT '';");
       }
+      if (!cCols.some(c => c.name === 'pricing_json')) {
+        db.exec("ALTER TABLE candidates ADD COLUMN pricing_json TEXT DEFAULT '';");
+      }
+      if (!cCols.some(c => c.name === 'price_basis')) {
+        db.exec("ALTER TABLE candidates ADD COLUMN price_basis TEXT DEFAULT 'legacy';");
+      }
+      if (!cCols.some(c => c.name === 'price_source')) {
+        db.exec("ALTER TABLE candidates ADD COLUMN price_source TEXT DEFAULT '';");
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const hCols = db.prepare("PRAGMA table_info('price_history');").all();
+    if (hCols.length > 0 && !hCols.some(c => c.name === 'pricing_json')) {
+      db.exec("ALTER TABLE price_history ADD COLUMN pricing_json TEXT DEFAULT '';");
+    }
+    if (hCols.length > 0 && !hCols.some(c => c.name === 'price_basis')) {
+      db.exec("ALTER TABLE price_history ADD COLUMN price_basis TEXT DEFAULT 'legacy';");
+    }
+    if (hCols.length > 0 && !hCols.some(c => c.name === 'price_source')) {
+      db.exec("ALTER TABLE price_history ADD COLUMN price_source TEXT DEFAULT '';");
     }
   } catch (e) {}
 
@@ -491,18 +513,40 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
 
   const insertCandidate = db.prepare(`
     INSERT INTO candidates (
-      item_id, keyword, category, title, price, price_num, original_price,
+      item_id, keyword, category, title, price, price_num, price_basis, price_source, original_price,
       price_drop, publish_time, location, seller, seller_user_id,
       seller_tag, condition, guarantee, item_url, image_url,
-      images, defect_notes, specs, min_price, max_price, skus_json,
+      images, defect_notes, specs, min_price, max_price, skus_json, pricing_json,
       seller_status, seller_note, status, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(item_id) DO UPDATE SET
       keyword = COALESCE(NULLIF(excluded.keyword, ''), candidates.keyword),
       category = CASE WHEN excluded.category != 'other' AND excluded.category != '' THEN excluded.category ELSE candidates.category END,
       title = CASE WHEN excluded.title != '闲鱼商品' AND excluded.title != '' THEN excluded.title ELSE candidates.title END,
-      price = CASE WHEN excluded.price != '¥0' AND excluded.price != '' THEN excluded.price ELSE candidates.price END,
-      price_num = CASE WHEN excluded.price_num > 0 THEN excluded.price_num ELSE candidates.price_num END,
+      price = CASE
+        WHEN excluded.price_basis = 'listing' AND excluded.price_num > 0 THEN excluded.price
+        WHEN COALESCE(candidates.price_basis, 'legacy') = 'listing' THEN candidates.price
+        WHEN excluded.price_num > 0 THEN excluded.price
+        ELSE candidates.price
+      END,
+      price_num = CASE
+        WHEN excluded.price_basis = 'listing' AND excluded.price_num > 0 THEN excluded.price_num
+        WHEN COALESCE(candidates.price_basis, 'legacy') = 'listing' THEN candidates.price_num
+        WHEN excluded.price_num > 0 THEN excluded.price_num
+        ELSE candidates.price_num
+      END,
+      price_basis = CASE
+        WHEN excluded.price_basis = 'listing' AND excluded.price_num > 0 THEN 'listing'
+        WHEN COALESCE(candidates.price_basis, 'legacy') = 'listing' THEN candidates.price_basis
+        WHEN excluded.price_num > 0 THEN excluded.price_basis
+        ELSE candidates.price_basis
+      END,
+      price_source = CASE
+        WHEN excluded.price_basis = 'listing' AND excluded.price_num > 0 THEN excluded.price_source
+        WHEN COALESCE(candidates.price_basis, 'legacy') = 'listing' THEN candidates.price_source
+        WHEN excluded.price_num > 0 THEN excluded.price_source
+        ELSE candidates.price_source
+      END,
       original_price = COALESCE(NULLIF(excluded.original_price, '-'), candidates.original_price),
       price_drop = COALESCE(NULLIF(excluded.price_drop, '-'), candidates.price_drop),
       publish_time = COALESCE(NULLIF(excluded.publish_time, '-'), candidates.publish_time),
@@ -520,6 +564,12 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
       min_price = CASE WHEN excluded.min_price > 0 THEN excluded.min_price ELSE candidates.min_price END,
       max_price = CASE WHEN excluded.max_price > 0 THEN excluded.max_price ELSE candidates.max_price END,
       skus_json = COALESCE(NULLIF(excluded.skus_json, ''), candidates.skus_json),
+      pricing_json = CASE
+        WHEN excluded.price_basis = 'listing' AND excluded.price_num > 0 THEN excluded.pricing_json
+        WHEN COALESCE(candidates.price_basis, 'legacy') = 'listing' THEN candidates.pricing_json
+        WHEN excluded.price_num > 0 THEN excluded.pricing_json
+        ELSE candidates.pricing_json
+      END,
       status = excluded.status,
       updated_at = excluded.updated_at;
   `);
@@ -569,6 +619,8 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
         valid.title,
         valid.price,
         valid.price_num,
+        valid.price_basis,
+        valid.price_source,
         valid.original_price,
         valid.price_drop,
         valid.publish_time,
@@ -586,6 +638,7 @@ export function saveCandidates(items, { keyword = '', category = '', filterAcces
         valid.min_price,
         valid.max_price,
         valid.skus_json,
+        valid.pricing_json,
         valid.seller_status,
         valid.seller_note,
         valid.status,
@@ -1015,12 +1068,12 @@ export function recordPriceHistory(items = [], metadata = {}) {
 
   const insertStmt = db.prepare(`
     INSERT INTO price_history (
-      item_id, task_id, keyword, category, title, price, price_num,
-      original_price, seller, seller_user_id, condition, defect_notes,
+      item_id, task_id, keyword, category, title, price, price_num, price_basis, price_source,
+      original_price, pricing_json, seller, seller_user_id, condition, defect_notes,
       item_url, image_url, status, is_below_target, spotted_at
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?
     )
   `);
@@ -1042,16 +1095,20 @@ export function recordPriceHistory(items = [], metadata = {}) {
 
       if (priceNum <= 0) continue;
 
-      const isBelow = targetPrice > 0 && priceNum <= targetPrice;
-      if (isBelow) belowTargetCount++;
-
-      if (priceNum < currentLow) {
-        currentLow = priceNum;
-        lowestItem = raw;
+      const priceBasis = String(raw.price_basis || 'legacy').trim() || 'legacy';
+      const trustedForTarget = priceBasis === 'listing';
+      const isBelow = trustedForTarget && targetPrice > 0 && priceNum <= targetPrice;
+      if (trustedForTarget) {
+        if (isBelow) belowTargetCount++;
+        if (priceNum < currentLow) {
+          currentLow = priceNum;
+          lowestItem = raw;
+        }
       }
 
       const rec = validatePriceHistoryRecord({
         ...raw,
+        price_basis: priceBasis,
         task_id: taskId,
         keyword: metadata.keyword || raw.keyword || '',
         category: metadata.category || raw.category || '',
@@ -1061,7 +1118,8 @@ export function recordPriceHistory(items = [], metadata = {}) {
 
       insertStmt.run(
         rec.item_id, rec.task_id, rec.keyword, rec.category, rec.title, rec.price,
-        rec.price_num, rec.original_price, rec.seller, rec.seller_user_id,
+        rec.price_num, rec.price_basis, rec.price_source, rec.original_price,
+        rec.pricing_json, rec.seller, rec.seller_user_id,
         rec.condition, rec.defect_notes, rec.item_url, rec.image_url,
         rec.status, rec.is_below_target, rec.spotted_at
       );

@@ -1,0 +1,28 @@
+{
+  "data": {
+    "buttonDisable": false,
+    "inspectionInfo": {
+      "inspectionFee": "5490",
+      "inspectionFeeInYuan": "54.90"
+    },
+    "itemInfo": {
+      "price": "5950",
+      "title": "Example listing"
+    },
+    "postageInfo": {
+      "postage": "0",
+      "postageInYuan": "0.00"
+    },
+    "totalAmount": "6004.90",
+    "tradePromotion": {
+      "promotions": null
+    },
+    "yhbConfirmBuy": {
+      "itemId": "123456789012",
+      "price": "5950.00"
+    }
+  },
+  "ret": [
+    "SUCCESS::调用成功"
+  ]
+}
